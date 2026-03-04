@@ -1,0 +1,27 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: distribuidora_hozana_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: distribuidora_hozana
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - distribuidora_hozana_postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: distribuidora_hozana_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - distribuidora_hozana_redis:/data
+
+volumes:
+  distribuidora_hozana_postgres:
+  distribuidora_hozana_redis:
