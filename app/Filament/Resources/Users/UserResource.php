@@ -16,7 +16,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class UserResource extends Resource
@@ -55,70 +54,25 @@ class UserResource extends Resource
 
     /**
      * Filtrar la query base: cada usuario solo ve su rama.
-     * Super admin ve todos.
+     *
+     * Reglas aplicadas (orden):
+     *   1. withoutSystem()  → ocultar el actor técnico del sistema
+     *      (User reservado para acciones automáticas como AutoCloseCashSessionsJob).
+     *      Sin este filtro aparecería en listado, búsqueda global y selects.
+     *   2. visibleTo($user) → jerarquía de visibilidad (super admin ve todo,
+     *      el resto solo su rama).
+     *
+     * Autorización fina delegada a UserPolicy.
      */
     public static function getEloquentQuery(): Builder
     {
         /** @var User $user */
         $user = Auth::user();
 
-        return parent::getEloquentQuery()->visibleTo($user);
-    }
-
-    /**
-     * Verificar si el usuario puede ver un registro específico.
-     */
-    public static function canView(Model $record): bool
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if ($user->hasRole(\BezhanSalleh\FilamentShield\Support\Utils::getSuperAdminName())) {
-            return true;
-        }
-
-        return in_array($record->id, $user->getVisibleUserIds());
-    }
-
-    /**
-     * Verificar si el usuario puede editar un registro específico.
-     */
-    public static function canEdit(Model $record): bool
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if ($user->hasRole(\BezhanSalleh\FilamentShield\Support\Utils::getSuperAdminName())) {
-            return true;
-        }
-
-        return in_array($record->id, $user->getVisibleUserIds());
-    }
-
-    /**
-     * Verificar si el usuario puede eliminar un registro específico.
-     * No se puede eliminar a sí mismo ni al super admin.
-     */
-    public static function canDelete(Model $record): bool
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        // No puede borrarse a sí mismo
-        if ($record->id === $user->id) {
-            return false;
-        }
-
-        // No puede borrar super admins
-        if ($record->hasRole(\BezhanSalleh\FilamentShield\Support\Utils::getSuperAdminName())) {
-            return false;
-        }
-
-        if ($user->hasRole(\BezhanSalleh\FilamentShield\Support\Utils::getSuperAdminName())) {
-            return true;
-        }
-
-        return in_array($record->id, $user->getVisibleUserIds());
+        return parent::getEloquentQuery()
+            ->with(['roles', 'createdBy'])
+            ->withoutSystem()
+            ->visibleTo($user);
     }
 
     public static function getRelations(): array

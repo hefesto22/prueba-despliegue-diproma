@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Spatie\Activitylog\Models\Activity;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 
 class ActivityLogResource extends Resource
 {
@@ -48,6 +49,11 @@ class ActivityLogResource extends Resource
     public static function canDelete($record): bool
     {
         return false;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with(['causer']);
     }
 
     public static function table(Table $table): Table
@@ -82,14 +88,22 @@ class ActivityLogResource extends Resource
             ->filters([
                 SelectFilter::make('log_name')
                     ->label('Tipo de log')
-                    ->options(fn () => Activity::distinct()->pluck('log_name', 'log_name')->toArray()),
+                    ->options(fn () => Cache::remember(
+                        'activity_log_types',
+                        now()->addMinutes(10),
+                        fn () => Activity::distinct()->pluck('log_name', 'log_name')->toArray()
+                    )),
                 SelectFilter::make('subject_type')
                     ->label('Modelo')
-                    ->options(fn () => Activity::distinct()
-                        ->whereNotNull('subject_type')
-                        ->pluck('subject_type')
-                        ->mapWithKeys(fn ($type) => [$type => class_basename($type)])
-                        ->toArray()),
+                    ->options(fn () => Cache::remember(
+                        'activity_subject_types',
+                        now()->addMinutes(10),
+                        fn () => Activity::distinct()
+                            ->whereNotNull('subject_type')
+                            ->pluck('subject_type')
+                            ->mapWithKeys(fn ($type) => [$type => class_basename($type)])
+                            ->toArray()
+                    )),
                 Filter::make('created_at')
                     ->indicateUsing(function (array $data): ?string {
                         if ($data['from'] ?? null) {

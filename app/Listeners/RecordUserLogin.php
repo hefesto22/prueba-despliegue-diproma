@@ -2,19 +2,22 @@
 
 namespace App\Listeners;
 
-use Illuminate\Auth\Events\Login;
+use App\Events\UserLoggedIn;
 
+/**
+ * Registra la informacion del ultimo inicio de sesion del usuario.
+ * Escucha el evento de dominio UserLoggedIn, no el evento de Laravel directamente.
+ *
+ * Para agregar mas comportamiento al login (notificaciones, geolocalizacion, etc.)
+ * crear nuevos listeners que escuchen UserLoggedIn sin tocar este archivo.
+ */
 class RecordUserLogin
 {
-    /**
-     * Handle the event.
-     */
-    public function handle(Login $event): void
+    public function handle(UserLoggedIn $event): void
     {
-        /** @var \App\Models\User $user */
-        $user = $event->user;
-        $user->recordLogin(
-            request()->ip()
-        );
+        $event->user->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $event->ipAddress,
+        ]);
     }
 }

@@ -23,7 +23,7 @@ return [
             'pages' => true,
             'widgets' => true,
             'resources' => true,
-            'custom_permissions' => false,
+            'custom_permissions' => true,
         ],
     ],
 
@@ -222,9 +222,17 @@ return [
     | Custom Permissions
     |--------------------------------------------------------------------------
     |
-    | Sometimes you need permissions that don't map to resources, pages, or
-    | widgets. Define any custom permissions here and they'll be available
-    | when editing roles in your application.
+    | NO EDITAR ESTE ARRAY MANUALMENTE. El enum `App\Authorization\CustomPermission`
+    | es la fuente de verdad — `CustomPermissionServiceProvider::boot()` pobla
+    | este valor en runtime con `CustomPermission::names()`.
+    |
+    | Para agregar un permiso nuevo:
+    |   1) Agregar un `case` al enum `App\Authorization\CustomPermission`.
+    |   2) Correr `php artisan db:seed --class=CustomPermissionsSeeder`.
+    |   3) Asignar el permiso al rol desde el panel Shield.
+    |
+    | El array vacío aquí es solo fallback defensivo — si el provider no corre
+    | por algún motivo, Shield al menos no truena por config missing.
     |
     */
 

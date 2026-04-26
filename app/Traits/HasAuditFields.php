@@ -20,6 +20,13 @@ trait HasAuditFields
             }
         });
 
+        static::created(function ($model) {
+            // Invalidar cache de descendientes del padre al crear un nuevo usuario
+            if (method_exists($model, 'clearDescendantCache')) {
+                $model->clearDescendantCache();
+            }
+        });
+
         static::updating(function ($model) {
             if (Auth::check()) {
                 $model->updated_by = Auth::id();
@@ -32,6 +39,11 @@ trait HasAuditFields
                 if (Auth::check() && !$model->isForceDeleting()) {
                     $model->deleted_by = Auth::id();
                     $model->saveQuietly();
+                }
+
+                // Invalidar cache de descendientes al eliminar un usuario
+                if (method_exists($model, 'clearDescendantCache')) {
+                    $model->clearDescendantCache();
                 }
             });
         }

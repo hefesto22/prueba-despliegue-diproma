@@ -13,7 +13,31 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Sistema Diproma'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Brand Name
+    |--------------------------------------------------------------------------
+    |
+    | Brand name shown in the admin panel header. Can be different from
+    | the application name for white-labeling purposes.
+    |
+    */
+
+    'brand_name' => env('APP_BRAND_NAME', 'Sistema Diproma'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Avatar URL
+    |--------------------------------------------------------------------------
+    |
+    | Base URL for generating default user avatars when no custom avatar
+    | is uploaded. Uses ui-avatars.com by default.
+    |
+    */
+
+    'default_avatar_url' => env('DEFAULT_AVATAR_URL', 'https://ui-avatars.com/api/'),
 
     /*
     |--------------------------------------------------------------------------

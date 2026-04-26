@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Establishment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -39,6 +40,22 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Asignar al usuario una sucursal activa (default_establishment_id).
+     *
+     * Si no se pasa una sucursal explícita, reusa la matriz existente — o la
+     * crea si no existe. Permite a los tests tener un user con sucursal sin
+     * tener que construir Establishment manualmente en cada setUp.
+     */
+    public function withEstablishment(?Establishment $establishment = null): static
+    {
+        return $this->state(fn () => [
+            'default_establishment_id' => $establishment?->id
+                ?? Establishment::main()->value('id')
+                ?? Establishment::factory()->main()->create()->id,
         ]);
     }
 }

@@ -19,7 +19,6 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UsersTable
@@ -31,7 +30,7 @@ class UsersTable
                 ImageColumn::make('avatar_url')
                     ->label('')
                     ->circular()
-                    ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name=' . urlencode($record->name) . '&color=FFFFFF&background=F59E0B'),
+                    ->defaultImageUrl(fn ($record) => static::getDefaultAvatarUrl($record->name)),
 
                 TextColumn::make('name')
                     ->label('Nombre')
@@ -56,15 +55,18 @@ class UsersTable
                     ->color('primary')
                     ->separator(',')
                     ->placeholder('Sin rol'),
-                    ToggleColumn::make('is_active')
+                TextColumn::make('defaultEstablishment.name')
+                    ->label('Sucursal')
+                    ->badge()
+                    ->color('gray')
+                    ->icon('heroicon-o-building-storefront')
+                    ->placeholder('Sin asignar')
+                    ->toggleable(),
+                ToggleColumn::make('is_active')
                     ->label('Activo')
                     ->onColor('success')
                     ->offColor('danger')
-                    ->beforeStateUpdated(function (Model $record) {
-                        if ($record->hasRole('super_admin')) {
-                            throw new \Exception('No se puede desactivar al super administrador.');
-                        }
-                    }),
+                    ->disabled(fn ($record) => $record->isSuperAdmin()),
                 TextColumn::make('last_login_at')
                     ->label('Último acceso')
                     ->dateTime('d/m/Y H:i')
@@ -104,25 +106,13 @@ class UsersTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
-                DeleteAction::make()
-                    ->before(function (Model $record) {
-                        if ($record->hasRole('super_admin')) {
-                            throw new \Exception('No se puede eliminar al super administrador.');
-                        }
-                    }),
+                DeleteAction::make(),
                 RestoreAction::make(),
                 ForceDeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->before(function ($records) {
-                            $records->each(function (Model $record) {
-                                if ($record->hasRole('super_admin')) {
-                                    throw new \Exception('No se puede eliminar al super administrador.');
-                                }
-                            });
-                        }),
+                    DeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                     ForceDeleteBulkAction::make(),
                 ]),
@@ -130,5 +120,20 @@ class UsersTable
             ->modifyQueryUsing(fn (Builder $query) => $query->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]));
+    }
+
+    /**
+     * Generar URL de avatar por defecto usando servicio configurable.
+     */
+    private static function getDefaultAvatarUrl(string $name): string
+    {
+        $baseUrl = config('app.default_avatar_url', 'https://ui-avatars.com/api/');
+        $params = http_build_query([
+            'name' => $name,
+            'color' => 'FFFFFF',
+            'background' => 'F59E0B',
+        ]);
+
+        return "{$baseUrl}?{$params}";
     }
 }

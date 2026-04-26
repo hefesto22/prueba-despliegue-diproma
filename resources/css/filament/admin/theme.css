@@ -1,0 +1,28 @@
+/*
+ * Theme del panel Filament (admin) — Sistema Diproma
+ *
+ * Este archivo extiende el theme base de Filament v4 y le agrega el
+ * escaneo de Tailwind para todos los archivos Blade y PHP custom del
+ * admin. Sin esto, las utility classes usadas en Blade views custom
+ * (resources/views/filament/**) o en clases PHP de Filament (builders,
+ * componentes Livewire) se purgan del CSS compilado y los layouts
+ * terminan sin estilos.
+ *
+ * Alcance:
+ *   - vendor/filament: el core para que Filament funcione.
+ *   - app/Filament: Resources, Pages, Widgets, Actions — capturan
+ *     clases pasadas en cadena al Form/Table/Infolist builder
+ *     (ej: ->extraAttributes(['class' => 'grid grid-cols-3'])).
+ *   - resources/views/filament: Blades custom que usamos en Pages,
+ *     Forms y Infolists (donde vive la UI personalizada).
+ *
+ * Tras cualquier cambio de clases en archivos no escaneados, correr:
+ *   npm run build   (producción)
+ *   npm run dev     (watch en desarrollo)
+ */
+
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament';
+@source '../../../../resources/views/filament';
+@source '../../../../vendor/filament/**/*.blade.php';

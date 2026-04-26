@@ -2,24 +2,22 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
-use BezhanSalleh\FilamentShield\Support\Utils;
 
+/**
+ * DEPRECATED: Este seeder ya no se usa.
+ *
+ * El super admin ahora se crea con Filament Shield:
+ *   php artisan shield:super-admin --panel=admin
+ *
+ * Para produccion, usar ShieldSeeder:
+ *   php artisan shield:seeder --with-users
+ */
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@gmail.com'],
-            [
-                'name' => 'Administrador',
-                'password' => bcrypt('12345678'),
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        $admin->assignRole(Utils::getSuperAdminName());
+        // Shield maneja la creacion del super admin interactivamente.
+        // Ver README para instrucciones de setup.
     }
 }

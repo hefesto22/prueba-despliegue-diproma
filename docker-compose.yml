@@ -1,17 +1,19 @@
 services:
 
-  postgres:
-    image: postgres:16
-    container_name: distribuidora_hozana_postgres
+  mysql:
+    image: mysql:8.0
+    container_name: distribuidora_hozana_mysql
     restart: unless-stopped
     environment:
-      POSTGRES_DB: distribuidora_hozana
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: sistema_diproma
+      MYSQL_USER: diproma_user
+      MYSQL_PASSWORD: secret
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - distribuidora_hozana_postgres:/var/lib/postgresql/data
+      - distribuidora_hozana_mysql:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
   redis:
     image: redis:7-alpine
@@ -23,5 +25,5 @@ services:
       - distribuidora_hozana_redis:/data
 
 volumes:
-  distribuidora_hozana_postgres:
+  distribuidora_hozana_mysql:
   distribuidora_hozana_redis:

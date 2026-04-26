@@ -52,6 +52,17 @@ class UserInfolist
                             ->placeholder('Sin roles asignados'),
                     ]),
 
+                Section::make('Sucursal de Trabajo')
+                    ->icon('heroicon-o-building-storefront')
+                    ->schema([
+                        TextEntry::make('defaultEstablishment.name')
+                            ->label('Sucursal activa')
+                            ->badge()
+                            ->color('gray')
+                            ->icon('heroicon-o-building-storefront')
+                            ->placeholder('Sin asignar — usa la matriz como fallback'),
+                    ]),
+
                 Section::make('Último Acceso')
                     ->icon('heroicon-o-arrow-right-on-rectangle')
                     ->schema([
