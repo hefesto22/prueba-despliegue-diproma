@@ -142,9 +142,11 @@ class RepairItemsRelationManager extends RelationManager
                         ->label('Cantidad')
                         ->required()
                         ->numeric()
-                        ->step('0.01')
+                        ->integer()
+                        ->step(1)
                         ->default(1)
-                        ->minValue(0.01),
+                        ->minValue(1)
+                        ->helperText('Cantidades enteras únicamente. Para "media hora" ajusta el precio unitario.'),
                     TextInput::make('unit_price')
                         ->label(fn (Get $get) => match (true) {
                             $get('source') === RepairItemSource::PiezaExterna->value && $get('condition') === RepairItemCondition::Nueva->value => 'Precio unitario (con ISV)',

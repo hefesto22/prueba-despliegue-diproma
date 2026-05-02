@@ -133,6 +133,14 @@ class SaleInventoryProcessor
             ->keyBy('product_id');
 
         foreach ($sale->items as $item) {
+            // Skip items sin producto (honorarios, piezas externas, servicios).
+            // Vienen del módulo Repairs cuando un Sale se generó al entregar
+            // una reparación: SaleItems con product_id null + description libre.
+            // No afectan stock — no hay nada que revertir.
+            if ($item->product_id === null) {
+                continue;
+            }
+
             $product = Product::where('id', $item->product_id)
                 ->lockForUpdate()
                 ->firstOrFail();

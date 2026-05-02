@@ -26,9 +26,12 @@ class SaleItem extends Model
     protected function casts(): array
     {
         return [
-            // SaleItems desde RepairDeliveryService permiten quantity decimal
-            // (ej: 1.5 horas de honorarios). Las ventas POS siguen siendo enteras.
-            'quantity' => 'decimal:2',
+            // quantity SIEMPRE integer — consistente con TaxableLine que el
+            // flujo fiscal (InvoiceTotalsCalculator) espera como int. Cualquier
+            // decimal aquí se truncaría silenciosamente al emitir factura,
+            // produciendo discrepancia Sale.total ≠ Invoice.total.
+            // RepairItems también guardan quantity como integer (mismo motivo).
+            'quantity' => 'integer',
             'unit_price' => 'decimal:2',
             'tax_type' => TaxType::class,
             'subtotal' => 'decimal:2',

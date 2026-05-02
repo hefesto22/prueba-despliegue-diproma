@@ -48,7 +48,18 @@ class RepairItem extends Model
             'source' => RepairItemSource::class,
             'condition' => RepairItemCondition::class,
             'tax_type' => TaxType::class,
-            'quantity' => 'decimal:2',
+            // quantity como integer para consistencia con SaleItem y el flujo
+            // fiscal de Invoice. Un cast decimal aquí causaría que `(int) 1.5`
+            // en `InvoiceTotalsCalculator` redondee a 1 al emitir factura,
+            // produciendo discrepancia entre Sale.total (375) e Invoice.total
+            // (250) — bug fiscal directo.
+            //
+            // Decisión de negocio: los honorarios se cobran por "trabajo
+            // realizado", no por fracciones de hora. Para cobrar el equivalente
+            // a 1.5 horas, el técnico ajusta unit_price (ej: 1 × 375 en lugar
+            // de 1.5 × 250). La columna BD sigue siendo decimal(8,2) por
+            // compatibilidad — el cast la trata como entero.
+            'quantity' => 'integer',
             'unit_cost' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'subtotal' => 'decimal:2',
