@@ -148,7 +148,7 @@ class DeclaracionIsvMensual extends Page implements HasForms
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Administración';
+        return 'Fiscal';
     }
 
     /**

@@ -34,7 +34,7 @@ class PurchaseResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Compras';
+        return 'Documentos';
     }
 
     public static function getNavigationBadge(): ?string

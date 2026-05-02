@@ -36,7 +36,7 @@ class RepairResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Técnico';
+        return 'Operación';
     }
 
     public static function form(Schema $schema): Schema

@@ -46,7 +46,7 @@ class CashSessionResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Finanzas';
+        return 'Operación';
     }
 
     /**

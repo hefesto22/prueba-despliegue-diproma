@@ -48,9 +48,21 @@ class CreditNoteResource extends Resource
      */
     protected static ?int $navigationSort = 3;
 
+    /**
+     * Oculto del sidebar por decisión operativa: Diproma no usa Notas de
+     * Crédito en su flujo. El Resource se mantiene funcional (URL directa,
+     * Policies, código dependiente como auditoría/integrity_hash) pero NO
+     * aparece en la navegación. Si en el futuro se reactiva el uso, basta
+     * con borrar este método.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getNavigationGroup(): ?string
     {
-        return 'Finanzas';
+        return 'Documentos';
     }
 
     public static function getNavigationBadge(): ?string

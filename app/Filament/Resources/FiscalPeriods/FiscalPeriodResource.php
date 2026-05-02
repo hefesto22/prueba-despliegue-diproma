@@ -36,7 +36,7 @@ class FiscalPeriodResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Administración';
+        return 'Fiscal';
     }
 
     /**

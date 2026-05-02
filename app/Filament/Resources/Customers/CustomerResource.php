@@ -32,7 +32,7 @@ class CustomerResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Ventas';
+        return 'Catálogo';
     }
 
     public static function form(Schema $schema): Schema

@@ -28,7 +28,7 @@ class CaiRangeResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Administración';
+        return 'Fiscal';
     }
 
     public static function getNavigationBadge(): ?string

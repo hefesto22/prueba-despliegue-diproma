@@ -34,7 +34,7 @@ class SupplierResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Compras';
+        return 'Catálogo';
     }
 
     public static function form(Schema $schema): Schema

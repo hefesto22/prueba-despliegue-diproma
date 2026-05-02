@@ -31,7 +31,7 @@ class SaleResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Ventas';
+        return 'Documentos';
     }
 
     public static function getNavigationBadge(): ?string

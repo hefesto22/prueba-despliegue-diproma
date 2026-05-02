@@ -88,7 +88,7 @@ class ExpenseResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Finanzas';
+        return 'Documentos';
     }
 
     public static function form(Schema $schema): Schema

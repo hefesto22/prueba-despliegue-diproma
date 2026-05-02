@@ -28,7 +28,7 @@ class InvoiceResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Finanzas';
+        return 'Documentos';
     }
 
     public static function getNavigationBadge(): ?string

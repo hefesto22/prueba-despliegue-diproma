@@ -6,6 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -49,6 +50,44 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Dashboard::class,
+            ])
+            // ─── Orden y estado inicial de los grupos del sidebar ─────────
+            //
+            // Reorganización 2026-05-02: el sidebar tenía 8 grupos con ~20
+            // items todos expandidos siempre. Ahora 6 grupos con jerarquía
+            // por tipo de uso:
+            //
+            //   1-2. Operación + Catálogo expandidos por default — son los
+            //        items que el cajero/admin tocan a diario.
+            //   3-4. Documentos + Inventario expandidos — uso frecuente pero
+            //        no continuo.
+            //   5-6. Fiscal + Sistema colapsados por default — el contador
+            //        los abre cuando declara, el admin cuando configura. El
+            //        resto del tiempo no estorban.
+            //
+            // El acceso a cada item sigue rigiéndose por permisos Shield —
+            // un técnico igual NO ve "Documentos" aunque el grupo esté en
+            // la lista, porque no tiene ViewAny:Sale/Invoice/Purchase/Expense.
+            // Filament oculta automáticamente los grupos sin items visibles.
+            ->navigationGroups([
+                NavigationGroup::make('Operación')
+                    ->icon('heroicon-o-bolt')
+                    ->collapsed(false),
+                NavigationGroup::make('Catálogo')
+                    ->icon('heroicon-o-tag')
+                    ->collapsed(false),
+                NavigationGroup::make('Documentos')
+                    ->icon('heroicon-o-document-text')
+                    ->collapsed(false),
+                NavigationGroup::make('Inventario')
+                    ->icon('heroicon-o-archive-box')
+                    ->collapsed(false),
+                NavigationGroup::make('Fiscal')
+                    ->icon('heroicon-o-banknotes')
+                    ->collapsed(true),
+                NavigationGroup::make('Sistema')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(true),
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([

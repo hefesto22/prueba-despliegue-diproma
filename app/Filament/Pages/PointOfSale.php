@@ -48,7 +48,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Ventas';
+        return 'Operación';
     }
 
     /**

@@ -130,7 +130,7 @@ class ReporteGastosMensual extends Page implements HasForms
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Finanzas';
+        return 'Documentos';
     }
 
     /**

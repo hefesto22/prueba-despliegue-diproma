@@ -33,6 +33,16 @@ class SpecOptionResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /**
+     * Oculto del sidebar — config técnica que casi nunca se toca.
+     * Sigue accesible vía URL directa (/admin/spec-options) para el admin
+     * cuando necesita agregar/modificar opciones de specs de productos.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return 'Catálogo';

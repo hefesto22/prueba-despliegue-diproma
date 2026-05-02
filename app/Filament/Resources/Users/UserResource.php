@@ -34,7 +34,7 @@ class UserResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Administración';
+        return 'Sistema';
     }
 
     public static function form(Schema $schema): Schema
