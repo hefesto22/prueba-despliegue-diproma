@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             SystemUserSeeder::class,
             SpecOptionSeeder::class,
             ProductSeeder::class,
+            DeviceCategorySeeder::class,
         ]);
     }
 }

@@ -26,6 +26,19 @@ class TopProductsChart extends ChartWidget
 
     protected ?string $maxHeight = '400px';
 
+    /**
+     * Ranking de productos más vendidos del mes. KPI de gestión — solo
+     * visible para super_admin / admin / contador. El cajero no necesita
+     * esta vista agregada para operar el POS.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     protected function getType(): string
     {
         return 'bar';

@@ -52,6 +52,23 @@ class Customer extends Model
         return $this->hasMany(Sale::class);
     }
 
+    public function repairs(): HasMany
+    {
+        return $this->hasMany(Repair::class);
+    }
+
+    /** Todos los créditos del cliente (incluye totalmente usados). */
+    public function credits(): HasMany
+    {
+        return $this->hasMany(CustomerCredit::class);
+    }
+
+    /** Solo los créditos con saldo disponible y no vencidos. */
+    public function availableCredits(): HasMany
+    {
+        return $this->credits()->available();
+    }
+
     // ─── Scopes ──────────────────────────────────────────────
 
     public function scopeActive($query)

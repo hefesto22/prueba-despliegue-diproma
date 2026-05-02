@@ -14,6 +14,7 @@ class SaleItem extends Model
     protected $fillable = [
         'sale_id',
         'product_id',
+        'description',
         'quantity',
         'unit_price',
         'tax_type',
@@ -25,13 +26,35 @@ class SaleItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity' => 'integer',
+            // SaleItems desde RepairDeliveryService permiten quantity decimal
+            // (ej: 1.5 horas de honorarios). Las ventas POS siguen siendo enteras.
+            'quantity' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'tax_type' => TaxType::class,
             'subtotal' => 'decimal:2',
             'isv_amount' => 'decimal:2',
             'total' => 'decimal:2',
         ];
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────
+
+    /**
+     * Nombre legible del item para la factura.
+     *
+     * Si el SaleItem tiene producto (caso POS normal): retorna `product->name`.
+     * Si NO tiene producto (caso entrega de reparación): retorna `description`
+     * — texto libre como "Honorarios por reparación" o "Memoria RAM externa".
+     *
+     * Esto encapsula la lógica para que las views de impresión no tengan
+     * que verificar `$item->product_id` en cada plantilla (Law of Demeter).
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if ($this->product_id !== null) {
+            return $this->product?->name ?? '—';
+        }
+        return $this->description ?? '—';
     }
 
     // ─── Relaciones ──────────────────────────────────────────

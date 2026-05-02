@@ -14,10 +14,14 @@ use App\Services\FiscalPeriods\FiscalPeriodService;
 use App\Services\Invoicing\Contracts\ResuelveCorrelativoFactura;
 use App\Services\Invoicing\Resolvers\CorrelativoCentralizado;
 use App\Services\Invoicing\Resolvers\CorrelativoPorSucursal;
+use App\Policies\ActivityPolicy;
+use App\Services\Repairs\Tax\RepairTaxCalculator;
 use App\Services\Sales\Tax\SaleTaxCalculator;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -83,6 +87,18 @@ class AppServiceProvider extends ServiceProvider
             SaleTaxCalculator::class,
             fn () => new SaleTaxCalculator((float) config('tax.multiplier', 1.15)),
         );
+
+        // ─── Calculador fiscal de reparaciones (singleton) ────
+        // Mismo razonamiento que SaleTaxCalculator: clase pura, multiplier
+        // único por request, materializado desde config una sola vez.
+        // No reusamos SaleTaxCalculator porque las reglas divergen (Repairs
+        // no tiene descuento global, sí distingue exempt_total/taxable_total
+        // explícitos en la salida). Mantenerlos separados protege de
+        // acoplamientos inversos cuando uno de los dos dominios evolucione.
+        $this->app->singleton(
+            RepairTaxCalculator::class,
+            fn () => new RepairTaxCalculator((float) config('tax.multiplier', 1.15)),
+        );
     }
 
     /**
@@ -90,6 +106,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ─── Policies de modelos externos ─────────────────────
+        //
+        // Laravel auto-detecta policies para modelos de `App\Models` por
+        // convención (App\Models\Foo → App\Policies\FooPolicy). Para modelos
+        // que viven en paquetes externos (Spatie\Activitylog\Models\Activity),
+        // hay que registrar la asociación manualmente. Sin esto, llamadas
+        // como `auth()->user()->can('viewAny', Activity::class)` retornaban
+        // true por default permisivo, lo que filtraba el Resource Activity Log
+        // en el sidebar de roles que no debían verlo (técnico, cajero).
+        Gate::policy(Activity::class, ActivityPolicy::class);
+
         // Evento de Laravel -> Nuestro evento de dominio
         Event::listen(Login::class, DispatchUserLoggedIn::class);
 

@@ -24,6 +24,12 @@ use Filament\Support\Contracts\HasLabel;
  * por `CashSessionService` al abrir/cerrar. `sale_income` lo genera
  * `SaleService::processSale()` y `sale_cancellation` lo genera
  * `SaleService::cancel()`. Ninguno de los cuatro se crea manualmente desde UI.
+ *
+ * Tipos del módulo de Reparaciones (generados por RepairService — nunca UI):
+ *   - repair_advance_payment: cliente paga anticipo al aprobar cotización (inflow).
+ *   - repair_advance_refund:  devolución del anticipo si la reparación se rechaza
+ *                             o anula y el cliente prefirió devolución sobre crédito.
+ *   - repair_final_income:    saldo restante (total - anticipo) cobrado al entregar.
  */
 enum CashMovementType: string implements HasLabel, HasColor, HasIcon
 {
@@ -35,6 +41,9 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
     case Deposit = 'deposit';
     case Adjustment = 'adjustment';
     case ClosingBalance = 'closing_balance';
+    case RepairAdvancePayment = 'repair_advance_payment';
+    case RepairAdvanceRefund = 'repair_advance_refund';
+    case RepairFinalIncome = 'repair_final_income';
 
     public function getLabel(): string
     {
@@ -47,6 +56,9 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::Deposit => 'Depósito bancario',
             self::Adjustment => 'Ajuste',
             self::ClosingBalance => 'Cierre',
+            self::RepairAdvancePayment => 'Anticipo de reparación',
+            self::RepairAdvanceRefund => 'Devolución de anticipo',
+            self::RepairFinalIncome => 'Ingreso por reparación',
         };
     }
 
@@ -61,6 +73,9 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::Deposit => 'warning',
             self::Adjustment => 'info',
             self::ClosingBalance => 'gray',
+            self::RepairAdvancePayment => 'info',
+            self::RepairAdvanceRefund => 'danger',
+            self::RepairFinalIncome => 'success',
         };
     }
 
@@ -75,6 +90,9 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::Deposit => 'heroicon-o-building-library',
             self::Adjustment => 'heroicon-o-adjustments-horizontal',
             self::ClosingBalance => 'heroicon-o-lock-closed',
+            self::RepairAdvancePayment => 'heroicon-o-banknotes',
+            self::RepairAdvanceRefund => 'heroicon-o-arrow-uturn-left',
+            self::RepairFinalIncome => 'heroicon-o-wrench-screwdriver',
         };
     }
 
@@ -87,7 +105,10 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
     public function isInflow(): bool
     {
         return match ($this) {
-            self::OpeningBalance, self::SaleIncome => true,
+            self::OpeningBalance,
+            self::SaleIncome,
+            self::RepairAdvancePayment,
+            self::RepairFinalIncome => true,
             default => false,
         };
     }
@@ -99,11 +120,19 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
      * al cliente (si fue en efectivo, sale del cajón; si fue en tarjeta, el
      * movimiento queda como registro contable pero `affectsCashBalance()` lo
      * filtra en el calculator por el payment_method).
+     *
+     * `RepairAdvanceRefund` es outflow simétrico al RepairAdvancePayment:
+     * devuelve al cliente el dinero que dejó como anticipo si la reparación
+     * se rechaza/anula y el cliente prefiere devolución sobre crédito.
      */
     public function isOutflow(): bool
     {
         return match ($this) {
-            self::Expense, self::SupplierPayment, self::Deposit, self::SaleCancellation => true,
+            self::Expense,
+            self::SupplierPayment,
+            self::Deposit,
+            self::SaleCancellation,
+            self::RepairAdvanceRefund => true,
             default => false,
         };
     }

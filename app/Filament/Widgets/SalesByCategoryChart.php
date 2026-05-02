@@ -26,6 +26,19 @@ class SalesByCategoryChart extends ChartWidget
 
     protected ?string $maxHeight = '400px';
 
+    /**
+     * Distribución de ventas por categoría. KPI de gestión comercial — solo
+     * visible para super_admin / admin / contador. El cajero no necesita
+     * vista agregada por categoría para operar.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     protected function getType(): string
     {
         return 'doughnut';

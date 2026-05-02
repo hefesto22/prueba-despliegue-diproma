@@ -60,6 +60,7 @@ class RolesAndSuperAdminSeeder extends Seeder
     public const ROLE_ADMIN = 'admin';
     public const ROLE_CONTADOR = 'contador';
     public const ROLE_CAJERO = 'cajero';
+    public const ROLE_TECNICO = 'tecnico';
 
     /**
      * Datos del super admin humano — se ubica/crea por email para que re-correr
@@ -115,6 +116,7 @@ class RolesAndSuperAdminSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => self::ROLE_ADMIN, 'guard_name' => $guard]);
         $contadorRole = Role::firstOrCreate(['name' => self::ROLE_CONTADOR, 'guard_name' => $guard]);
         $cajeroRole = Role::firstOrCreate(['name' => self::ROLE_CAJERO, 'guard_name' => $guard]);
+        $tecnicoRole = Role::firstOrCreate(['name' => self::ROLE_TECNICO, 'guard_name' => $guard]);
 
         // 2. Crear/ubicar al super admin humano.
         //    Password en plano: el cast 'password' => 'hashed' del modelo lo
@@ -168,6 +170,7 @@ class RolesAndSuperAdminSeeder extends Seeder
         $adminRole->syncPermissions($this->permisosAdmin($allPermissionNames));
         $contadorRole->syncPermissions($this->permisosContador($allPermissionNames));
         $cajeroRole->syncPermissions($this->permisosCajero($allPermissionNames));
+        $tecnicoRole->syncPermissions($this->permisosTecnico($allPermissionNames));
 
         // super_admin no necesita permisos asignados — el `Gate::before` que
         // Shield instala lo deja pasar todo. Asignar permisos explícitos sería
@@ -180,11 +183,12 @@ class RolesAndSuperAdminSeeder extends Seeder
         // Reportar resultado de forma legible — útil para verificar que el
         // refresh de la DB salió bien sin tener que abrir tinker.
         $this->command?->info(sprintf(
-            'Roles configurados: super_admin=%s | admin=%d permisos | contador=%d permisos | cajero=%d permisos (total disponibles: %d)',
+            'Roles configurados: super_admin=%s | admin=%d permisos | contador=%d permisos | cajero=%d permisos | tecnico=%d permisos (total disponibles: %d)',
             $mauricio->email,
             $adminRole->permissions()->count(),
             $contadorRole->permissions()->count(),
             $cajeroRole->permissions()->count(),
+            $tecnicoRole->permissions()->count(),
             count($allPermissionNames),
         ));
     }
@@ -520,6 +524,93 @@ class RolesAndSuperAdminSeeder extends Seeder
                 self::ACTION_VIEW_ANY,
                 self::ACTION_VIEW,
                 self::ACTION_CREATE,
+            ]),
+        );
+
+        // Reparaciones: el cajero recibe equipos (alta) y registra entregas.
+        // No aprueba/rechaza/inicia reparación — eso es del técnico.
+        // Las acciones de transición no son permisos Shield separados; las
+        // cubre Update:Repair, y los Filament Actions las gatean en runtime
+        // según el estado actual.
+        $deseados = array_merge(
+            $deseados,
+            $this->buildResourcePermissions('Repair', [
+                self::ACTION_VIEW_ANY,
+                self::ACTION_VIEW,
+                self::ACTION_CREATE,
+                self::ACTION_UPDATE,
+            ]),
+        );
+
+        // DeviceCategory: solo lectura para alimentar el dropdown del form.
+        $deseados = array_merge(
+            $deseados,
+            $this->buildResourcePermissions('DeviceCategory', [
+                self::ACTION_VIEW_ANY,
+                self::ACTION_VIEW,
+            ]),
+        );
+
+        // CustomerCredit: solo lectura para verificar saldos a favor del cliente.
+        // El uso del crédito (consumirlo en una nueva venta) lo hace el sistema
+        // automáticamente; el cajero no edita balances manualmente.
+        $deseados = array_merge(
+            $deseados,
+            $this->buildResourcePermissions('CustomerCredit', [
+                self::ACTION_VIEW_ANY,
+                self::ACTION_VIEW,
+            ]),
+        );
+
+        return $this->soloLosQueExisten($deseados, $allPermissionNames);
+    }
+
+    /**
+     * Técnico = el especialista que repara los equipos.
+     *
+     * RESPONSABILIDADES OPERATIVAS:
+     *   - Recibir equipos (con cajero o solo) — crear reparaciones.
+     *   - Hacer diagnóstico técnico tras inspeccionar.
+     *   - Cotizar (agregar líneas: honorarios + piezas externas/inventario).
+     *   - Iniciar reparación, agregar piezas adicionales si surgen, marcar como
+     *     completada (esto dispara notificación a admin/cajero para llamar al cliente).
+     *   - Subir fotos del equipo durante todo el ciclo.
+     *
+     * NO HACE (queda para cajero/admin):
+     *   - Cobrar anticipo en caja (el dinero lo recibe el cajero).
+     *   - Entregar al cliente / emitir factura (eso lo hace cajero al recibir el dinero).
+     *   - Anular reparaciones (acción administrativa del admin).
+     *
+     * SIDEBAR DEL TÉCNICO: solo ve "Reparaciones" — decisión de UX confirmada
+     * por Mauricio (2026-05-02). No le mostramos Customer/Product/Category/
+     * InventoryMovement como Resources separados aunque los necesite usar
+     * indirectamente desde el form de Repair (autocomplete/búsqueda).
+     *
+     * Por qué los selects siguen funcionando sin permisos `ViewAny:*`:
+     *   El form de Repair usa `Customer::query()` y `Product::query()` directos
+     *   en `getSearchResultsUsing`. Esas queries NO pasan por la Policy del
+     *   Resource — solo por el constraint del modelo. El usuario nunca abre
+     *   el Resource Customer/Product, solo los consume desde el flujo de
+     *   reparación. La auto-creación de Customer en CreateRepair tampoco
+     *   requiere permisos Shield: usa `Customer::firstOrCreate()` directo.
+     *
+     * @param  array<int, string>  $allPermissionNames
+     * @return array<int, string>
+     */
+    private function permisosTecnico(array $allPermissionNames): array
+    {
+        $deseados = [];
+
+        // Reparaciones: el ÚNICO Resource que ve en su sidebar.
+        // Ver, crear (recepción de equipo), actualizar (diagnóstico, items,
+        // transiciones de estado). Delete NO — solo admin elimina.
+        $deseados = array_merge(
+            $deseados,
+            $this->buildResourcePermissions('Repair', [
+                self::ACTION_VIEW_ANY,
+                self::ACTION_VIEW,
+                self::ACTION_CREATE,
+                self::ACTION_UPDATE,
             ]),
         );
 

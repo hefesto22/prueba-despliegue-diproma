@@ -41,6 +41,22 @@ class CompanySettings extends Page implements HasForms
         return 'Administración';
     }
 
+    /**
+     * Sólo super_admin / admin pueden ver/editar la configuración de empresa.
+     *
+     * El permiso `View:CompanySettings` lo genera Shield. Si por algún motivo
+     * Shield no lo creó (depende del flag `register_role_policy` y de que la
+     * Page esté incluida en `discovery`), la verificación cae a Gate::denies()
+     * que retorna true para cualquier user sin el permiso → bloqueo seguro.
+     *
+     * Sin este método, la Page aparecía en el sidebar para CUALQUIER user
+     * autenticado (cajero, contador, técnico) — bug heredado del scaffold.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('View:CompanySettings') === true;
+    }
+
     // ─── Estado del formulario ──────────────────────────
 
     public ?array $data = [];

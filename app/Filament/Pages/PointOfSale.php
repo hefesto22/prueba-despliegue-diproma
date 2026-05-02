@@ -51,6 +51,20 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
         return 'Ventas';
     }
 
+    /**
+     * Sólo users con permiso explícito `View:PointOfSale` ven y entran al POS.
+     *
+     * Sin este método, Filament muestra la página a CUALQUIER user que pase
+     * `canAccessPanel()` — afecta directamente a los roles tecnico, contador
+     * y otros que no tienen nada que ver con ventas. El permiso lo genera
+     * Shield al correr `php artisan shield:generate --all` y se asigna al
+     * rol `cajero` desde `RolesAndSuperAdminSeeder::permisosCajero()`.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('View:PointOfSale') === true;
+    }
+
     // ─── Estado del carrito (Livewire) ──────────────────────
 
     /** @var array<int, array{product_id: int, name: string, sku: string, unit_price: float, tax_type: string, quantity: int, stock: int}> */

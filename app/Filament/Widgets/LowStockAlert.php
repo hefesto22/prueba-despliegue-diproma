@@ -19,6 +19,29 @@ class LowStockAlert extends TableWidget
 
     protected ?string $pollingInterval = '300s';
 
+    /**
+     * Roles que ven el alert de stock bajo en el escritorio.
+     *
+     * Patrón consistente con SalesChart, FinancialStatsOverview y demás
+     * widgets del dashboard: filtro por rol con `hasAnyRole`.
+     *
+     * - super_admin / admin: gestión completa.
+     * - cajero: necesita saber si va a quedar sin stock al vender.
+     * - contador: revisa inventario al cierre fiscal.
+     * - tecnico: NO incluido — su escritorio debe estar enfocado en
+     *   reparaciones, no en stock de venta.
+     *
+     * Sin este método, el widget aparecía en el escritorio de TODOS los users
+     * autenticados — bug heredado del scaffold de Filament.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'cajero', 'contador']);
+    }
+
     public function table(Table $table): Table
     {
         return $table

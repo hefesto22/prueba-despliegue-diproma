@@ -17,6 +17,19 @@ class LatestSales extends TableWidget
 
     protected ?string $pollingInterval = '120s';
 
+    /**
+     * Últimas 10 ventas del negocio. El cajero ve sus ventas en el módulo
+     * Ventas (con filtros, paginación, etc.) — no necesita este resumen
+     * en el escritorio. Solo super_admin / admin / contador lo ven.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     public function table(Table $table): Table
     {
         return $table

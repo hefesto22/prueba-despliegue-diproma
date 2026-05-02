@@ -25,6 +25,19 @@ class SalesChart extends ChartWidget
 
     public ?string $filter = '30d';
 
+    /**
+     * Tendencia de ventas con período comparativo. Información ejecutiva —
+     * solo visible para super_admin / admin / contador. El cajero ve sus
+     * ventas concretas en el módulo Ventas, no necesita la tendencia global.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     protected function getFilters(): ?array
     {
         return [

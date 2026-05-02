@@ -1,7 +1,9 @@
 <?php
 
 use App\Jobs\AutoCloseCashSessionsJob;
+use App\Jobs\CleanupRepairPhotosJob;
 use App\Jobs\ExecuteCaiFailoverJob;
+use App\Jobs\MarkAbandonedRepairsJob;
 use App\Jobs\SendCaiAlertsJob;
 use App\Jobs\SendFiscalPeriodAlertsJob;
 use Illuminate\Foundation\Inspiring;
@@ -122,5 +124,41 @@ Schedule::job(new AutoCloseCashSessionsJob)
     ->dailyAt(config('cash.auto_close.hour', '21:00'))
     ->timezone('America/Tegucigalpa')
     ->name('cash-auto-close')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+/*
+ * Marcar como Abandonadas las reparaciones que llevan demasiado tiempo en
+ * estado ListoEntrega sin que el cliente recoja el equipo.
+ *
+ * Hora: 06:00 HN — antes del horario operativo, para que cuando el staff
+ * entre, las reparaciones marcadas ya estén actualizadas y limpias de los
+ * filtros activos. Threshold configurable por config/repairs.php
+ * (default 60 días, aprobado por Mauricio 2026-05-02).
+ *
+ * Idempotente: re-correr es inocuo (la query filtra por status ListoEntrega).
+ */
+Schedule::job(new MarkAbandonedRepairsJob)
+    ->dailyAt('06:00')
+    ->timezone('America/Tegucigalpa')
+    ->name('repairs-mark-abandoned')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+/*
+ * Limpieza automática de fotos de reparaciones en estados terminales.
+ *
+ * Hora: 06:15 HN — después del job de abandono (06:00) para procesar también
+ * los repairs que se acaben de marcar Abandonadas si aplican retención.
+ * Threshold configurable por config/repairs.php (default 7 días, aprobado
+ * por Mauricio 2026-05-02). Borra físicamente del disk 'public' + el registro
+ * en `repair_photos`. Audita cada borrado en `repair_status_logs`.
+ *
+ * Idempotente: las fotos ya borradas no aparecen en la query siguiente.
+ */
+Schedule::job(new CleanupRepairPhotosJob)
+    ->dailyAt('06:15')
+    ->timezone('America/Tegucigalpa')
+    ->name('repairs-cleanup-photos')
     ->withoutOverlapping()
     ->onOneServer();

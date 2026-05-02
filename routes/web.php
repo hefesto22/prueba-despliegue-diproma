@@ -6,6 +6,8 @@ use App\Http\Controllers\CreditNoteVerificationController;
 use App\Http\Controllers\InvoicePrintController;
 use App\Http\Controllers\InvoiceVerificationController;
 use App\Http\Controllers\IsvDeclarationPrintController;
+use App\Http\Controllers\RepairPublicTrackingController;
+use App\Http\Controllers\RepairQuotationPrintController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -138,3 +140,51 @@ Route::get('/cash-sessions/{cashSession}', CashSessionPrintController::class)
 Route::get('/declaraciones-isv/{isvMonthlyDeclaration}/imprimir', IsvDeclarationPrintController::class)
     ->middleware('auth')
     ->name('isv-declarations.print');
+
+/*
+|--------------------------------------------------------------------------
+| Reparación — Recibo Interno de Cotización (acceso por qr_token)
+|--------------------------------------------------------------------------
+|
+| GET /repairs/quotation/{repair:qr_token}
+|
+| Route model binding por `qr_token` (UUID), NO por id. El token actúa
+| como "secreto compartido" entre Diproma y el cliente:
+|
+|   - Staff autenticado: puede ver cualquier reparación, accede vía
+|     "Imprimir cotización" en el panel.
+|   - Cliente final: ve SU reparación escaneando el QR del recibo físico
+|     que se le entregó al recibir el equipo. Sin login.
+|
+| El controlador rechaza acceso público (404) a reparaciones Anuladas.
+| Las demás (incluso terminales como Entregada, Rechazada) son visibles
+| para el cliente — sirven como respaldo histórico.
+|
+| Mismo patrón window.print() que invoices.print: sin Node, sin Browsershot.
+|
+*/
+Route::get('/repairs/quotation/{repair:qr_token}', RepairQuotationPrintController::class)
+    ->name('repairs.quotation.print');
+
+/*
+|--------------------------------------------------------------------------
+| Reparación — Vista pública de tracking (acceso por QR del cliente)
+|--------------------------------------------------------------------------
+|
+| GET /r/{repair:qr_token}
+|
+| URL corta codificada en el QR del recibo de cotización. Cuando el cliente
+| escanea el QR desde su celular, aterriza en esta vista de tracking — NO
+| en el recibo imprimible. Razón: el cliente desde móvil quiere ver estado
+| + fotos + total, no necesariamente imprimir.
+|
+| Sin login: el `qr_token` UUID es secreto compartido. Quien tiene el token
+| puede ver SU reparación, no las de otros. Reparaciones Anuladas se ocultan
+| al público (404 si no autenticado) — solo el staff las consulta.
+|
+| Para imprimir el recibo, hay un botón en esta vista que lleva a la ruta
+| `repairs.quotation.print`.
+|
+*/
+Route::get('/r/{repair:qr_token}', RepairPublicTrackingController::class)
+    ->name('repairs.public.show');

@@ -25,6 +25,19 @@ class FinancialStatsOverview extends StatsOverviewWidget
         $this->stats = $stats;
     }
 
+    /**
+     * KPIs financieros (ganancia bruta, margen, ticket promedio, clientes nuevos).
+     * Información sensible de rentabilidad — restringida a super_admin / admin /
+     * contador. El cajero NO debe ver márgenes ni ganancias del negocio.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     protected function getStats(): array
     {
         $profit = $this->stats->grossProfitThisMonth();

@@ -24,6 +24,20 @@ class StatsOverview extends StatsOverviewWidget
         $this->stats = $stats;
     }
 
+    /**
+     * KPIs operativos del negocio (ventas globales, stock, compras pendientes).
+     * Solo visibles para roles que necesitan vista ejecutiva — el cajero opera
+     * en POS y ve sus propias ventas en el módulo correspondiente, no necesita
+     * (ni debe ver) los totales globales del negocio.
+     */
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->hasAnyRole(['super_admin', 'admin', 'contador']);
+    }
+
     protected function getStats(): array
     {
         $today = $this->stats->salesToday();
