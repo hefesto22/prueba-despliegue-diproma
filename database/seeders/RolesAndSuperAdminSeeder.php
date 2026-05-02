@@ -73,7 +73,13 @@ class RolesAndSuperAdminSeeder extends Seeder
      * aún rotar el password directamente desde el panel y dejar el seeder solo
      * para crear el usuario inicial.
      */
-    private const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
+    /**
+     * Email del super_admin — público porque otros seeders (DemoUsersSeeder)
+     * necesitan ubicarlo para encadenar `created_by`. Mantenerlo privado
+     * obligaría a duplicar el string, lo que rompería al cambiar el dueño
+     * del sistema en el futuro.
+     */
+    public const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
     private const SUPER_ADMIN_NAME = 'Administrador Diproma';
     private const SUPER_ADMIN_DEFAULT_PASSWORD = '12345678';
 
