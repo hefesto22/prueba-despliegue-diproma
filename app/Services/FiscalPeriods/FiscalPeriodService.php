@@ -10,6 +10,7 @@ use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalCerradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalNoConfiguradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalYaDeclaradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalYaReabiertoException;
+use App\Services\FiscalPeriods\Exceptions\VentanaAnulacionVencidaException;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -36,6 +37,21 @@ use Illuminate\Support\Facades\DB;
  */
 class FiscalPeriodService
 {
+    /**
+     * Día del mes siguiente a partir del cual se BLOQUEA la anulación de
+     * facturas — REGLA OPERATIVA DIPROMA, estricta vs. SAR.
+     *
+     * Ejemplo con valor 10: una factura del 5 de junio puede anularse hasta
+     * las 23:59:59 del 9 de julio. A partir del 10 de julio 00:00:00 ya no.
+     * El contador típicamente declara durante el día 10; este corte le da
+     * un día sin tráfico operativo para preparar la declaración con datos
+     * congelados.
+     *
+     * Si el SAR cambia el plazo legal (hoy día 10), o si Mauricio decide
+     * darle más/menos margen al contador, se ajusta solo este valor.
+     */
+    private const VOIDING_CUTOFF_DAY = 10;
+
     /**
      * Resolver (o crear lazy) el período fiscal del mes actual.
      *
@@ -103,11 +119,13 @@ class FiscalPeriodService
      * ¿Esta factura se puede anular directamente (sin NC)?
      *
      * Criterios acumulativos (todos deben cumplirse):
-     *   1. La empresa tiene fiscal_period_start configurado.
-     *   2. invoice_date >= fiscal_period_start (no es pre-tracking).
-     *   3. El período de invoice_date está ABIERTO (nunca declarado o reabierto).
-     *
-     * Factura ya anulada devuelve false: no se "reanula" una anulación.
+     *   1. Factura no está ya anulada.
+     *   2. La empresa tiene fiscal_period_start configurado.
+     *   3. invoice_date >= fiscal_period_start (no es pre-tracking).
+     *   4. NO pasamos el cutoff calendárico (regla operativa Diproma —
+     *      ver `isPastVoidingCutoff` para detalle).
+     *   5. El período de invoice_date está ABIERTO (defense-in-depth: si el
+     *      contador declaró antes del cutoff, también bloquea).
      *
      * Performance: el lookup del estado del período usa un map memoizado por
      * request (`loadFiscalPeriodsMap`). La primera llamada ejecuta UNA query
@@ -133,6 +151,11 @@ class FiscalPeriodService
             return false;
         }
 
+        // Regla operativa Diproma — más estricta que SAR.
+        if ($this->isPastVoidingCutoff($invoiceDate)) {
+            return false;
+        }
+
         $period = $this->loadFiscalPeriodsMap()->get("{$invoiceDate->year}-{$invoiceDate->month}");
 
         // Período inexistente ≡ abierto (consistente con isOpen()).
@@ -145,9 +168,22 @@ class FiscalPeriodService
      * Úselo en el punto de entrada de la anulación (Filament action,
      * controlador, etc.) para fallar con mensaje útil en vez de silencioso.
      *
-     * @throws PeriodoFiscalNoConfiguradoException Si fiscal_period_start es NULL.
-     * @throws PeriodoFiscalCerradoException       Si el período ya fue declarado
-     *                                             o la factura es pre-tracking.
+     * Orden de las reglas (importa para qué excepción se lanza):
+     *   1. Configuración fiscal activa.
+     *   2. Pre-tracking (factura anterior a la adopción del sistema).
+     *   3. Cutoff operativo Diproma (estricto vs. SAR).
+     *   4. Período declarado por el contador (defense-in-depth).
+     *
+     * NOTA: NO delegamos en `assertDateIsInOpenPeriod` (que combina 1+2+4),
+     * porque necesitamos insertar la regla #3 entre pre-tracking y período-
+     * declarado. Esa regla solo aplica a anulación de facturas — otros
+     * dominios (Purchase, IsvRetention) siguen usando el gate genérico sin
+     * el cutoff.
+     *
+     * @throws PeriodoFiscalNoConfiguradoException   Si fiscal_period_start es NULL.
+     * @throws PeriodoFiscalCerradoException         Si la factura es pre-tracking
+     *                                               o el período ya fue declarado.
+     * @throws VentanaAnulacionVencidaException      Si pasamos el cutoff Diproma.
      */
     public function assertCanVoidInvoice(Invoice $invoice): void
     {
@@ -157,14 +193,69 @@ class FiscalPeriodService
             throw new PeriodoFiscalNoConfiguradoException();
         }
 
-        // Delego la doble regla (pre-tracking + período declarado) en el gate
-        // genérico. El caso de facturas era el único callsite originalmente;
-        // ahora ese mismo gate se reusa desde los Observers de Purchase e
-        // IsvRetentionReceived, manteniendo una sola implementación del concepto
-        // "fecha en período cerrado" (ISV.3a).
-        $this->assertDateIsInOpenPeriod(
-            $invoice->invoice_date,
-            "la factura {$invoice->invoice_number}",
+        $invoiceDate = CarbonImmutable::instance($invoice->invoice_date);
+        $documentLabel = "la factura {$invoice->invoice_number}";
+
+        // 1. Pre-tracking: factura anterior a la adopción del sistema.
+        if ($invoiceDate->lessThan($company->fiscal_period_start)) {
+            throw new PeriodoFiscalCerradoException(
+                periodYear: $invoiceDate->year,
+                periodMonth: $invoiceDate->month,
+                documentLabel: $documentLabel,
+            );
+        }
+
+        // 2. Cutoff operativo Diproma — estricto vs. SAR. Bloqueamos al iniciar
+        //    el día N del mes siguiente al de la factura, AUNQUE el contador
+        //    no haya declarado todavía. Razón: evitar conflictos día-10 entre
+        //    cajero/contador. Detalle en `isPastVoidingCutoff`.
+        if ($this->isPastVoidingCutoff($invoiceDate)) {
+            throw new VentanaAnulacionVencidaException(
+                documentLabel: $documentLabel,
+                cutoffDate: $this->voidingCutoffFor($invoiceDate)->format('d/m/Y'),
+                invoicePeriod: $invoiceDate->format('m/Y'),
+            );
+        }
+
+        // 3. Defense-in-depth: si el contador declaró ANTES del cutoff
+        //    (ej: declaración temprana día 7), bloqueamos por estado del período.
+        //    También cubre el caso de períodos reabiertos que luego se vuelven
+        //    a declarar antes del cutoff.
+        $this->assertPeriodIsOpen($invoiceDate->year, $invoiceDate->month, $documentLabel);
+    }
+
+    /**
+     * Calcula la fecha de cutoff (primer instante del día `VOIDING_CUTOFF_DAY`
+     * del mes SIGUIENTE al de la factura).
+     *
+     * Usa `addMonthNoOverflow` para evitar el bug clásico de "31 de enero
+     * + 1 mes = 3 de marzo" — con noOverflow se queda en el mes correcto
+     * (febrero) y luego seteamos el día explícitamente.
+     */
+    private function voidingCutoffFor(CarbonInterface $invoiceDate): CarbonImmutable
+    {
+        return CarbonImmutable::instance($invoiceDate)
+            ->startOfMonth()
+            ->addMonthNoOverflow()
+            ->setDay(self::VOIDING_CUTOFF_DAY)
+            ->startOfDay();
+    }
+
+    /**
+     * ¿Hoy ya pasamos (o estamos en) el cutoff de anulación para esta factura?
+     *
+     * Inclusivo en el cutoff: el día 10 a las 00:00:00 ya está bloqueado.
+     * Esto es por diseño — Mauricio definió el día 10 entero como "día del
+     * contador", no parcialmente operativo.
+     *
+     * Aplica calendar dates, no días hábiles. Si el día 9 cae sábado o
+     * domingo, el cliente perdió la ventana — la regla es predecible y
+     * fácilmente comunicable; no manejamos calendarios laborales aquí.
+     */
+    private function isPastVoidingCutoff(CarbonInterface $invoiceDate): bool
+    {
+        return CarbonImmutable::now()->greaterThanOrEqualTo(
+            $this->voidingCutoffFor($invoiceDate),
         );
     }
 

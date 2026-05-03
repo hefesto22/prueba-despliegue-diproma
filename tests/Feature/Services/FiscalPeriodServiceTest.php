@@ -11,7 +11,9 @@ use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalCerradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalNoConfiguradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalYaDeclaradoException;
 use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalYaReabiertoException;
+use App\Services\FiscalPeriods\Exceptions\VentanaAnulacionVencidaException;
 use App\Services\FiscalPeriods\FiscalPeriodService;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -65,6 +67,16 @@ class FiscalPeriodServiceTest extends TestCase
         $this->refreshCompanyCache();
 
         $this->service = app(FiscalPeriodService::class);
+    }
+
+    protected function tearDown(): void
+    {
+        // Limpiar reloj fijo para no contaminar tests posteriores en la suite.
+        // Reseteamos ambas clases por simetría con setUp.
+        Carbon::setTestNow(null);
+        CarbonImmutable::setTestNow(null);
+
+        parent::tearDown();
     }
 
     /**
@@ -228,6 +240,10 @@ class FiscalPeriodServiceTest extends TestCase
 
     public function test_can_void_invoice_false_when_period_is_declared(): void
     {
+        // Reloj fijo dentro de la ventana de cutoff para que la causa del
+        // false sea exclusivamente "período declarado", no el cutoff.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 3, 25, 12, 0, 0));
+
         $user = User::factory()->create();
         FiscalPeriod::factory()
             ->forMonth(2026, 3)
@@ -243,6 +259,10 @@ class FiscalPeriodServiceTest extends TestCase
 
     public function test_can_void_invoice_true_when_period_open_and_invoice_valid(): void
     {
+        // Reloj fijo dentro de la ventana de anulación de la factura.
+        // Sin esto, una corrida después del 10 de abril 2026 fallaría por cutoff.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 3, 25, 12, 0, 0));
+
         $invoice = $this->makeInvoice([
             'invoice_date' => '2026-03-10',
         ]);
@@ -252,6 +272,8 @@ class FiscalPeriodServiceTest extends TestCase
 
     public function test_can_void_invoice_true_when_period_reopened_after_declaration(): void
     {
+        Carbon::setTestNow(CarbonImmutable::create(2026, 3, 25, 12, 0, 0));
+
         $user = User::factory()->create();
         FiscalPeriod::factory()
             ->forMonth(2026, 3)
@@ -303,6 +325,12 @@ class FiscalPeriodServiceTest extends TestCase
 
     public function test_assert_can_void_invoice_throws_cerrado_if_period_declared(): void
     {
+        // Reloj fijo dentro de la ventana de anulación. Garantiza que la
+        // excepción que se lanza es Cerrado (período declarado) y NO la
+        // de cutoff vencido — son dos códigos distintos para dos escenarios
+        // distintos.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 3, 25, 12, 0, 0));
+
         $user = User::factory()->create();
         FiscalPeriod::factory()
             ->forMonth(2026, 3)
@@ -320,6 +348,8 @@ class FiscalPeriodServiceTest extends TestCase
 
     public function test_assert_can_void_invoice_passes_silently_when_period_open(): void
     {
+        Carbon::setTestNow(CarbonImmutable::create(2026, 3, 25, 12, 0, 0));
+
         $invoice = $this->makeInvoice([
             'invoice_date' => '2026-03-10',
         ]);
@@ -327,6 +357,145 @@ class FiscalPeriodServiceTest extends TestCase
         // Si el período está abierto, no debe lanzar nada.
         $this->service->assertCanVoidInvoice($invoice);
         $this->assertTrue(true); // llegamos aquí = ok
+    }
+
+    // ─── Cutoff operativo Diproma (regla más estricta vs. SAR) ───────
+    //
+    // Las anulaciones se cierran al iniciar el día 10 del mes SIGUIENTE
+    // al de la factura, AUNQUE el contador no haya declarado todavía.
+    // Razón: evitar conflictos día-10 entre cajero y contador.
+
+    public function test_can_void_invoice_true_at_day_9_of_next_month_at_2359(): void
+    {
+        // Factura del 5 de marzo. Hoy = 9 de abril 23:59:59. Cutoff = 10 abril 00:00.
+        // El cliente llegó al límite, todavía dentro de la ventana.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 9, 23, 59, 59));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-03-05',
+        ]);
+
+        $this->assertTrue($this->service->canVoidInvoice($invoice));
+    }
+
+    public function test_can_void_invoice_false_at_exact_cutoff_moment(): void
+    {
+        // El instante mismo del cutoff: día 10 del mes siguiente, 00:00:00.
+        // Por diseño es INCLUSIVO — la regla es "el día 10 entero ya no se puede".
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 10, 0, 0, 0));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-03-05',
+        ]);
+
+        $this->assertFalse($this->service->canVoidInvoice($invoice));
+    }
+
+    public function test_can_void_invoice_false_when_well_past_cutoff(): void
+    {
+        // Día 15 de abril. Cutoff fue el 10. Debe estar bloqueada.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 15, 9, 30, 0));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-03-05',
+        ]);
+
+        $this->assertFalse($this->service->canVoidInvoice($invoice));
+    }
+
+    public function test_can_void_invoice_handles_year_boundary(): void
+    {
+        // Factura de diciembre 2026. Cutoff = 10 enero 2027.
+        // Comprobamos que el cálculo de cutoff cruza correctamente el año.
+        Carbon::setTestNow(CarbonImmutable::create(2027, 1, 9, 23, 0, 0));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-12-15',
+        ]);
+
+        $this->assertTrue(
+            $this->service->canVoidInvoice($invoice),
+            'Cutoff debería ser 10/01/2027 — el 09/01/2027 todavía permite anular',
+        );
+
+        // Avanzamos al cutoff exacto
+        Carbon::setTestNow(CarbonImmutable::create(2027, 1, 10, 0, 0, 0));
+        $invoice->refresh();
+
+        $this->assertFalse(
+            $this->service->canVoidInvoice($invoice),
+            'Al inicio del 10/01/2027, la anulación debe quedar bloqueada',
+        );
+    }
+
+    public function test_assert_can_void_invoice_throws_ventana_vencida_with_clear_message(): void
+    {
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 10, 8, 30, 0));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-03-05',
+            'invoice_number' => '001-001-01-00000123',
+        ]);
+
+        try {
+            $this->service->assertCanVoidInvoice($invoice);
+            $this->fail('Se esperaba VentanaAnulacionVencidaException.');
+        } catch (VentanaAnulacionVencidaException $e) {
+            $this->assertEquals('la factura 001-001-01-00000123', $e->documentLabel);
+            $this->assertEquals('10/04/2026', $e->cutoffDate);
+            $this->assertEquals('03/2026', $e->invoicePeriod);
+            $this->assertStringContainsString('cerraron el 10/04/2026', $e->getMessage());
+            $this->assertStringContainsString('día 9 del mes siguiente', $e->getMessage());
+        }
+    }
+
+    public function test_pre_tracking_takes_precedence_over_cutoff(): void
+    {
+        // Factura pre-tracking (anterior a fiscal_period_start) Y past cutoff.
+        // Debe lanzar PeriodoFiscalCerradoException (pre-tracking), no la
+        // de ventana vencida — el orden de las reglas es determinista.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 15, 12, 0, 0));
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2025-11-20', // anterior a fiscal_period_start (2026-01-01)
+            'invoice_number' => '001-001-01-00000099',
+        ]);
+
+        try {
+            $this->service->assertCanVoidInvoice($invoice);
+            $this->fail('Se esperaba PeriodoFiscalCerradoException por pre-tracking.');
+        } catch (PeriodoFiscalCerradoException $e) {
+            $this->assertEquals(2025, $e->periodYear);
+            $this->assertEquals(11, $e->periodMonth);
+        } catch (VentanaAnulacionVencidaException $e) {
+            $this->fail('Pre-tracking debe tomar precedencia sobre cutoff. '
+                . 'La excepción correcta es PeriodoFiscalCerrado.');
+        }
+    }
+
+    public function test_declared_period_before_cutoff_still_blocks(): void
+    {
+        // Defense-in-depth: si el contador declaró el día 7 (antes del cutoff
+        // del día 10), la factura debe quedar bloqueada por estado de período.
+        Carbon::setTestNow(CarbonImmutable::create(2026, 4, 8, 14, 0, 0));
+
+        $user = User::factory()->create();
+        FiscalPeriod::factory()
+            ->forMonth(2026, 3)
+            ->declared($user)
+            ->create();
+
+        $invoice = $this->makeInvoice([
+            'invoice_date' => '2026-03-15',
+        ]);
+
+        // canVoid retorna false — pasó por el check de cutoff (no aplica todavía,
+        // estamos en día 8) y luego por el check de período declarado.
+        $this->assertFalse($this->service->canVoidInvoice($invoice));
+
+        // assert lanza PeriodoFiscalCerrado, no VentanaAnulacionVencida.
+        $this->expectException(PeriodoFiscalCerradoException::class);
+        $this->service->assertCanVoidInvoice($invoice);
     }
 
     // ─── declare() ───────────────────────────────────────────────────

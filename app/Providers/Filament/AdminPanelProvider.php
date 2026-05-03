@@ -41,7 +41,18 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->profile()
+            // brandName se mantiene como fallback: lo usa Filament para el
+            // <title> de la pestaña del navegador, alt-text del logo y casos
+            // donde el logo no carga. brandLogo lo reemplaza visualmente en
+            // sidebar y login.
             ->brandName(config('app.brand_name', 'Sistema Diproma'))
+            ->brandLogo(asset('diproma-baner.webp'))
+            ->darkModeBrandLogo(asset('diproma-baner.webp'))
+            ->brandLogoHeight('2.5rem')
+            // PNG real en vez de .ico para evitar el problema clásico de
+            // "PNG renombrado a .ico" que Chrome silenciosamente rechaza.
+            // Browsers modernos aceptan PNG sin problema en cualquier tamaño.
+            ->favicon(asset('favicon.png'))
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'primary' => Color::Amber,
