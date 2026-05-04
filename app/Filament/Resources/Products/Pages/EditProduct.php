@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Products\Pages;
 
-use App\Enums\ProductCondition;
 use App\Enums\TaxType;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Schemas\ProductForm;
@@ -27,9 +26,11 @@ class EditProduct extends EditRecord
         // Desempacar specs JSON a campos individuales del formulario
         $data = ProductForm::unpackSpecs($data);
 
-        // Convertir precios para display
-        $isGravado = ($data['condition'] ?? '') !== ProductCondition::Used->value
-            && ($data['condition'] ?? '') !== 'used';
+        // Convertir precios para display: usar tax_type como fuente de verdad
+        // (no condition). condition solo aplica a productos físicos enum;
+        // para custom (servicios o productos físicos custom) la regla fiscal
+        // viene del tax_type explícito del producto.
+        $isGravado = ($data['tax_type'] ?? '') === TaxType::Gravado15->value;
 
         if ($isGravado) {
             $data['cost_price'] = Product::priceWithIsv((float) ($data['cost_price'] ?? 0));
@@ -42,12 +43,14 @@ class EditProduct extends EditRecord
     /**
      * Al guardar:
      * 1. Empacar campos spec_tipo_campo → specs JSON
-     * 2. Convertir precios con ISV a precios base
+     * 2. Convertir precios con ISV a precios base (solo si gravado)
+     * 3. Stock infinito para tipos custom (servicios)
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data = ProductForm::packSpecs($data);
         $data = CreateProduct::convertPricesToBase($data);
+        $data = CreateProduct::applyServiceDefaults($data);
 
         return $data;
     }

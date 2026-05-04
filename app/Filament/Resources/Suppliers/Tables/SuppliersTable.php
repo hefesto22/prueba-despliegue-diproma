@@ -33,10 +33,13 @@ class SuppliersTable
                 TextColumn::make('rtn')
                     ->label('RTN')
                     ->searchable()
-                    ->formatStateUsing(fn ($record) => $record->formatted_rtn)
+                    ->placeholder('Sin RTN')
+                    ->formatStateUsing(fn ($record) => filled($record->rtn)
+                        ? $record->formatted_rtn
+                        : null)
                     ->copyable()
                     ->badge()
-                    ->color('gray'),
+                    ->color(fn ($record) => filled($record->rtn) ? 'gray' : 'warning'),
                 TextColumn::make('contact_name')
                     ->label('Contacto')
                     ->searchable()

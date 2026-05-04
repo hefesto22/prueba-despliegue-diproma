@@ -88,8 +88,27 @@
                                         <div style="font-size: 0.75rem; color: rgb(107 114 128); font-family: monospace;">{{ $item['sku'] }}</div>
                                     </td>
                                     {{-- Precio --}}
+                                    @php $isService = $item['is_service'] ?? false; @endphp
                                     <td style="padding: 0.75rem; text-align: right; color: rgb(55 65 81);">
-                                        L {{ number_format($item['unit_price'], 2) }}
+                                        @if($isService)
+                                            {{-- Servicios (Honorarios, etc.): precio editable.
+                                                 wire:change envía el valor al método updateUnitPrice
+                                                 cuando el cajero termina de escribir. --}}
+                                            <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                                                <span style="font-size: 0.75rem; color: rgb(107 114 128);">L</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value="{{ $item['unit_price'] }}"
+                                                    wire:change="updateUnitPrice({{ $index }}, $event.target.value)"
+                                                    title="Precio variable — ajustar al facturar"
+                                                    style="width: 6rem; text-align: right; padding: 0.25rem 0.5rem; border: 1px solid rgb(217 119 6); border-radius: 0.375rem; font-weight: 500; color: rgb(17 24 39);"
+                                                />
+                                            </div>
+                                        @else
+                                            L {{ number_format($item['unit_price'], 2) }}
+                                        @endif
                                     </td>
                                     {{-- ISV --}}
                                     <td style="padding: 0.75rem; text-align: center;">
@@ -286,23 +305,6 @@
                             Este método no afecta el saldo físico de caja — se registra para reporte fiscal.
                         </p>
                     @endif
-                </div>
-
-                {{-- ═══ Opción Sin CAI ═══ --}}
-                <div style="background: rgb(254 252 232); border-radius: 0.75rem; padding: 0.75rem 1rem; border: 1px solid rgb(250 204 21);">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            wire:model.live="withoutCai"
-                            style="width: 1rem; height: 1rem; accent-color: rgb(217 119 6); cursor: pointer;"
-                        />
-                        <span style="font-size: 0.875rem; font-weight: 500; color: rgb(113 63 18);">
-                            Factura sin CAI
-                        </span>
-                    </label>
-                    <p style="font-size: 0.75rem; color: rgb(161 98 7); margin-top: 0.25rem; margin-left: 1.5rem;">
-                        Marcar si no se requiere número fiscal autorizado (SAR). Se usará un número interno de referencia.
-                    </p>
                 </div>
 
             @else

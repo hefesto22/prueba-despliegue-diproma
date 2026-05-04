@@ -90,7 +90,17 @@ class ExpenseForm
                         Select::make('category')
                             ->label('Categoría')
                             ->required()
-                            ->options(ExpenseCategory::class)
+                            ->options(
+                                // Excluimos las categorías auto-generadas por el sistema
+                                // (ej. ComisionesBancarias). Esos gastos los crea el
+                                // CardFeeRecorder al cobrar con tarjeta — no deberían
+                                // poder elegirse manualmente para mantener la integridad
+                                // del filtro "comisiones del mes" en reportes.
+                                collect(ExpenseCategory::cases())
+                                    ->reject(fn (ExpenseCategory $c) => $c->isSystemGenerated())
+                                    ->mapWithKeys(fn (ExpenseCategory $c) => [$c->value => $c->getLabel()])
+                                    ->all()
+                            )
                             ->native(false)
                             ->helperText('Agrupación para reportes mensuales.'),
 

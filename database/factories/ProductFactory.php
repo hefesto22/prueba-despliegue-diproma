@@ -34,7 +34,9 @@ class ProductFactory extends Factory
             // hay que forzarlo via ->state([...]) despues del create.
             'description' => fake()->optional(0.3)->sentence(),
             'category_id' => Category::factory(),
-            'product_type' => $type,
+            // Para enum cases: guardamos el `value` en minúsculas (ej. 'laptop').
+            // El modelo Product::normalizeProductType respeta este formato.
+            'product_type' => $type->value,
             'brand' => fake()->randomElement(['HP', 'DELL', 'LENOVO', 'ASUS', 'ACER', 'SONY', 'SAMSUNG', 'LG', 'EPSON', 'LOGITECH']),
             'model' => strtoupper(fake()->bothify('???-####')),
             'condition' => $condition,
@@ -74,11 +76,20 @@ class ProductFactory extends Factory
     }
 
     /**
-     * Producto tipo específico.
+     * Producto tipo específico (acepta enum o string custom).
+     *
+     * Enum: guarda el `value` (minúsculas — 'laptop', 'desktop').
+     * String custom: guarda en MAYÚSCULAS (formato de spec_options).
+     * Product::normalizeProductType en el modelo aplica la misma regla
+     * en runtime, así que también acepta cualquier casing del input.
      */
-    public function ofType(ProductType $type): static
+    public function ofType(ProductType|string $type): static
     {
-        return $this->state(fn () => ['product_type' => $type]);
+        $value = $type instanceof ProductType
+            ? $type->value                       // 'laptop'
+            : mb_strtoupper((string) $type);     // 'EQUIPO DE SEGURIDAD'
+
+        return $this->state(fn () => ['product_type' => $value]);
     }
 
     /**
@@ -87,6 +98,27 @@ class ProductFactory extends Factory
     public function outOfStock(): static
     {
         return $this->state(fn () => ['stock' => 0]);
+    }
+
+    /**
+     * Servicio sin inventario (Honorarios, instalación, mantenimiento).
+     *
+     * - product_type: tipo custom 'HONORARIO' (no enum).
+     * - is_service: true (controla descuento de stock, edición de precio en POS,
+     *   exclusión de reportes de stock bajo).
+     * - tax_type: Exento (servicios profesionales en HN son exentos).
+     * - stock virtual de 999999 para que el SaleInventoryProcessor no se queje.
+     */
+    public function service(string $type = 'HONORARIO'): static
+    {
+        return $this->state(fn () => [
+            'product_type' => mb_strtoupper($type),
+            'is_service' => true,
+            'tax_type' => TaxType::Exento,
+            'condition' => ProductCondition::New,
+            'stock' => 999999,
+            'min_stock' => 0,
+        ]);
     }
 
     /**

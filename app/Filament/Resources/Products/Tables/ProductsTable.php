@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Products\Tables;
 
 use App\Enums\ProductCondition;
 use App\Enums\ProductType;
+use App\Models\SpecOption;
 use App\Enums\TaxType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -55,7 +56,22 @@ class ProductsTable
                 TextColumn::make('condition')
                     ->label('Condición')
                     ->badge()
-                    ->color(fn (ProductCondition $state) => $state === ProductCondition::New ? 'success' : 'warning'),
+                    ->color(fn ($state, $record) =>
+                        $record->is_service
+                            ? 'gray'
+                            : ($state === ProductCondition::New ? 'success' : 'warning')
+                    )
+                    ->formatStateUsing(function ($state, $record) {
+                        // Servicios (Honorarios, etc.): condición no aplica
+                        // conceptualmente — mostramos guion. Productos físicos
+                        // (sean enum o custom) muestran su condición real.
+                        if ($record->is_service) {
+                            return '—';
+                        }
+                        return $state instanceof ProductCondition
+                            ? $state->getLabel()
+                            : $state;
+                    }),
                 TextColumn::make('sale_price_with_isv')
                     ->label('Precio')
                     ->money('HNL')
@@ -65,7 +81,20 @@ class ProductsTable
                     ->label('Stock')
                     ->sortable()
                     ->badge()
-                    ->color(fn ($record) => $record->isOutOfStock() ? 'danger' : ($record->isLowStock() ? 'warning' : 'success')),
+                    ->color(fn ($record) => $record->is_service
+                        ? 'gray'
+                        : ($record->isOutOfStock() ? 'danger' : ($record->isLowStock() ? 'warning' : 'success'))
+                    )
+                    ->formatStateUsing(function ($state, $record) {
+                        // Solo SERVICIOS muestran ∞ — su stock virtual (999999)
+                        // representa "sin inventario real". Productos físicos
+                        // (enum o custom) muestran su stock real, incluso si
+                        // accidentalmente tienen un número alto.
+                        if ($record->is_service) {
+                            return '∞';
+                        }
+                        return (string) $state;
+                    }),
                 ToggleColumn::make('is_active')
                     ->label('Activo')
                     ->onColor('success')
@@ -90,7 +119,7 @@ class ProductsTable
             ->filters([
                 SelectFilter::make('product_type')
                     ->label('Tipo')
-                    ->options(ProductType::class)
+                    ->options(fn () => SpecOption::searchOptions('product_type'))
                     ->multiple(),
                 SelectFilter::make('brand')
                     ->label('Marca')

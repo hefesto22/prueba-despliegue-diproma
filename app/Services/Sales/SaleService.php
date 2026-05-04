@@ -12,6 +12,7 @@ use App\Models\Customer;
 use App\Models\Establishment;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\Banking\CardFeeRecorder;
 use App\Services\Cash\CashSessionService;
 use App\Services\Establishments\EstablishmentResolver;
 use App\Services\Sales\Tax\SaleTaxCalculator;
@@ -47,6 +48,7 @@ class SaleService
         private readonly CashSessionService $cashSessionService,
         private readonly SaleTaxCalculator $taxCalculator,
         private readonly SaleInventoryProcessor $inventoryProcessor,
+        private readonly CardFeeRecorder $cardFeeRecorder,
     ) {}
 
     /**
@@ -155,6 +157,15 @@ class SaleService
 
             // 6. Marcar como completada
             $sale->update(['status' => SaleStatus::Completada]);
+
+            // 7. Si fue pagada con tarjeta (crédito o débito), registrar el
+            //    Expense automático por la comisión bancaria que cobra el
+            //    procesador. El monto NO se descuenta de caja (la comisión
+            //    la retiene el banco del depósito, no del cajón) — solo
+            //    queda como gasto contable para reflejar la utilidad real
+            //    del negocio. Si el método no aplica, recordIfApplicable()
+            //    es no-op silencioso.
+            $this->cardFeeRecorder->recordIfApplicable($sale, $paymentMethod);
 
             return $sale->fresh(['items.product', 'customer']);
         });

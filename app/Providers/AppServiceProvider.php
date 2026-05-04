@@ -7,8 +7,10 @@ use App\Events\UserLoggedIn;
 use App\Listeners\DispatchUserLoggedIn;
 use App\Listeners\LogCaiFailoverActivity;
 use App\Listeners\RecordUserLogin;
+use App\Models\CompanySetting;
 use App\Services\Alerts\CaiSuccessorResolver;
 use App\Services\Alerts\Contracts\ResuelveSucesoresDeCai;
+use App\Services\Banking\CardFeeCalculator;
 use App\Services\Cai\CaiAvailabilityService;
 use App\Services\FiscalPeriods\FiscalPeriodService;
 use App\Services\Invoicing\Contracts\ResuelveCorrelativoFactura;
@@ -98,6 +100,22 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             RepairTaxCalculator::class,
             fn () => new RepairTaxCalculator((float) config('tax.multiplier', 1.15)),
+        );
+
+        // ─── CardFeeCalculator (singleton) ────────────
+        // El calculator es liviano y stateless. Su única dependencia es el
+        // closure que resuelve CompanySetting, que ejecutamos cada vez que
+        // se necesita la tasa (refleja cambios admin sin reiniciar).
+        //
+        // CompanySetting::current() está cacheado por 24h con invalidación
+        // automática en `saved()`. Eso es suficiente para producción: si el
+        // admin edita la tasa desde el panel, el observer borra el cache y
+        // la próxima venta usa la tasa nueva.
+        $this->app->singleton(
+            CardFeeCalculator::class,
+            fn () => new CardFeeCalculator(
+                settingsResolver: fn () => CompanySetting::current(),
+            ),
         );
     }
 

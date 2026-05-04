@@ -48,12 +48,18 @@ class ProductInfolist
                                 if (!is_array($state) || empty($state)) {
                                     return 'Sin especificaciones';
                                 }
+
+                                // Labels desde el enum si el tipo es conocido.
+                                // Para tipos personalizados, usamos el field_key
+                                // como fallback (ej. "ram" → "Ram").
                                 $labels = [];
-                                if ($record->product_type) {
-                                    foreach ($record->product_type->specFields() as $field) {
+                                $enum = $record->productTypeEnum ?? null;
+                                if ($enum) {
+                                    foreach ($enum->specFields() as $field) {
                                         $labels[$field['key']] = $field['label'];
                                     }
                                 }
+
                                 return collect($state)
                                     ->map(fn ($value, $key) => '**' . ($labels[$key] ?? ucfirst($key)) . ':** ' . $value)
                                     ->implode("\n\n");
@@ -84,6 +90,9 @@ class ProductInfolist
                     ]),
 
                 Section::make('Inventario')
+                    // Ocultar la sección entera para servicios — no tienen
+                    // inventario real (stock = 999999 placeholder).
+                    ->visible(fn ($record) => ! $record->is_service)
                     ->schema([
                         Grid::make(3)->schema([
                             TextEntry::make('stock')

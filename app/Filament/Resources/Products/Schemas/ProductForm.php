@@ -43,16 +43,27 @@ class ProductForm
             $typeValue = $typeValue->value;
         }
 
-        $type = ProductType::tryFrom($typeValue ?? '');
+        // tryFrom case-insensitive: los valores guardados están en MAYÚSCULAS
+        // (ej. 'LAPTOP'), los cases del enum en minúsculas (ej. 'laptop').
+        $type = ProductType::tryFrom(mb_strtolower((string) ($typeValue ?? '')));
         $specs = [];
 
         if ($type) {
+            // Tipo enum conocido: empacar specs específicos del tipo.
             foreach ($type->specFields() as $field) {
                 $formKey = static::specFieldName($type, $field['key']);
                 $val = $data[$formKey] ?? null;
                 if (filled($val)) {
                     $specs[$field['key']] = $val;
                 }
+            }
+        } else {
+            // Tipo CUSTOM: el form puede haber puesto `subtype` directamente
+            // en `data.specs.subtype` vía dot notation del Select. Preservarlo
+            // — sin esto, $data['specs'] = $specs sobreescribe el subtype.
+            $existingSpecs = $data['specs'] ?? [];
+            if (is_array($existingSpecs) && filled($existingSpecs['subtype'] ?? null)) {
+                $specs['subtype'] = $existingSpecs['subtype'];
             }
         }
 
@@ -78,7 +89,8 @@ class ProductForm
             $typeValue = $typeValue->value;
         }
 
-        $type = ProductType::tryFrom($typeValue ?? '');
+        // Case-insensitive resolve (ver packSpecs).
+        $type = ProductType::tryFrom(mb_strtolower((string) ($typeValue ?? '')));
         $specs = $data['specs'] ?? [];
 
         if ($type && is_array($specs)) {
@@ -98,18 +110,69 @@ class ProductForm
             ->components([
 
                 // ── 1. Tipo de producto ──────────────────────────────
+                // Combina los 8 tipos del enum (con sus labels bonitos y
+                // schema de specs específicos) + tipos custom que el cliente
+                // haya agregado (Equipo de seguridad, Honorarios, etc).
+                //
+                // Si el cliente escribe un tipo que no existe en la lista,
+                // aparece "(PERSONALIZADO)" y al guardar el producto queda
+                // registrado en spec_options para el próximo. Mismo patrón
+                // que RAM, procesador, almacenamiento.
                 Section::make('Tipo de producto')
                     ->aside()
-                    ->description('Los campos de especificaciones se ajustan según el tipo.')
+                    ->description('Si el tipo no existe en la lista, escribilo y se guarda automáticamente para próxima vez. Los campos de especificaciones se ajustan según el tipo.')
                     ->schema([
                         Select::make('product_type')
                             ->label('¿Qué estás registrando?')
-                            ->options(ProductType::class)
                             ->required()
-                            ->default(ProductType::Laptop)
+                            ->default(ProductType::Laptop->value)
+                            ->searchable()
+                            ->options(fn () => static::buildProductTypeOptions())
+                            ->getSearchResultsUsing(function (string $search): array {
+                                $base = static::buildProductTypeOptions();
+                                $needle = mb_strtolower(trim($search));
+
+                                if ($needle === '') {
+                                    return $base;
+                                }
+
+                                // Filtrar opciones que coincidan con la búsqueda
+                                // (case-insensitive en el label).
+                                $filtered = array_filter(
+                                    $base,
+                                    fn (string $label) => str_contains(mb_strtolower($label), $needle),
+                                );
+
+                                // Si no hay match exacto y el search está lleno,
+                                // ofrecer "(PERSONALIZADO)" — guardará el valor en
+                                // MAYÚSCULAS al confirmar el producto.
+                                $upper = mb_strtoupper(trim($search));
+                                $existsAsEnum = ProductType::tryFrom(mb_strtolower(trim($search))) !== null;
+                                $existsAsCustom = isset($base[$upper]);
+
+                                if (filled($search) && ! $existsAsEnum && ! $existsAsCustom) {
+                                    $filtered = [$upper => "{$upper} (PERSONALIZADO)"] + $filtered;
+                                }
+
+                                return $filtered;
+                            })
+                            ->getOptionLabelUsing(function (?string $value) {
+                                if (! filled($value)) {
+                                    return null;
+                                }
+                                // Si el valor es un enum case, devolver su label oficial.
+                                $enum = ProductType::tryFrom(mb_strtolower((string) $value));
+                                if ($enum) {
+                                    return $enum->getLabel();
+                                }
+                                // Si es custom, mostrarlo tal cual (MAYÚSCULAS).
+                                return $value;
+                            })
                             ->live()
                             ->afterStateUpdated(function (callable $set) {
-                                // Limpiar TODOS los campos spec de todos los tipos
+                                // Limpiar todos los campos spec al cambiar de tipo.
+                                // Para tipos enum los specs aplicables son distintos;
+                                // para custom no se muestran specs específicos.
                                 foreach (ProductType::cases() as $t) {
                                     foreach ($t->specFields() as $field) {
                                         $set(static::specFieldName($t, $field['key']), null);
@@ -157,17 +220,37 @@ class ProductForm
                         Placeholder::make('name_preview')
                             ->label('')
                             ->content(function ($get) {
-                                $type = static::getProductType($get);
-                                if (!$type) {
+                                $rawType = $get('product_type');
+                                if (! filled($rawType)) {
                                     return new HtmlString('<span class="text-gray-400">Seleccione un tipo de producto</span>');
                                 }
 
+                                $type = static::getProductType($get); // ?ProductType
                                 $brand = $get('brand') ?? '';
-                                $specs = static::collectSpecs($get, $type);
-                                $name = $type->generateName($brand, $get('model') ?? '', $specs);
+                                $model = $get('model') ?? '';
 
-                                // Preview del SKU
-                                $skuPrefix = $type->skuPrefix();
+                                if ($type) {
+                                    // Tipo enum conocido: nombre y SKU usan el enum.
+                                    $specs = static::collectSpecs($get, $type);
+                                    $name = $type->generateName($brand, $model, $specs);
+                                    $skuPrefix = $type->skuPrefix();
+                                } else {
+                                    // Tipo personalizado: tipo + marca + modelo
+                                    // + subtype (si está). Ej: "HONORARIOS - INSTALACIÓN".
+                                    $parts = [mb_strtoupper((string) $rawType)];
+                                    if (filled($brand)) $parts[] = mb_strtoupper((string) $brand);
+                                    if (filled($model)) $parts[] = mb_strtoupper((string) $model);
+                                    $name = implode(' ', $parts);
+
+                                    $subtype = $get('specs.subtype');
+                                    if (filled($subtype)) {
+                                        $name .= ' - ' . mb_strtoupper((string) $subtype);
+                                    }
+
+                                    $clean = strtoupper(preg_replace('/[^a-zA-Z]/', '', (string) $rawType) ?: '');
+                                    $skuPrefix = $clean !== '' ? substr($clean, 0, 3) : 'GEN';
+                                }
+
                                 $brandPrefix = filled($brand)
                                     ? strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $brand), 0, 3) ?: 'GEN')
                                     : 'GEN';
@@ -192,19 +275,79 @@ class ProductForm
                         Hidden::make('slug')->dehydrated(),
                     ]),
 
+                // ── 2.5. Datos del producto (SOLO tipos custom) ──────
+                // Para tipos enum (Laptop, Desktop, etc.) los specs vienen
+                // del schema del enum y se renderizan arriba dinámicamente.
+                // Para tipos custom (Equipo de seguridad, Honorarios, etc.),
+                // damos al cliente UN sub-clasificador (Subtipo) + un campo
+                // libre de descripción técnica para que pueda identificar
+                // el producto sin necesidad de configurar nuevos schemas.
+                Section::make('Datos del producto')
+                    ->aside()
+                    ->description('Subtipo, descripción técnica y naturaleza (servicio o producto físico).')
+                    ->visible(fn ($get) => static::isCustomType($get))
+                    ->schema([
+                        // Toggle is_service: identifica si este tipo custom es
+                        // un servicio (sin inventario) o un producto físico.
+                        // Esto controla:
+                        //   - Si se muestra/oculta la sección "Inventario".
+                        //   - Si se muestra/oculta el campo "Condición".
+                        //   - Si el POS permite editar el precio en el carrito.
+                        //   - Si se descuenta stock al vender.
+                        //   - Si aparece en reportes de "stock bajo".
+                        //
+                        // Default false: ante la duda, asumimos que es producto
+                        // físico — más seguro porque no oculta el inventario.
+                        Toggle::make('is_service')
+                            ->label('Es un servicio (sin inventario)')
+                            ->helperText('Marcar SI: Honorarios profesionales, instalación, mantenimiento, asesoría. NO marcar para productos físicos como equipos de seguridad, cámaras, biométricos.')
+                            ->default(false)
+                            ->onColor('warning')
+                            ->offColor('success')
+                            ->live(),
+
+                        Select::make('specs.subtype')
+                            ->label('Subtipo')
+                            ->searchable()
+                            ->options(fn () => SpecOption::searchOptions('subtype'))
+                            ->getSearchResultsUsing(function (string $search): array {
+                                $search = mb_strtoupper(trim($search));
+                                $options = SpecOption::searchOptions('subtype', $search);
+
+                                if (filled($search) && ! isset($options[$search])) {
+                                    $options = [$search => "{$search} (PERSONALIZADO)"] + $options;
+                                }
+
+                                return $options;
+                            })
+                            ->getOptionLabelUsing(fn (?string $value): ?string => $value)
+                            ->helperText('Ej: Cámara IP, DVR, Biométrico, Instalación. Si no existe, escribilo y se guarda.')
+                            ->live(),
+
+                        Textarea::make('description')
+                            ->label('Descripción técnica')
+                            ->rows(3)
+                            ->maxLength(2000)
+                            ->placeholder('Ej: 4MP, lente 2.8mm, IR 30m, IP67, PoE, slot microSD')
+                            ->helperText('Detalles que ayuden a identificar el producto: especificaciones técnicas, características, lo que incluye.'),
+                    ]),
+
                 // ── 3. Condición + Precios ───────────────────────────
                 Section::make('Precio')
                     ->aside()
-                    ->description(fn ($get) => static::isGravado($get)
-                        ? 'Nuevo — ingrese precios con ISV incluido.'
-                        : 'Usado — exento de ISV.')
+                    ->description(fn ($get) => static::priceSectionDescription($get))
                     ->schema([
                         Grid::make(3)->schema([
+                            // Condición: aplica a TODO producto físico (enum o
+                            // custom no-servicio). Un servicio no tiene
+                            // condición "nuevo/usado", es exento por su
+                            // naturaleza profesional.
                             Select::make('condition')
                                 ->label('Condición')
                                 ->options(ProductCondition::class)
                                 ->required()
                                 ->default(ProductCondition::New)
+                                ->visible(fn ($get) => ! static::isService($get))
                                 ->live()
                                 ->afterStateUpdated(function ($state, callable $set) {
                                     $isUsed = $state === ProductCondition::Used->value
@@ -213,6 +356,19 @@ class ProductForm
                                         ? TaxType::Exento->value
                                         : TaxType::Gravado15->value);
                                 }),
+
+                            // Tipo fiscal explícito SOLO para servicios. El
+                            // usuario elige (default Exento — caso típico de
+                            // honorarios profesionales).
+                            Select::make('tax_type')
+                                ->label('Tipo fiscal')
+                                ->options(TaxType::class)
+                                ->default(TaxType::Exento)
+                                ->required()
+                                ->visible(fn ($get) => static::isService($get))
+                                ->helperText('Servicios profesionales (Honorarios) son normalmente Exento.')
+                                ->live(),
+
                             TextInput::make('cost_price')
                                 ->label('Costo')
                                 ->numeric()
@@ -220,7 +376,11 @@ class ProductForm
                                 ->minValue(0)
                                 ->step(0.01)
                                 ->prefix('L')
+                                ->default(fn ($get) => static::isService($get) ? 0 : null)
                                 ->placeholder('0.00')
+                                ->helperText(fn ($get) => static::isService($get)
+                                    ? 'Variable. Ajustar al facturar.'
+                                    : null)
                                 ->live(onBlur: true),
                             TextInput::make('sale_price')
                                 ->label('Precio de venta')
@@ -229,7 +389,11 @@ class ProductForm
                                 ->minValue(0)
                                 ->step(0.01)
                                 ->prefix('L')
+                                ->default(fn ($get) => static::isService($get) ? 0 : null)
                                 ->placeholder('0.00')
+                                ->helperText(fn ($get) => static::isService($get)
+                                    ? 'Variable. Ajustar al facturar.'
+                                    : null)
                                 ->live(onBlur: true),
                         ]),
                         Placeholder::make('price_summary')
@@ -238,15 +402,27 @@ class ProductForm
                             ->visible(fn ($get) =>
                                 (float) ($get('cost_price') ?? 0) > 0
                                 || (float) ($get('sale_price') ?? 0) > 0),
+
+                        // Hidden tax_type para productos físicos (lo setea el
+                        // afterStateUpdated del Condition select según
+                        // Nuevo=Gravado15 / Usado=Exento). Para servicios, el
+                        // TaxType select arriba ya es el campo persistido.
                         Hidden::make('tax_type')
                             ->default(TaxType::Gravado15->value)
-                            ->dehydrated(),
+                            ->dehydrated(fn ($get) => ! static::isService($get))
+                            ->visible(fn ($get) => ! static::isService($get)),
                     ]),
 
                 // ── 4. Stock ─────────────────────────────────────────
+                // Inventario aplica a productos FÍSICOS (sean enum o custom
+                // no-servicio). Para servicios (is_service=true) no tiene
+                // sentido — el stock se setea internamente como infinito en
+                // CreateProduct::applyServiceDefaults para que el SaleInventoryProcessor
+                // no se queje de "stock insuficiente" al vender un servicio.
                 Section::make('Inventario')
                     ->aside()
                     ->description('Control de existencias.')
+                    ->visible(fn ($get) => ! static::isService($get))
                     ->schema([
                         Grid::make(2)->schema([
                             TextInput::make('stock')
@@ -270,11 +446,16 @@ class ProductForm
                     ->collapsible()
                     ->collapsed()
                     ->schema([
+                        // Para tipos enum: aquí va la descripción opcional.
+                        // Para tipos custom: la descripción técnica ya está
+                        // en la sección "Datos del producto" arriba — la
+                        // ocultamos acá para no duplicar.
                         Textarea::make('description')
                             ->label('Descripción')
                             ->rows(2)
                             ->maxLength(2000)
-                            ->placeholder('Notas adicionales del producto'),
+                            ->placeholder('Notas adicionales del producto')
+                            ->visible(fn ($get) => ! static::isCustomType($get)),
                         TagsInput::make('serial_numbers')
                             ->label('Números de serie')
                             ->placeholder('Escriba y presione Enter'),
@@ -293,7 +474,66 @@ class ProductForm
                             ->onColor('success')
                             ->offColor('danger'),
                     ]),
+
             ]);
+        // Stock infinito para tipos custom: se inyecta en
+        // mutateFormDataBeforeCreate / mutateFormDataBeforeSave de las
+        // pages CreateProduct/EditProduct (más confiable que Hidden fields
+        // dentro de Sections con visible() condicional).
+    }
+
+    private static function priceSectionDescription($get): string
+    {
+        if (static::isService($get)) {
+            return 'Servicio — Tipo fiscal según corresponda. Precios variables, ajustables al facturar.';
+        }
+
+        return static::isGravado($get)
+            ? 'Nuevo — ingrese precios con ISV incluido.'
+            : 'Usado — exento de ISV.';
+    }
+
+    /**
+     * ¿El tipo seleccionado es CUSTOM (no es uno de los 8 enum cases)?
+     * Determina si se muestra la sección "Datos del producto" con subtipo,
+     * descripción técnica y el toggle is_service.
+     */
+    private static function isCustomType($get): bool
+    {
+        $val = $get('product_type');
+        if (! filled($val)) {
+            return false;
+        }
+        if ($val instanceof ProductType) {
+            return false; // es enum
+        }
+        return ProductType::tryFrom(mb_strtolower((string) $val)) === null;
+    }
+
+    /**
+     * ¿Este producto es un SERVICIO (sin inventario)?
+     *
+     * Solo puede serlo si es tipo CUSTOM y el usuario marcó el toggle.
+     * Los tipos enum (Laptop, Desktop, etc.) son siempre productos físicos —
+     * el toggle is_service no aparece para ellos.
+     *
+     * Determina:
+     *   - Si se oculta la sección "Inventario" (servicios no llevan stock).
+     *   - Si se oculta el campo "Condición" (servicios no son nuevo/usado).
+     *   - Si se muestra el campo "Tipo fiscal" explícito.
+     *   - Si los defaults de cost/sale_price son 0.
+     *   - Comportamiento del POS al vender este producto.
+     */
+    private static function isService($get): bool
+    {
+        // Solo tipos custom pueden ser servicio.
+        if (! static::isCustomType($get)) {
+            return false;
+        }
+
+        // El toggle is_service decide. Si no está seteado todavía (form
+        // recién renderizado), default false.
+        return (bool) $get('is_service');
     }
 
     // ─── Dynamic spec fields ─────────────────────────────────
@@ -369,7 +609,51 @@ class ProductForm
         if ($val instanceof ProductType) {
             return $val;
         }
-        return ProductType::tryFrom($val ?? '');
+        // Case-insensitive: los enum cases están en minúsculas ('laptop'),
+        // pero un tipo custom guardado en spec_options está en MAYÚSCULAS
+        // ('EQUIPO DE SEGURIDAD'). tryFrom devuelve null para custom, y el
+        // form lo trata como "sin specs específicos".
+        return ProductType::tryFrom(mb_strtolower((string) ($val ?? '')));
+    }
+
+    /**
+     * Combina los 8 tipos del enum (con labels bonitos) + los tipos custom
+     * que el cliente agregó al vuelo (vienen de spec_options con field_key
+     * 'product_type'). Retorna [value => label] para Filament Select.
+     *
+     * Los enum cases se persisten con su `value` en minúsculas ('laptop')
+     * para mantener compatibilidad con el código existente que compara
+     * `$selected === $type->value`. Los custom se persisten en MAYÚSCULAS
+     * ('EQUIPO DE SEGURIDAD') siguiendo el patrón de spec_options.
+     *
+     * Si un valor custom coincide con un enum case (case-insensitive), se
+     * filtra para no duplicar — el enum tiene preferencia.
+     *
+     * @return array<string, string>
+     */
+    private static function buildProductTypeOptions(): array
+    {
+        // 1) Tipos del enum con sus labels oficiales.
+        $enumOptions = [];
+        foreach (ProductType::cases() as $t) {
+            $enumOptions[$t->value] = $t->getLabel();
+        }
+
+        // 2) Custom values de spec_options.
+        $customRaw = SpecOption::searchOptions('product_type');
+
+        // Filtrar duplicados: si un custom value es solo un enum en MAYÚSCULAS,
+        // descartarlo porque el enum ya está arriba con su label bonito.
+        $enumValuesUpper = array_map('mb_strtoupper', array_keys($enumOptions));
+        $customFiltered = [];
+        foreach ($customRaw as $value => $label) {
+            if (in_array(mb_strtoupper($value), $enumValuesUpper, true)) {
+                continue;
+            }
+            $customFiltered[$value] = $label;
+        }
+
+        return $enumOptions + $customFiltered;
     }
 
     /**
@@ -390,7 +674,11 @@ class ProductForm
     {
         $type = static::getProductType($get);
         if (! $type) {
-            return 'Detalles';
+            // Tipo personalizado o vacío: descripción genérica.
+            $rawType = $get('product_type');
+            return filled($rawType)
+                ? mb_strtoupper((string) $rawType) . ' — completá los datos del producto.'
+                : 'Detalles';
         }
 
         return match ($type) {

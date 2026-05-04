@@ -24,7 +24,10 @@ class SupplierInfolist
                                 ->weight('bold'),
                             TextEntry::make('rtn')
                                 ->label('RTN')
-                                ->formatStateUsing(fn ($record) => $record->formatted_rtn)
+                                ->placeholder('Sin RTN (proveedor informal)')
+                                ->formatStateUsing(fn ($record) => filled($record->rtn)
+                                    ? $record->formatted_rtn
+                                    : null)
                                 ->copyable(),
                             TextEntry::make('company_name')
                                 ->label('Razón social')

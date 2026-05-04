@@ -28,6 +28,7 @@ enum ExpenseCategory: string implements HasLabel, HasColor, HasIcon
     case Papeleria = 'papeleria';
     case Mantenimiento = 'mantenimiento';
     case Servicios = 'servicios';
+    case ComisionesBancarias = 'comisiones_bancarias';
     case Otros = 'otros';
 
     public function getLabel(): string
@@ -38,6 +39,7 @@ enum ExpenseCategory: string implements HasLabel, HasColor, HasIcon
             self::Papeleria => 'Papelería',
             self::Mantenimiento => 'Mantenimiento',
             self::Servicios => 'Servicios básicos',
+            self::ComisionesBancarias => 'Comisiones bancarias',
             self::Otros => 'Otros',
         };
     }
@@ -50,6 +52,7 @@ enum ExpenseCategory: string implements HasLabel, HasColor, HasIcon
             self::Papeleria => 'gray',
             self::Mantenimiento => 'danger',
             self::Servicios => 'primary',
+            self::ComisionesBancarias => 'info',
             self::Otros => 'gray',
         };
     }
@@ -62,7 +65,23 @@ enum ExpenseCategory: string implements HasLabel, HasColor, HasIcon
             self::Papeleria => 'heroicon-o-document',
             self::Mantenimiento => 'heroicon-o-wrench-screwdriver',
             self::Servicios => 'heroicon-o-bolt',
+            self::ComisionesBancarias => 'heroicon-o-credit-card',
             self::Otros => 'heroicon-o-ellipsis-horizontal-circle',
         };
+    }
+
+    /**
+     * ¿Esta categoría corresponde a un gasto generado automáticamente
+     * por el sistema (no por el usuario)?
+     *
+     * Útil para:
+     *   - Bloquear edición/eliminación manual desde Filament — son gastos
+     *     producto de operaciones registradas (comisiones de tarjeta) cuyo
+     *     monto/fecha debe coincidir con la venta de origen.
+     *   - Filtrar reportes "gastos del día por mí" vs "gastos automáticos".
+     */
+    public function isSystemGenerated(): bool
+    {
+        return $this === self::ComisionesBancarias;
     }
 }

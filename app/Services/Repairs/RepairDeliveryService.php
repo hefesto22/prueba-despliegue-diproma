@@ -19,6 +19,7 @@ use App\Models\Product;
 use App\Models\Repair;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\Banking\CardFeeRecorder;
 use App\Services\Cash\CashSessionService;
 use App\Services\Establishments\EstablishmentResolver;
 use App\Services\Invoicing\InvoiceService;
@@ -58,6 +59,7 @@ class RepairDeliveryService
         private readonly CashSessionService $cashSessionService,
         private readonly EstablishmentResolver $establishmentResolver,
         private readonly InvoiceService $invoiceService,
+        private readonly CardFeeRecorder $cardFeeRecorder,
     ) {}
 
     /**
@@ -261,7 +263,24 @@ class RepairDeliveryService
                 );
             }
 
-            // 7. Actualizar Repair: estado terminal + vínculos fiscales.
+            // 7. Si el saldo se cobró con tarjeta, registrar Expense
+            //    automático por la comisión bancaria del procesador.
+            //    Importante: la comisión se calcula sobre el `outstanding`
+            //    (lo que efectivamente pasó por el POS bancario), NO sobre
+            //    el total de la venta. El anticipo se cobró en efectivo
+            //    (RepairStatusService lo hardcodea así), por lo que no
+            //    generó comisión en su momento. Si en el futuro el anticipo
+            //    soporta tarjeta, ese flujo deberá llamar a este recorder
+            //    también con su propio chargedAmount.
+            if ($outstanding > 0) {
+                $this->cardFeeRecorder->recordIfApplicable(
+                    sale: $sale,
+                    method: $paymentMethod,
+                    chargedAmount: $outstanding,
+                );
+            }
+
+            // 8. Actualizar Repair: estado terminal + vínculos fiscales.
             $repair->update([
                 'status' => RepairStatus::Entregada,
                 'delivered_at' => now(),
@@ -271,7 +290,7 @@ class RepairDeliveryService
                 'customer_rtn' => $finalRtn,
             ]);
 
-            // 8. Registrar el StatusChange en la bitácora del repair.
+            // 9. Registrar el StatusChange en la bitácora del repair.
             $repair->statusLogs()->create([
                 'event_type' => RepairLogEvent::StatusChange,
                 'from_status' => $previousStatus->value,
@@ -290,8 +309,8 @@ class RepairDeliveryService
             return $repair->fresh();
         });
 
-        // 9. Disparar evento DESPUÉS del commit — listeners (cleanup de fotos)
-        //    solo deben correr si la entrega quedó realmente persistida.
+        // 10. Disparar evento DESPUÉS del commit — listeners (cleanup de fotos)
+        //     solo deben correr si la entrega quedó realmente persistida.
         RepairDelivered::dispatch($delivered);
 
         return $delivered;

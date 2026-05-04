@@ -146,16 +146,24 @@ class Supplier extends Model
 
     /**
      * RTN formateado: 0801-1999-12345
+     *
+     * Retorna string vacío si el proveedor no tiene RTN (proveedor informal
+     * tipo Recibo Interno). En PHP 8.4 pasar null a preg_replace/strlen lanza
+     * error — por eso el guard explícito al inicio.
      */
     public function getFormattedRtnAttribute(): string
     {
-        $rtn = preg_replace('/\D/', '', $this->rtn);
+        if (! filled($this->rtn)) {
+            return '';
+        }
+
+        $rtn = preg_replace('/\D/', '', (string) $this->rtn);
 
         if (strlen($rtn) === 14) {
             return substr($rtn, 0, 4) . '-' . substr($rtn, 4, 4) . '-' . substr($rtn, 8, 6);
         }
 
-        return $this->rtn;
+        return (string) $this->rtn;
     }
 
     /**

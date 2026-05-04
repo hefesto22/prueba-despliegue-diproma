@@ -353,6 +353,11 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 'tax_type' => $product->tax_type->value,
                 'quantity' => 1,
                 'stock' => $product->stock,
+                // is_service viene del flag explícito del producto. Solo los
+                // servicios (Honorarios) permiten editar el precio en el cart
+                // — los productos físicos (incluyendo custom como equipo de
+                // seguridad) tienen precio fijo del catálogo.
+                'is_service' => (bool) $product->is_service,
             ];
 
             Notification::make()
@@ -388,6 +393,34 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
         }
 
         $this->cart[$index]['quantity'] = $quantity;
+    }
+
+    /**
+     * Actualizar el precio unitario de un item del carrito.
+     *
+     * Solo aplicable a items marcados `is_service=true` (tipos custom como
+     * Honorarios), donde el precio varía según el trabajo realizado. La vista
+     * solo expone el input editable para esos items, pero validamos también
+     * acá como defense-in-depth — un cajero malicioso podría intentar
+     * modificar el precio de productos físicos vía wire request directo.
+     */
+    public function updateUnitPrice(int $index, $price): void
+    {
+        if (! isset($this->cart[$index])) {
+            return;
+        }
+
+        // Solo se permite editar precio en servicios.
+        if (! ($this->cart[$index]['is_service'] ?? false)) {
+            return;
+        }
+
+        $price = (float) $price;
+        if ($price < 0) {
+            return;
+        }
+
+        $this->cart[$index]['unit_price'] = round($price, 2);
     }
 
     /**

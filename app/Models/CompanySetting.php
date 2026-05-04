@@ -31,6 +31,8 @@ class CompanySetting extends Model
         'cai_exhaustion_warning_percentage',
         'cai_exhaustion_warning_absolute',
         'cash_discrepancy_tolerance',
+        'card_fee_rate_credit',
+        'card_fee_rate_debit',
     ];
 
     protected function casts(): array
@@ -41,6 +43,8 @@ class CompanySetting extends Model
             'cai_exhaustion_warning_percentage' => 'decimal:2',
             'cai_exhaustion_warning_absolute' => 'integer',
             'cash_discrepancy_tolerance' => 'decimal:2',
+            'card_fee_rate_credit' => 'decimal:4',
+            'card_fee_rate_debit' => 'decimal:4',
         ];
     }
 
@@ -62,6 +66,18 @@ class CompanySetting extends Model
      * campo está en null (no configurado).
      */
     public const DEFAULT_CASH_DISCREPANCY_TOLERANCE = 50.00;
+
+    /**
+     * Tasas de comisión bancaria por tipo de tarjeta.
+     *
+     * 3.4% es la tasa estándar promedio en Honduras (BAC, Banco Atlántida,
+     * Ficohsa, Credomatic). El admin la puede afinar desde el panel cuando
+     * renegocie con su banco — defaults solo aplican si el valor está null
+     * o el campo no se ha guardado nunca.
+     */
+    public const DEFAULT_CARD_FEE_RATE_CREDIT = 0.0340;
+
+    public const DEFAULT_CARD_FEE_RATE_DEBIT = 0.0340;
 
     /**
      * Días de aviso para vencimiento de CAI. Fallback a los defaults si está vacío.
@@ -116,6 +132,44 @@ class CompanySetting extends Model
 
         if ($raw === null) {
             return self::DEFAULT_CASH_DISCREPANCY_TOLERANCE;
+        }
+
+        $value = (float) $raw;
+
+        return $value >= 0 ? $value : 0.0;
+    }
+
+    /**
+     * Tasa efectiva de comisión por tarjeta de crédito (decimal, no porcentaje).
+     *
+     * Ejemplo: 0.0340 = 3.4%. Null → fallback al default. Negativo → 0.
+     *
+     * Pattern análogo a `effectiveCashDiscrepancyTolerance()`: leemos el
+     * valor crudo de attributes para evitar interferencia del cast cuando
+     * el campo está null pero Filament quiere mostrar/editar el valor.
+     */
+    public function effectiveCardFeeRateCredit(): float
+    {
+        $raw = $this->attributes['card_fee_rate_credit'] ?? null;
+
+        if ($raw === null) {
+            return self::DEFAULT_CARD_FEE_RATE_CREDIT;
+        }
+
+        $value = (float) $raw;
+
+        return $value >= 0 ? $value : 0.0;
+    }
+
+    /**
+     * Tasa efectiva de comisión por tarjeta de débito (decimal, no porcentaje).
+     */
+    public function effectiveCardFeeRateDebit(): float
+    {
+        $raw = $this->attributes['card_fee_rate_debit'] ?? null;
+
+        if ($raw === null) {
+            return self::DEFAULT_CARD_FEE_RATE_DEBIT;
         }
 
         $value = (float) $raw;

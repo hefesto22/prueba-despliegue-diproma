@@ -30,11 +30,15 @@ class SupplierForm
                                 ->placeholder('Ej: TecnoHN'),
                             TextInput::make('rtn')
                                 ->label('RTN')
-                                ->required()
                                 ->maxLength(14)
+                                // Opcional: hay proveedores informales (mercados,
+                                // taxis, freelancers) que solo se identifican por
+                                // nombre. Cuando no traen RTN, registramos la
+                                // compra como Recibo Interno (no genera crédito
+                                // fiscal pero sí queda como gasto deducible).
                                 ->unique(ignoreRecord: true)
-                                ->placeholder('08011999123456')
-                                ->helperText('14 dígitos, sin guiones'),
+                                ->placeholder('08011999123456 (opcional)')
+                                ->helperText('Opcional. 14 dígitos, sin guiones. Sin RTN se registra como proveedor informal (Recibo Interno).'),
                         ]),
                         TextInput::make('company_name')
                             ->label('Razón social')

@@ -24,6 +24,18 @@ class SpecOptionSeeder extends Seeder
     private function allOptions(): array
     {
         return [
+            // NOTA: 'product_type' NO se siembra aquí. Los 8 tipos conocidos
+            // (Laptop, Desktop, etc.) vienen del enum ProductType con sus
+            // labels bonitos y schema de specs específicos. Solo los tipos
+            // CUSTOM que el cliente agrega al vuelo (Equipo de seguridad,
+            // Honorarios) se guardan en spec_options con field_key='product_type',
+            // y aparecen al lado de los enum en el dropdown.
+
+            // 'subtype': para tipos CUSTOM, sirve como un sub-clasificador.
+            // Ej: tipo "Equipo de seguridad" → subtipo "Cámara IP" / "DVR" / etc.
+            // El cliente puede agregar más al vuelo desde el form.
+            'subtype' => $this->subtypes(),
+
             'processor' => $this->processors(),
             'ram' => $this->ram(),
             'storage' => $this->storage(),
@@ -42,6 +54,28 @@ class SpecOptionSeeder extends Seeder
             'component_type' => $this->componentTypes(),
             'comp_interface' => $this->componentInterfaces(),
             'accessory_type' => $this->accessoryTypes(),
+        ];
+    }
+
+    /**
+     * Subtipos iniciales — pensados para tipos custom como "Equipo de
+     * seguridad". El cliente puede agregar más al vuelo desde el form
+     * (mismo patrón que RAM, procesador, etc.).
+     */
+    private function subtypes(): array
+    {
+        return [
+            'CÁMARA IP',
+            'CÁMARA ANÁLOGA',
+            'DVR',
+            'NVR',
+            'BIOMÉTRICO',
+            'SENSOR DE MOVIMIENTO',
+            'ALARMA',
+            'CONTROL DE ACCESO',
+            'INSTALACIÓN',
+            'MANTENIMIENTO',
+            'ASESORÍA',
         ];
     }
 

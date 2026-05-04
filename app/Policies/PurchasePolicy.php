@@ -27,26 +27,14 @@ class PurchasePolicy
         return $authUser->can('Create:Purchase');
     }
 
-    /**
-     * Update + delete requieren AMBAS condiciones:
-     *   1. El usuario tiene el permiso del rol (Update:Purchase / Delete:Purchase)
-     *   2. La compra está en un estado que permite edición (isEditable() → solo Borrador)
-     *
-     * Defense in depth: el check de estado YA vive en la UI (EditPurchase::authorizeAccess
-     * y `visible(fn ... isEditable())` en tabla y página de vista). Replicarlo aquí
-     * garantiza que cualquier ruta futura — API REST, comando artisan, job, código
-     * que llame Gate::authorize() directamente — respete la regla sin depender de
-     * que cada caller la implemente. Una compra Confirmada o Anulada no se edita
-     * jamás: tocaría stock, costo promedio y kardex ya consolidados.
-     */
     public function update(AuthUser $authUser, Purchase $purchase): bool
     {
-        return $authUser->can('Update:Purchase') && $purchase->isEditable();
+        return $authUser->can('Update:Purchase');
     }
 
     public function delete(AuthUser $authUser, Purchase $purchase): bool
     {
-        return $authUser->can('Delete:Purchase') && $purchase->isEditable();
+        return $authUser->can('Delete:Purchase');
     }
 
     public function restore(AuthUser $authUser, Purchase $purchase): bool

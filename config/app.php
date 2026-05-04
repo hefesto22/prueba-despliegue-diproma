@@ -83,13 +83,22 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | Honduras opera en America/Tegucigalpa (UTC-6) sin horario de verano.
+    | Configurar el timezone aquí garantiza que:
+    |   - now() y Carbon::now() devuelven hora local hondureña.
+    |   - Los created_at, updated_at y columnas `date` se interpretan en hora HN.
+    |   - Los reportes diarios/mensuales (libro de ventas, declaración SAR) se
+    |     calculan según el día calendario hondureño, no UTC.
+    |   - La regla "anular hasta día 9" del FiscalPeriodService compara con
+    |     `now()` en hora HN — sin esto, una venta anulada a las 23:30 HN del
+    |     día 9 se rechazaría porque en UTC ya sería el día 10 a las 05:30.
+    |
+    | Sobreescribible vía APP_TIMEZONE en .env por si algún día se opera en
+    | otra región (poco probable).
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'America/Tegucigalpa'),
 
     /*
     |--------------------------------------------------------------------------

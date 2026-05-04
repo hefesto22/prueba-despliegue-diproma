@@ -162,6 +162,49 @@ class CompanySettings extends Page implements HasForms
                             ->helperText('Aparecerá en facturas y documentos. Máximo 2MB.'),
                     ]),
 
+                Section::make('Comisiones bancarias por tarjeta')
+                    ->description('Tasa que tu banco/procesador te cobra por cada transacción con tarjeta. El sistema registra automáticamente esta comisión como gasto al cobrar con tarjeta — no afecta el ISV declarado al SAR, solo refleja la utilidad real del negocio en los reportes.')
+                    ->icon('heroicon-o-credit-card')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('card_fee_rate_credit')
+                            ->label('Tarjeta de crédito (%)')
+                            ->numeric()
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->suffix('%')
+                            ->required()
+                            ->placeholder('3.40')
+                            ->helperText('Tasa que tu banco te cobra por pagos con tarjeta de crédito. Default: 3.40%.')
+                            // El campo en BD se almacena como decimal (0.0340 para 3.4%).
+                            // En el form lo mostramos en porcentaje (3.40) para que sea
+                            // intuitivo al usuario — convertimos en hidrate y dehidrate.
+                            ->formatStateUsing(fn ($state) => $state !== null
+                                ? number_format((float) $state * 100, 2, '.', '')
+                                : null)
+                            ->dehydrateStateUsing(fn ($state) => $state !== null && $state !== ''
+                                ? round((float) $state / 100, 4)
+                                : null),
+
+                        TextInput::make('card_fee_rate_debit')
+                            ->label('Tarjeta de débito (%)')
+                            ->numeric()
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->suffix('%')
+                            ->required()
+                            ->placeholder('3.40')
+                            ->helperText('Tasa que tu banco te cobra por pagos con tarjeta de débito. Algunos bancos cobran menos (ej. 1.8–2.5%) — ajusta según tu contrato.')
+                            ->formatStateUsing(fn ($state) => $state !== null
+                                ? number_format((float) $state * 100, 2, '.', '')
+                                : null)
+                            ->dehydrateStateUsing(fn ($state) => $state !== null && $state !== ''
+                                ? round((float) $state / 100, 4)
+                                : null),
+                    ]),
+
                 Section::make('Configuración Fiscal SAR')
                     ->description('Régimen tributario del obligado. Los códigos de establecimiento y punto de emisión se gestionan en Establecimientos.')
                     ->icon('heroicon-o-document-text')

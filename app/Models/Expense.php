@@ -60,6 +60,7 @@ class Expense extends Model
     protected $fillable = [
         'establishment_id',
         'user_id',
+        'sale_id',
         'expense_date',
         'category',
         'payment_method',
@@ -121,6 +122,17 @@ class Expense extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Venta de origen (solo cuando el gasto fue auto-generado por una venta
+     * pagada con tarjeta — comisión bancaria del procesador).
+     *
+     * Null para gastos manuales (combustible, papelería, etc.).
+     */
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
     }
 
     /**

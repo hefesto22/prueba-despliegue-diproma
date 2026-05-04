@@ -11,7 +11,6 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 
 /**
@@ -263,11 +262,14 @@ class RepairTransitionActions
      * Solo visible cuando estado = ListoEntrega. Modal pregunta:
      *   - Método de pago (efectivo, tarjeta, transferencia).
      *   - RTN del cliente (editable: cliente puede pedir factura con RTN al recoger).
-     *   - Sin CAI (toggle, default off — solo si el SAR aún no asignó CAI vigente).
      *
      * El servicio `RepairDeliveryService` hace todo en una transacción atómica:
      * crea Sale + descuenta stock + emite Invoice CAI + ingresa caja por SALDO
      * (no por total — el anticipo ya estaba en caja desde aprobación).
+     *
+     * Nota: la entrega siempre exige CAI vigente. Si no hay CAI activo, el
+     * `InvoiceService` lanzará excepción y bloqueará la entrega — comportamiento
+     * legalmente correcto en Honduras (no se puede facturar sin CAI).
      */
     public static function entregar(): Action
     {
@@ -299,10 +301,6 @@ class RepairTransitionActions
                     ->maxLength(20)
                     ->default(fn (Repair $record) => $record->customer_rtn)
                     ->helperText('Editable. Si el cliente quiere factura con RTN, ingresa o ajusta acá. Vacío = consumidor final.'),
-                Toggle::make('without_cai')
-                    ->label('Emitir sin CAI (solo si no hay CAI vigente)')
-                    ->default(false)
-                    ->helperText('Caso excepcional. La factura sin CAI no es válida fiscalmente.'),
                 Textarea::make('note')
                     ->label('Nota (opcional)')
                     ->rows(2),
@@ -314,7 +312,7 @@ class RepairTransitionActions
                         repair: $record,
                         paymentMethod: $paymentMethod,
                         customerRtnOverride: $data['customer_rtn'] ?? null,
-                        withoutCai: (bool) ($data['without_cai'] ?? false),
+                        withoutCai: false,
                         note: $data['note'] ?? null,
                     );
 
