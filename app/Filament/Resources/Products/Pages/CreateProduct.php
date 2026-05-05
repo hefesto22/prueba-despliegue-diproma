@@ -16,8 +16,8 @@ class CreateProduct extends CreateRecord
     /**
      * Transformar datos del formulario antes de crear el producto.
      * 1. Convertir campos spec_tipo_campo → specs JSON
-     * 2. Convertir precios con ISV a precios base (solo si gravado)
-     * 3. Stock infinito para tipos custom (servicios sin inventario)
+     * 2. Convertir SOLO el sale_price con ISV a base (no el costo)
+     * 3. Stock infinito para servicios
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -34,11 +34,21 @@ class CreateProduct extends CreateRecord
     }
 
     /**
-     * Convertir precios con ISV a precios base para almacenar.
+     * Convertir el PRECIO DE VENTA con ISV a precio base para almacenar.
      *
-     * Solo aplica si el producto es gravado. Para servicios exentos
-     * (Honorarios) o productos usados, el precio se almacena tal cual
-     * lo ingresó el usuario.
+     * Convención del catálogo:
+     *   - cost_price: SIEMPRE se guarda como el costo NETO (lo que vale el
+     *     producto en libros). NO se convierte. Si el producto se compró
+     *     con factura, el ISV pagado al proveedor se registra por separado
+     *     en la tabla `purchases` (genera crédito fiscal). El costo del
+     *     producto en sí es siempre el neto.
+     *   - sale_price: el usuario ingresa el precio CON ISV (forma comercial,
+     *     lo que el cliente paga). Se almacena la base (sale_price/1.15)
+     *     para que los cálculos fiscales en POS y reportes mensuales sean
+     *     consistentes (subtotal + ISV = total).
+     *
+     * Para productos exentos (Usado, Honorarios) ningún precio se convierte
+     * porque no hay ISV — se guardan tal cual.
      */
     public static function convertPricesToBase(array $data): array
     {
@@ -46,8 +56,10 @@ class CreateProduct extends CreateRecord
         $isGravado = $taxTypeValue === TaxType::Gravado15->value;
 
         if ($isGravado) {
-            $data['cost_price'] = Product::priceWithoutIsv((float) ($data['cost_price'] ?? 0));
+            // Solo el precio de venta se convierte: el form lo recibe CON ISV
+            // (precio público) y la BD lo necesita como base.
             $data['sale_price'] = Product::priceWithoutIsv((float) ($data['sale_price'] ?? 0));
+            // cost_price queda SIN tocar — es el costo neto en libros.
         }
 
         return $data;

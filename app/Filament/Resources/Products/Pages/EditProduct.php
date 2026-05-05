@@ -19,21 +19,23 @@ class EditProduct extends EditRecord
     /**
      * Al cargar el formulario:
      * 1. Desempacar specs JSON → campos spec_tipo_campo
-     * 2. Convertir precios base a precios con ISV (para gravados)
+     * 2. Mostrar el sale_price CON ISV (la BD lo guarda como base)
+     *
+     * El cost_price NO se convierte porque la BD lo guarda como costo
+     * neto desde el inicio (ver CreateProduct::convertPricesToBase).
+     * Mostrar el costo igual al ingresado evita la confusión que reporta
+     * el usuario: "ingresé 1000 de costo y veo 869.57".
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
         // Desempacar specs JSON a campos individuales del formulario
         $data = ProductForm::unpackSpecs($data);
 
-        // Convertir precios para display: usar tax_type como fuente de verdad
-        // (no condition). condition solo aplica a productos físicos enum;
-        // para custom (servicios o productos físicos custom) la regla fiscal
-        // viene del tax_type explícito del producto.
+        // Convertir SOLO el sale_price para display: la BD tiene base, el
+        // form muestra precio público con ISV (más natural para el cajero).
         $isGravado = ($data['tax_type'] ?? '') === TaxType::Gravado15->value;
 
         if ($isGravado) {
-            $data['cost_price'] = Product::priceWithIsv((float) ($data['cost_price'] ?? 0));
             $data['sale_price'] = Product::priceWithIsv((float) ($data['sale_price'] ?? 0));
         }
 

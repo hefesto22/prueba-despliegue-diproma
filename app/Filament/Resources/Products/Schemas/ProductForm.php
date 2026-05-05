@@ -370,7 +370,7 @@ class ProductForm
                                 ->live(),
 
                             TextInput::make('cost_price')
-                                ->label('Costo')
+                                ->label('Costo (neto)')
                                 ->numeric()
                                 ->required()
                                 ->minValue(0)
@@ -380,10 +380,10 @@ class ProductForm
                                 ->placeholder('0.00')
                                 ->helperText(fn ($get) => static::isService($get)
                                     ? 'Variable. Ajustar al facturar.'
-                                    : null)
+                                    : 'Costo neto del producto en libros (sin ISV). El crédito fiscal por compras se registra aparte en Compras.')
                                 ->live(onBlur: true),
                             TextInput::make('sale_price')
-                                ->label('Precio de venta')
+                                ->label(fn ($get) => static::isGravado($get) ? 'Precio de venta (con ISV)' : 'Precio de venta')
                                 ->numeric()
                                 ->required()
                                 ->minValue(0)
@@ -393,7 +393,9 @@ class ProductForm
                                 ->placeholder('0.00')
                                 ->helperText(fn ($get) => static::isService($get)
                                     ? 'Variable. Ajustar al facturar.'
-                                    : null)
+                                    : (static::isGravado($get)
+                                        ? 'Precio público — incluye 15% de ISV. Se descompondrá automáticamente al facturar.'
+                                        : 'Precio público (exento de ISV).'))
                                 ->live(onBlur: true),
                         ]),
                         Placeholder::make('price_summary')
@@ -489,7 +491,7 @@ class ProductForm
         }
 
         return static::isGravado($get)
-            ? 'Nuevo — ingrese precios con ISV incluido.'
+            ? 'Nuevo — costo neto + precio público con ISV (15%).'
             : 'Usado — exento de ISV.';
     }
 
@@ -716,6 +718,9 @@ class ProductForm
 
     private static function buildPriceSummary($get): HtmlString
     {
+        // Convención de los campos del form:
+        //   - cost_price: costo NETO (no incluye ISV) — se compara directo.
+        //   - sale_price: precio CON ISV (lo que cobramos al cliente).
         $cost = (float) ($get('cost_price') ?? 0);
         $sale = (float) ($get('sale_price') ?? 0);
         $gravado = static::isGravado($get);
@@ -723,6 +728,7 @@ class ProductForm
         $parts = [];
 
         if ($gravado && $sale > 0) {
+            // Para gravado, descomponemos el sale_price en base + ISV.
             $saleBase = round($sale / $multiplier, 2);
             $saleIsv = round($sale - $saleBase, 2);
             $parts[] = "<span class='text-gray-500 dark:text-gray-400'>Venta: L "
@@ -730,10 +736,11 @@ class ProductForm
         }
 
         if ($cost > 0 && $sale > 0) {
-            $costBase = $gravado ? round($cost / $multiplier, 2) : $cost;
+            // Ganancia = base de venta − costo neto. El cost_price del form
+            // YA es neto (no se divide entre 1.15), así que se usa directo.
             $saleBase = $gravado ? round($sale / $multiplier, 2) : $sale;
-            $profit = round($saleBase - $costBase, 2);
-            $margin = $costBase > 0 ? round(($profit / $costBase) * 100, 2) : 0;
+            $profit = round($saleBase - $cost, 2);
+            $margin = $cost > 0 ? round(($profit / $cost) * 100, 2) : 0;
             $color = $margin >= 20 ? 'text-green-500' : ($margin >= 10 ? 'text-yellow-500' : 'text-red-500');
             $parts[] = "<span class='{$color} font-semibold'>Ganancia: L "
                 . number_format($profit, 2) . " ({$margin}%)</span>";
