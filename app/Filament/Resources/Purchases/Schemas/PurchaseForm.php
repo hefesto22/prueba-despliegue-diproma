@@ -553,14 +553,40 @@ class PurchaseForm
                                             $product = Product::find($value);
                                             return $product ? self::renderProductOptionCompact($product) : null;
                                         })
-                                        ->afterStateUpdated(function ($state, callable $set) {
-                                            if ($state) {
-                                                $product = Product::find($state);
-                                                if ($product) {
-                                                    $set('unit_cost', $product->cost_price);
-                                                    $set('tax_type', $product->tax_type->value);
-                                                }
+                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                            if (! $state) {
+                                                return;
                                             }
+
+                                            $product = Product::find($state);
+                                            if (! $product) {
+                                                return;
+                                            }
+
+                                            // Pre-fill del unit_cost respetando el formato del campo:
+                                            //   - Factura + Gravado15 → con ISV (cost_price × 1.15) porque el
+                                            //     suffix dice "c/ISV" y el operador espera el precio que va
+                                            //     a coincidir con el de la factura del proveedor.
+                                            //   - RI o producto Exento → cost_price directo (sin ISV) porque
+                                            //     el suffix dice "precio final" y no se separa ISV.
+                                            //
+                                            // Sin este ajuste, sugeríamos siempre el NETO y el operador tenía
+                                            // que multiplicar mentalmente para que cuadre con la factura SAR.
+                                            $documentTypeRaw = $get('../../document_type');
+                                            $documentType = $documentTypeRaw instanceof SupplierDocumentType
+                                                ? $documentTypeRaw
+                                                : SupplierDocumentType::tryFrom((string) $documentTypeRaw);
+
+                                            $shouldShowWithIsv = ($documentType?->separatesIsv() ?? true)
+                                                && $product->tax_type === TaxType::Gravado15;
+
+                                            $multiplier = (float) config('tax.multiplier', 1.15);
+                                            $suggestedCost = $shouldShowWithIsv
+                                                ? round((float) $product->cost_price * $multiplier, 2)
+                                                : (float) $product->cost_price;
+
+                                            $set('unit_cost', $suggestedCost);
+                                            $set('tax_type', $product->tax_type->value);
                                         })
                                         // Producto ocupa la fila completa: el Select necesita ancho
                                         // para mostrar nombre + SKU sin rebalsar sobre Cantidad/Costo.

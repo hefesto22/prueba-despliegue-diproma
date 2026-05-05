@@ -27,9 +27,19 @@ use App\Models\PurchaseItem;
  *   - Registrar movimientos de inventario (eso lo hace PurchaseService)
  *   - Actualizar costo de productos (eso lo hace PurchaseService)
  *
- * Convención de costos: `unit_cost` llega CON ISV incluido (así lo ingresa
- * el usuario en el form, así lo almacena kardex como snapshot histórico).
- * La base sin ISV se deriva dividiendo por el multiplicador de `config/tax.php`.
+ * Convención de costos:
+ *   - `PurchaseItem.unit_cost`: lo que el operador ingresó en el form. En
+ *     Factura+Gravado15 viene CON ISV incluido (suffix "c/ISV" del form). En
+ *     Recibo Interno o producto Exento viene SIN ISV ("precio final").
+ *   - `PurchaseItem.subtotal`: SIEMPRE base sin ISV (lo que este Calculator
+ *     persiste). Para Factura+Gravado15 hace back-out; para RI/Exento es el
+ *     unit_cost × quantity directo.
+ *   - `Product.cost_price`: SIEMPRE NETO sin ISV. PurchaseService lo recalcula
+ *     vía CPP usando el unit_cost NETO derivado por `PurchaseService::netUnitCost`.
+ *   - `InventoryMovement.unit_cost`: SIEMPRE NETO. Snapshot consistente entre
+ *     compras (entrada NETA) y ventas (salida NETA del cost_price del producto).
+ *   - `Purchase.isv`: crédito fiscal del período (back-out de las líneas
+ *     gravadas con factura). Activo tributario separado del costo de inventario.
  */
 class PurchaseTotalsCalculator
 {

@@ -16,6 +16,32 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+/**
+ * ─── Convención de costos (FUENTE ÚNICA DE VERDAD) ──────────────────────────
+ *
+ * `cost_price` SIEMPRE almacena el costo NETO del producto en libros (sin ISV).
+ *
+ * Flujos que tocan cost_price:
+ *   - Carga inicial vía form de Producto (CreateProduct): el operador ingresa
+ *     el costo real pagado. NO genera crédito fiscal — no hay documento SAR
+ *     detrás. Se almacena tal cual (sin back-out).
+ *   - Compra confirmada vía PurchaseService: aplica CPP móvil contra el costo
+ *     NETO derivado del unit_cost de cada línea. El crédito fiscal del 15% va
+ *     a `purchases.isv` como activo tributario separado.
+ *   - Ajustes manuales de inventario: usan el cost_price actual del producto
+ *     como snapshot del kardex.
+ *
+ * `sale_price` se almacena como BASE sin ISV (el form recibe el precio público
+ * con ISV y CreateProduct::convertPricesToBase aplica el back-out al guardar).
+ *
+ * Accessor `cost_price_with_isv` reconstruye el precio con ISV (cost_price × 1.15
+ * para gravados; cost_price directo para exentos) — útil para reportes que
+ * necesitan exhibir el costo "como se pagó" con ISV reconstruido.
+ *
+ * Esta convención está alineada con SaleInventoryProcessor, RepairDeliveryService,
+ * CreateInventoryMovement, CreditNoteInventoryProcessor, DashboardStatsService y
+ * PurchaseService — todos consumen y producen cost_price/unit_cost en NETO.
+ */
 class Product extends Model
 {
     use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;

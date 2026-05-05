@@ -29,8 +29,14 @@ use Tests\TestCase;
  *  4. updateQuietly no dispara Activity Log (un recálculo no es evento fiscal).
  *  5. Comportamiento correcto ante compra sin items.
  *
- * Convención del dominio: `unit_cost` llega con ISV incluido. La base se
- * deriva dividiendo entre `config('tax.multiplier')` (15% → 1.15).
+ * Convención del dominio:
+ *   - En Factura + Gravado15: `unit_cost` llega con ISV incluido y la base se
+ *     deriva dividiendo entre `config('tax.multiplier')` (15% → 1.15).
+ *   - En Recibo Interno o producto Exento: no se separa ISV; `unit_cost` ES
+ *     la base directa y el ISV de la línea queda en 0.
+ *
+ * Para compras formales (Factura), la base de cada línea contribuye al CPP del
+ * producto vía `PurchaseService::netUnitCost`. El ISV separado es crédito fiscal.
  */
 class PurchaseTotalsCalculatorTest extends TestCase
 {

@@ -5,6 +5,8 @@ namespace App\Services\Purchases;
 use App\Enums\MovementType;
 use App\Enums\PaymentStatus;
 use App\Enums\PurchaseStatus;
+use App\Enums\SupplierDocumentType;
+use App\Enums\TaxType;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -20,13 +22,26 @@ class PurchaseService
     /**
      * Confirmar una compra: actualizar stock y costo promedio ponderado.
      *
-     * Operación financiera crítica:
-     * - Transacción DB con lockForUpdate() en cada producto
-     * - El stock se incrementa con la cantidad comprada
-     * - El costo del producto se actualiza al promedio ponderado:
-     *   nuevo_costo = (stock_actual * costo_actual + qty_compra * costo_compra) / (stock_actual + qty_compra)
+     * ─── Convención de costos (FUENTE ÚNICA DE VERDAD) ──────────────────────
+     * `Product.cost_price` es SIEMPRE el costo NETO (sin ISV) en libros.
+     * `PurchaseItem.unit_cost` es el costo TAL COMO LO INGRESÓ EL OPERADOR:
+     *   - En Factura + producto Gravado15: viene CON ISV incluido — hay que
+     *     hacer back-out antes de promediar contra cost_price.
+     *   - En Recibo Interno: viene como precio final sin desglose fiscal —
+     *     no hay back-out, el unit_cost ES el costo neto efectivo.
+     *   - En producto Exento (Usado, servicios): no hay ISV que separar —
+     *     unit_cost es directamente el costo neto.
      *
-     * El costo se maneja CON ISV incluido (mismo formato que product.cost_price).
+     * El crédito fiscal (Factura + Gravado15) vive en `purchases.isv` como
+     * activo tributario separado, NO se mezcla con el costo del inventario.
+     *
+     * ─── CPP móvil (Costo Promedio Ponderado) ───────────────────────────────
+     * nuevo_cost_NETO = (stock_actual × cost_price + qty × netUnitCost) / (stock_actual + qty)
+     *
+     * Operación financiera crítica:
+     *   - Transacción DB con lockForUpdate() en cada producto
+     *   - Stock se incrementa con la cantidad comprada
+     *   - Kardex captura el unit_cost NETO (consistente con SaleInventoryProcessor)
      *
      * @throws \InvalidArgumentException Si la compra no está en estado borrador
      * @throws \RuntimeException Si la compra no tiene items
@@ -56,20 +71,33 @@ class PurchaseService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                // Registrar movimiento ANTES de actualizar stock
-                // (record() usa product.stock actual como stock_before y calcula stock_after)
-                // unit_cost: el costo real de esta compra (con ISV para gravados)
+                // Derivar unit_cost NETO según tipo de documento + tax_type del item.
+                // Esto es lo que entra al kardex (snapshot) y al CPP del producto —
+                // garantiza que cost_price siempre quede en NETO sin importar si la
+                // compra fue Factura (con ISV en unit_cost) o RI (sin ISV).
+                $netUnitCost = static::netUnitCost(
+                    rawUnitCost: (float) $item->unit_cost,
+                    taxType: $item->tax_type,
+                    documentType: $purchase->document_type,
+                );
+
+                // Registrar movimiento ANTES de actualizar stock — record() usa
+                // product.stock actual como stock_before y calcula stock_after.
+                // unit_cost del kardex = NETO, igual que el snapshot que captura
+                // SaleInventoryProcessor para ventas. Esto permite que reportes
+                // de COGS y dashboard de ganancia bruta se sumen sin mezclar
+                // unidades fiscales con unidades de costo.
                 InventoryMovement::record(
                     product: $product,
                     type: MovementType::EntradaCompra,
                     quantity: $item->quantity,
                     reference: $purchase,
                     notes: "Compra {$purchase->purchase_number} confirmada",
-                    unitCost: (float) $item->unit_cost,
+                    unitCost: $netUnitCost,
                     establishment: $purchase->establishment,
                 );
 
-                $this->updateProductCostAndStock($product, $item->quantity, $item->unit_cost);
+                $this->updateProductCostAndStock($product, $item->quantity, $netUnitCost);
             }
 
             // 3. Cambiar estado y resolver payment_status según condiciones de pago.
@@ -123,15 +151,22 @@ class PurchaseService
                         ->lockForUpdate()
                         ->firstOrFail();
 
-                    // Registrar movimiento de salida ANTES de reversar stock
-                    // unit_cost: mismo costo con que entró esta línea — reversa exacta
+                    // Reversa simétrica: el unit_cost de la salida de anulación
+                    // debe ser idéntico al unit_cost de la entrada original — así
+                    // entrada + salida cuadran a cero en el kardex (NETO).
+                    $netUnitCost = static::netUnitCost(
+                        rawUnitCost: (float) $item->unit_cost,
+                        taxType: $item->tax_type,
+                        documentType: $purchase->document_type,
+                    );
+
                     InventoryMovement::record(
                         product: $product,
                         type: MovementType::SalidaAnulacionCompra,
                         quantity: $item->quantity,
                         reference: $purchase,
                         notes: "Compra {$purchase->purchase_number} anulada",
-                        unitCost: (float) $item->unit_cost,
+                        unitCost: $netUnitCost,
                         establishment: $purchase->establishment,
                     );
 
@@ -148,26 +183,31 @@ class PurchaseService
     /**
      * Actualizar costo promedio ponderado y stock de un producto.
      *
-     * Fórmula: nuevo_costo = (stock_actual * costo_actual + qty_nueva * costo_nuevo) / (stock_actual + qty_nueva)
+     * Fórmula CPP móvil (NETO):
+     *   nuevo_cost = (stock_actual × cost_actual + qty × netUnitCost) / (stock_actual + qty)
      *
-     * Caso especial: si el stock actual es 0, el nuevo costo es simplemente el costo de la compra.
+     * Caso especial: si el stock actual es 0, el nuevo costo es directamente
+     * el netUnitCost de esta compra (no hay costo previo que promediar).
      *
-     * @param Product $product     Producto con lock
-     * @param int     $quantity    Cantidad comprada
-     * @param float   $unitCost   Costo unitario CON ISV (tal como lo ingresó el usuario)
+     * @param Product $product       Producto con lock pesimista activo.
+     * @param int     $quantity      Cantidad comprada.
+     * @param float   $netUnitCost   Costo unitario NETO (sin ISV) — ya con back-out
+     *                               aplicado si correspondía. Mismo valor que se
+     *                               capturó en kardex como snapshot.
      */
-    private function updateProductCostAndStock(Product $product, int $quantity, float $unitCost): void
+    private function updateProductCostAndStock(Product $product, int $quantity, float $netUnitCost): void
     {
         $currentStock = (int) $product->stock;
         $currentCost = (float) $product->cost_price;
 
         if ($currentStock <= 0) {
-            // Sin stock previo: el nuevo costo es el de esta compra
-            $newCost = $unitCost;
+            // Sin stock previo: el nuevo costo es directamente el de esta compra.
+            $newCost = $netUnitCost;
         } else {
-            // Promedio ponderado
+            // Promedio ponderado: pondera unidades existentes (a su CPP histórico)
+            // con las unidades nuevas (al netUnitCost de esta compra).
             $totalCurrentValue = $currentStock * $currentCost;
-            $totalNewValue = $quantity * $unitCost;
+            $totalNewValue = $quantity * $netUnitCost;
             $newCost = ($totalCurrentValue + $totalNewValue) / ($currentStock + $quantity);
         }
 
@@ -177,4 +217,34 @@ class PurchaseService
         ]);
     }
 
+    /**
+     * Derivar el costo unitario NETO (sin ISV) según tipo de documento y tax_type.
+     *
+     * Reglas:
+     *   - Factura + Gravado15 → back-out: NETO = rawUnitCost / 1.15
+     *   - Recibo Interno (cualquier tax) → sin back-out: NETO = rawUnitCost
+     *   - Cualquier doc + Exento → sin back-out: NETO = rawUnitCost
+     *
+     * El multiplicador 1.15 viene de config/tax.php (TASA_ISV_HONDURAS) para
+     * que un cambio futuro de tasa solo toque un archivo.
+     *
+     * Es estática para que pueda llamarse sin instanciar el servicio (útil en
+     * tests y en cualquier flujo futuro que necesite la misma derivación).
+     */
+    public static function netUnitCost(
+        float $rawUnitCost,
+        ?TaxType $taxType,
+        ?SupplierDocumentType $documentType,
+    ): float {
+        $separates = ($documentType?->separatesIsv() ?? true)
+            && $taxType === TaxType::Gravado15;
+
+        if (! $separates) {
+            return round($rawUnitCost, 2);
+        }
+
+        $multiplier = (float) config('tax.multiplier', 1.15);
+
+        return round($rawUnitCost / $multiplier, 2);
+    }
 }
