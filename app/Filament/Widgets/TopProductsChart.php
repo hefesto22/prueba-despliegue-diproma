@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class TopProductsChart extends ChartWidget
 {
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 5;
 
     protected ?string $heading = 'Top 10 Productos Más Vendidos';
 

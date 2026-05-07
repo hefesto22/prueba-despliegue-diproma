@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class SalesByCategoryChart extends ChartWidget
 {
-    protected static ?int $sort = 5;
+    protected static ?int $sort = 6;
 
     protected ?string $heading = 'Ventas por Categoría';
 

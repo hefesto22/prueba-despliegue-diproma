@@ -18,6 +18,7 @@ use App\Filament\Widgets\FinancialStatsOverview;
 use App\Filament\Widgets\FiscalPeriodsPendingWidget;
 use App\Filament\Widgets\LatestSales;
 use App\Filament\Widgets\LowStockAlert;
+use App\Filament\Widgets\NetProfitOverview;
 use App\Filament\Widgets\SalesByCategoryChart;
 use App\Filament\Widgets\SalesChart;
 use App\Filament\Widgets\StatsOverview;
@@ -106,11 +107,12 @@ class AdminPanelProvider extends PanelProvider
                 CaiStatusWidget::class,          // sort 1 — Estado de CAIs (vencimiento + agotamiento) — solo Manage:Cai
                 StatsOverview::class,            // sort 1 — KPIs operativos (ventas, stock, compras)
                 FinancialStatsOverview::class,   // sort 2 — KPIs financieros (ganancia, margen, ticket)
-                SalesChart::class,               // sort 3 — Tendencia de ventas con período comparativo
-                TopProductsChart::class,         // sort 4 — Top 10 productos (columna izquierda en xl)
-                SalesByCategoryChart::class,     // sort 5 — Ventas por categoría (columna derecha en xl)
-                LatestSales::class,              // sort 6 — Últimas 10 ventas con acción ver
-                LowStockAlert::class,            // sort 7 — Alertas de stock con acción crear orden
+                NetProfitOverview::class,        // sort 3 — Utilidad Neta (Ganancia Bruta − Gastos)
+                SalesChart::class,               // sort 4 — Tendencia de ventas con período comparativo
+                TopProductsChart::class,         // sort 5 — Top 10 productos (columna izquierda en xl)
+                SalesByCategoryChart::class,     // sort 6 — Ventas por categoría (columna derecha en xl)
+                LatestSales::class,              // sort 7 — Últimas 10 ventas con acción ver
+                LowStockAlert::class,            // sort 8 — Alertas de stock con acción crear orden
             ])
             ->middleware([
                 EncryptCookies::class,

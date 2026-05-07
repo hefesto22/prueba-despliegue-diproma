@@ -13,7 +13,7 @@ use Filament\Widgets\TableWidget;
 
 class LowStockAlert extends TableWidget
 {
-    protected static ?int $sort = 7;
+    protected static ?int $sort = 8;
 
     protected int | string | array $columnSpan = 'full';
 
@@ -95,7 +95,10 @@ class LowStockAlert extends TableWidget
                     ->label('Mínimo')
                     ->alignCenter(),
 
-                TextColumn::make('sale_price')
+                // Precio público con ISV — lo que el cliente paga. La BD guarda
+                // sale_price NETO; sale_price_with_isv lo reconstruye respetando
+                // tax_type del producto.
+                TextColumn::make('sale_price_with_isv')
                     ->label('Precio Venta')
                     ->money('HNL')
                     ->alignEnd()

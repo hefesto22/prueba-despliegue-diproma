@@ -6,6 +6,7 @@ use App\Enums\MovementType;
 use App\Enums\PaymentStatus;
 use App\Enums\SaleStatus;
 use App\Models\Customer;
+use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Sale;
@@ -170,6 +171,75 @@ class DashboardStatsService
     }
 
     /**
+     * Total de gastos operativos del mes en curso.
+     *
+     * Incluye TODOS los gastos del mes — deducibles y no deducibles. La
+     * distinción "deducible" aplica solo al ISV-353 (crédito fiscal). Para
+     * P&L (utilidad neta), todo gasto reduce ganancia sin importar si tiene
+     * crédito fiscal asociado.
+     *
+     * Filtra por `expense_date` (no por created_at) para alinear con el
+     * período fiscal correcto — un gasto registrado tarde con fecha del mes
+     * pasado pertenece al mes pasado.
+     */
+    public function expensesThisMonth(): float
+    {
+        return $this->remember('expenses_month', function () {
+            $now = Carbon::now();
+
+            return (float) Expense::query()
+                ->forMonth($now->year, $now->month)
+                ->sum('amount_total');
+        });
+    }
+
+    /**
+     * Utilidad neta del mes = ganancia bruta − gastos operativos.
+     *
+     * Ganancia bruta = revenue − COGS (ya calculado por grossProfitThisMonth).
+     * Gastos operativos = suma de Expense.amount_total del mes.
+     *
+     * El COGS NO se vuelve a restar acá — ya está descontado en la ganancia
+     * bruta. Tampoco se mezcla el ISV (crédito fiscal de compras o débito de
+     * ventas) — eso es trazabilidad SAR, no P&L.
+     *
+     * net_margin_percent = (net_profit / revenue) × 100. Útil para juzgar la
+     * salud real del negocio: dos meses pueden tener la misma ganancia bruta
+     * pero muy distinto net_margin si los gastos operativos varían.
+     *
+     * @return array{
+     *     gross_profit: float,
+     *     expenses: float,
+     *     net_profit: float,
+     *     net_margin_percent: float,
+     *     revenue: float
+     * }
+     */
+    public function netProfitThisMonth(): array
+    {
+        return $this->remember('net_profit_month', function () {
+            $gross = $this->grossProfitThisMonth();
+            $expenses = $this->expensesThisMonth();
+
+            $revenue = (float) $gross['revenue'];
+            $grossProfit = (float) $gross['gross_profit'];
+            $netProfit = round($grossProfit - $expenses, 2);
+
+            $netMargin = $revenue > 0
+                ? round(($netProfit / $revenue) * 100, 2)
+                : 0.0;
+
+            return [
+                'gross_profit' => $grossProfit,
+                'expenses' => round($expenses, 2),
+                'net_profit' => $netProfit,
+                'net_margin_percent' => $netMargin,
+                'revenue' => round($revenue, 2),
+            ];
+        });
+    }
+
+    /**
      * Ticket promedio del mes (total promedio por venta completada).
      */
     public function averageTicketThisMonth(): float
@@ -248,7 +318,8 @@ class DashboardStatsService
     {
         $keys = [
             'sales_today', 'sales_this_month', 'sales_sparkline_14d',
-            'gross_profit_month', 'avg_ticket_month', 'new_customers_month',
+            'gross_profit_month', 'expenses_month', 'net_profit_month',
+            'avg_ticket_month', 'new_customers_month',
             'stock_alerts', 'pending_purchases',
         ];
 

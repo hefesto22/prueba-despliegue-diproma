@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class SalesChart extends ChartWidget
 {
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 4;
 
     protected ?string $heading = 'Tendencia de Ventas';
 
