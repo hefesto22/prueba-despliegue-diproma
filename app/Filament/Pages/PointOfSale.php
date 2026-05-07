@@ -148,10 +148,16 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                     ->sortable()
                     ->toggleable(),
 
-                TextColumn::make('sale_price')
+                // El catálogo guarda sale_price como base NETA (sin ISV) para
+                // que los reportes fiscales y el desglose de la venta sean
+                // exactos. Pero acá mostramos al cajero el precio público
+                // CON ISV — es lo que el cliente paga. El accessor
+                // sale_price_with_isv ya respeta el tax_type del producto:
+                // gravados se multiplican por 1.15, exentos quedan igual.
+                TextColumn::make('sale_price_with_isv')
                     ->label('Precio')
                     ->money('HNL')
-                    ->sortable(),
+                    ->sortable(query: fn ($query, string $direction) => $query->orderBy('sale_price', $direction)),
 
                 TextColumn::make('stock')
                     ->label('Disponible')
@@ -349,7 +355,12 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 'product_id' => $product->id,
                 'name' => $product->name,
                 'sku' => $product->sku,
-                'unit_price' => (float) $product->sale_price,
+                // unit_price del cart va SIEMPRE con ISV incluido — es la
+                // convención que SaleTaxCalculator y SaleService asumen.
+                // El catálogo guarda sale_price como base NETA, así que
+                // usamos el accessor sale_price_with_isv que reconstruye
+                // el precio público (gravado: ×1.15, exento: tal cual).
+                'unit_price' => (float) $product->sale_price_with_isv,
                 'tax_type' => $product->tax_type->value,
                 'quantity' => 1,
                 'stock' => $product->stock,

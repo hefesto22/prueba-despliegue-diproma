@@ -366,6 +366,16 @@ class ProductForm
                                 ->default(TaxType::Exento)
                                 ->required()
                                 ->visible(fn ($get) => static::isService($get))
+                                // CRÍTICO: dehidratar SOLO cuando es servicio.
+                                // Sin esta regla, este Select dehidrataba SIEMPRE (default
+                                // de Filament) y pisaba al Hidden::make('tax_type') de
+                                // productos físicos enviando 'exento' en $data. Eso hacía
+                                // que CreateProduct::convertPricesToBase NO convirtiera el
+                                // sale_price (porque la comparación contra 'gravado_15'
+                                // fallaba) y se guardaba CON ISV. El observer
+                                // enforceTaxType del modelo después corregía tax_type a
+                                // 'gravado_15' pero el sale_price ya quedaba mal.
+                                ->dehydrated(fn ($get) => static::isService($get))
                                 ->helperText('Servicios profesionales (Honorarios) son normalmente Exento.')
                                 ->live(),
 
@@ -692,8 +702,26 @@ class ProductForm
         };
     }
 
+    /**
+     * ¿Este producto se va a guardar como Gravado15 (con ISV)?
+     *
+     * Espeja la lógica canónica de `Product::enforceTaxType` para que las
+     * etiquetas y helpers del form ("Precio de venta (con ISV)" vs
+     * "Precio de venta") sean coherentes con cómo se va a almacenar.
+     *
+     *   - Servicio (is_service=true): respeta el Select tax_type que el
+     *     usuario eligió explícitamente (Honorarios típicamente Exento).
+     *   - Físico (enum o custom no-servicio): deriva de condition.
+     *     Nuevo = Gravado15, Usado = Exento.
+     */
     private static function isGravado($get): bool
     {
+        if (static::isService($get)) {
+            $taxType = $get('tax_type');
+            return $taxType === TaxType::Gravado15->value
+                || $taxType === TaxType::Gravado15;
+        }
+
         $condition = $get('condition');
         return $condition !== ProductCondition::Used->value
             && $condition !== ProductCondition::Used;

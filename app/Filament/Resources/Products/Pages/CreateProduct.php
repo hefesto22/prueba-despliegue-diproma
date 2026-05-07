@@ -52,8 +52,18 @@ class CreateProduct extends CreateRecord
      */
     public static function convertPricesToBase(array $data): array
     {
-        $taxTypeValue = $data['tax_type'] ?? null;
-        $isGravado = $taxTypeValue === TaxType::Gravado15->value;
+        // Derivar isGravado desde la combinación condition + product_type +
+        // is_service — NO solo desde data['tax_type']. Razón: el form tiene
+        // dos campos llamados 'tax_type' (un Hidden para físicos y un Select
+        // para servicios) y la dehidratación de uno puede pisar al otro,
+        // dejando data['tax_type'] inconsistente con la realidad. La regla
+        // canónica replica Product::enforceTaxType del modelo:
+        //   - Servicio (is_service=true) → siempre Exento
+        //   - Tipo custom (Equipo de seguridad, Honorarios, etc.) →
+        //     respetar tax_type del form (el cliente lo eligió)
+        //   - Tipo enum (Laptop, Component, etc.) →
+        //     Nuevo = Gravado15, Usado = Exento (por condition)
+        $isGravado = static::isGravadoFromFormData($data);
 
         if ($isGravado) {
             // Solo el precio de venta se convierte: el form lo recibe CON ISV
@@ -63,6 +73,35 @@ class CreateProduct extends CreateRecord
         }
 
         return $data;
+    }
+
+    /**
+     * Determinar si el producto que se está guardando es Gravado15 sin
+     * confiar exclusivamente en data['tax_type'].
+     *
+     * Replica la lógica canónica de `Product::enforceTaxType`:
+     *   - Servicio: respeta tax_type del form (Select expuesto al usuario).
+     *   - Físico (enum o custom no-servicio): deriva de condition.
+     *
+     * Para físicos NO confiamos en data['tax_type'] del form porque el
+     * conflicto Hidden vs Select de tax_type puede contaminar el state
+     * inicial con valores defaults conflictivos. Derivar de condition
+     * elimina esa fuente de bugs.
+     */
+    private static function isGravadoFromFormData(array $data): bool
+    {
+        // 1. Servicio: respetar tax_type del form (Select expuesto).
+        if (! empty($data['is_service'])) {
+            $taxType = $data['tax_type'] ?? null;
+            return $taxType === TaxType::Gravado15->value
+                || $taxType === TaxType::Gravado15;
+        }
+
+        // 2. Producto físico (enum o custom no-servicio): derivar de condition.
+        //    Nuevo = Gravado15, Usado = Exento. Mismo criterio que el modelo.
+        $condition = $data['condition'] ?? null;
+        return $condition === ProductCondition::New->value
+            || $condition === ProductCondition::New;
     }
 
     /**

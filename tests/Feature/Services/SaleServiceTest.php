@@ -839,4 +839,92 @@ class SaleServiceTest extends TestCase
         $this->expectException(NoHayCajaAbiertaException::class);
         $this->service->cancel($saleB->refresh());
     }
+
+    // ─── Regresión: doble back-out de ISV cuando sale_price está en NETO ──
+    //
+    // Bug reportado 2026-05-04: el operador creaba un producto vía form con
+    // "Precio de venta (con ISV) = L 2,300" → la BD guardaba sale_price = 2,000
+    // (NETO, post conversión del CreateProduct). El POS leía 2,000 y SaleService
+    // hacía back-out otra vez (2000/1.15 = 1,739.13 subtotal, 260.87 ISV,
+    // total 2,000) — perdiendo L 300 por unidad vendida.
+    //
+    // Fix: el cart del POS y los flujos similares (Repairs, seeders) usan
+    // `$product->sale_price_with_isv` para reconstruir el precio con ISV
+    // antes de pasarlo a SaleService. Este test fija el contrato.
+
+    public function test_sale_total_correcto_cuando_sale_price_almacenado_en_neto(): void
+    {
+        // Simular el estado post-form: sale_price NETO (lo que el form guarda
+        // tras CreateProduct::convertPricesToBase). El operador entró 2,300
+        // c/ISV en el form y la BD persiste 2,000 como base.
+        $product = $this->makeProduct(salePrice: 2000, stock: 5);
+
+        // El POS construye el cart usando el accessor sale_price_with_isv
+        // (gravado: ×1.15 → 2,300). Eso es lo que SaleService espera recibir.
+        $cartItems = [[
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => $product->sale_price_with_isv,
+            'tax_type' => $product->tax_type->value,
+        ]];
+
+        $sale = $this->service->processSale(
+            cartItems: $cartItems,
+            paymentMethod: PaymentMethod::Efectivo,
+        );
+
+        $sale->refresh();
+
+        // Lo que el cliente paga
+        $this->assertEquals(2300.00, (float) $sale->total,
+            'Total debe ser 2,300 (sale_price con ISV).');
+
+        // Desglose fiscal
+        $this->assertEquals(2000.00, (float) $sale->subtotal,
+            'Subtotal debe ser 2,000 (la base NETA original).');
+        $this->assertEquals(300.00, (float) $sale->isv,
+            'ISV debe ser 300 (15% sobre 2,000 base).');
+
+        // Identidad: subtotal + isv = total
+        $this->assertEquals(
+            (float) $sale->total,
+            (float) $sale->subtotal + (float) $sale->isv,
+            'subtotal + isv debe igualar total al centavo.'
+        );
+    }
+
+    public function test_sale_exento_no_aplica_isv_aunque_sale_price_in_neto(): void
+    {
+        // Producto Exento (Usado): el accessor sale_price_with_isv devuelve
+        // sale_price tal cual (sin ×1.15). Verificamos que no se introduce ISV
+        // fantasma cuando el cart usa el accessor en productos exentos.
+        $product = Product::factory()
+            ->inCategory($this->category)
+            ->create([
+                'sale_price' => 1500,
+                'cost_price' => 800,
+                'stock' => 5,
+                'tax_type' => TaxType::Exento,
+                'condition' => \App\Enums\ProductCondition::Used,
+            ]);
+
+        $cartItems = [[
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_price' => $product->sale_price_with_isv, // = 1500 (exento, sin ×1.15)
+            'tax_type' => TaxType::Exento->value,
+        ]];
+
+        $sale = $this->service->processSale(
+            cartItems: $cartItems,
+            paymentMethod: PaymentMethod::Efectivo,
+        );
+
+        $sale->refresh();
+
+        $this->assertEquals(3000.00, (float) $sale->total);
+        $this->assertEquals(3000.00, (float) $sale->subtotal);
+        $this->assertEquals(0.00, (float) $sale->isv,
+            'Productos Exentos no deben generar ISV — accessor devuelve sale_price tal cual.');
+    }
 }

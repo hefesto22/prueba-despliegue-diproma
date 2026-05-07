@@ -75,8 +75,15 @@ class ProductInfolist
                                 ->label('Precio venta')
                                 ->money('HNL')
                                 ->weight('bold'),
-                            TextEntry::make('cost_price_with_isv')
-                                ->label('Costo')
+                            // Mostrar el costo NETO en libros — coincide con
+                            // lo que está en BD y con el kardex. Antes se
+                            // mostraba cost_price_with_isv (cost_price × 1.15)
+                            // que confundía: para compras con RI no existe
+                            // ese ISV reconstruido, y para Factura mezclaba
+                            // costo de inventario con crédito fiscal (que
+                            // vive aparte en purchases.isv).
+                            TextEntry::make('cost_price')
+                                ->label('Costo (neto)')
                                 ->money('HNL'),
                             TextEntry::make('tax_type')
                                 ->label('Fiscal')

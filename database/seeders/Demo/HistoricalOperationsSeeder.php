@@ -409,7 +409,10 @@ class HistoricalOperationsSeeder extends Seeder
             $cart[] = [
                 'product_id' => $product->id,
                 'quantity' => $qty,
-                'unit_price' => (float) $product->sale_price,
+                // SaleService espera unit_price CON ISV (convención del cart
+                // del POS). La BD guarda sale_price NETO; el accessor
+                // sale_price_with_isv lo reconstruye respetando tax_type.
+                'unit_price' => (float) $product->sale_price_with_isv,
                 'tax_type' => $product->tax_type,
             ];
         }

@@ -104,10 +104,14 @@ class ProductsTable
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('cost_price_with_isv')
-                    ->label('Costo')
+                // Costo NETO en libros (igual que el form Edit y el kardex).
+                // No usamos cost_price_with_isv porque representaría un ISV
+                // reconstruido que no siempre existió (RI no separa ISV) y
+                // confunde con el crédito fiscal real (purchases.isv).
+                TextColumn::make('cost_price')
+                    ->label('Costo (neto)')
                     ->money('HNL')
-                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy('cost_price', $direction))
+                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->label('Creado')

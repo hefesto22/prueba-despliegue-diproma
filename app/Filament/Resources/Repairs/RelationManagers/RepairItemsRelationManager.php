@@ -93,8 +93,13 @@ class RepairItemsRelationManager extends RelationManager
                                 ->where('stock', '>', 0)
                                 ->limit(20)
                                 ->get()
+                                // Mostrar precio público CON ISV — es el monto que el
+                                // cliente paga y con el que el técnico debe cuadrar
+                                // mentalmente. La BD guarda sale_price NETO; el
+                                // accessor sale_price_with_isv reconstruye el
+                                // precio con ISV (gravado: ×1.15, exento: igual).
                                 ->mapWithKeys(fn (Product $p) => [
-                                    $p->id => "{$p->name} (stock: {$p->stock} | L. " . number_format($p->sale_price, 2) . ')',
+                                    $p->id => "{$p->name} (stock: {$p->stock} | L. " . number_format($p->sale_price_with_isv, 2) . ')',
                                 ])
                                 ->toArray();
                         })
@@ -104,7 +109,11 @@ class RepairItemsRelationManager extends RelationManager
                                 $p = Product::find($state);
                                 if ($p) {
                                     $set('description', $p->name);
-                                    $set('unit_price', (string) $p->sale_price);
+                                    // unit_price: convención WITH ISV (igual que cart del POS
+                                    // y SaleItem). RepairQuotationService hace back-out por
+                                    // tax_type al persistir subtotal/isv_amount.
+                                    // unit_cost: convención NETA (igual que CPP del producto).
+                                    $set('unit_price', (string) $p->sale_price_with_isv);
                                     $set('unit_cost', (string) $p->cost_price);
                                 }
                             }

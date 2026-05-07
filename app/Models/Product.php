@@ -34,9 +34,12 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * `sale_price` se almacena como BASE sin ISV (el form recibe el precio público
  * con ISV y CreateProduct::convertPricesToBase aplica el back-out al guardar).
  *
- * Accessor `cost_price_with_isv` reconstruye el precio con ISV (cost_price × 1.15
- * para gravados; cost_price directo para exentos) — útil para reportes que
- * necesitan exhibir el costo "como se pagó" con ISV reconstruido.
+ * El display siempre debe usar `cost_price` directo (NETO). NO existe un
+ * accessor "cost_price con ISV reconstruido" porque ese ISV no siempre fue
+ * pagado realmente: compras con Recibo Interno no separan ISV, y para
+ * compras con factura el ISV es crédito fiscal (activo tributario), no
+ * costo del inventario. Mostrar `cost_price × 1.15` mezcla conceptos y
+ * confunde al operador. Si necesitás "lo que pagué" usá `purchases.total`.
  *
  * Esta convención está alineada con SaleInventoryProcessor, RepairDeliveryService,
  * CreateInventoryMovement, CreditNoteInventoryProcessor, DashboardStatsService y
@@ -172,30 +175,40 @@ class Product extends Model
     }
 
     /**
-     * Tax type según condición — SOLO aplica para tipos enum (Laptop,
-     * Desktop, etc.) donde la condición Nuevo/Usado tiene sentido fiscal.
+     * Enforzar tax_type basado en is_service + condition. Esta es la fuente
+     * canónica de verdad — IGNORAMOS lo que envíe el form para productos
+     * físicos porque Filament tiene un bug histórico con dos campos del
+     * mismo name (Hidden y Select para tax_type) que pueden contaminarse
+     * entre sí dependiendo del orden de evaluación interno.
      *
-     * Para tipos CUSTOM (Honorarios, Equipo de seguridad, etc.) el cliente
-     * elige el tax_type explícitamente desde el form (Exento por default
-     * para servicios; Gravado 15% si es mercancía). Respetamos esa decisión.
+     * Reglas (Honduras Art. 15 inc e Decreto 194-2002):
+     *   - Servicio (is_service=true): respetar tax_type del form. El Select
+     *     "Tipo fiscal" se le muestra al usuario para que elija (Honorarios
+     *     son típicamente Exento pero podría haber servicios gravados).
+     *   - Producto físico (is_service=false), sea ENUM (Laptop, Component)
+     *     o CUSTOM (Equipo de seguridad, Cámaras), regla por condición:
+     *       Nuevo  → Gravado15
+     *       Usado  → Exento (bienes usados son exentos de ISV).
      *
-     * Honduras Art. 15 inc e Decreto 194-2002: bienes usados son exentos
-     * de ISV. Servicios profesionales también son exentos por la misma ley
-     * pero por una causal distinta — por eso lo marca el cliente.
+     * Para físicos NO confiamos en data['tax_type'] del form porque:
+     *   1. Hidden::make('tax_type') con default 'gravado_15'
+     *   2. Select::make('tax_type') con default 'exento' (para servicios)
+     *   Filament aplica los defaults de AMBOS al inicializar el state.
+     *   Cuál gana al guardar depende del orden de procesamiento interno.
+     *   Derivar de condition rompe esa cadena — fuente única de verdad.
      */
     private static function enforceTaxType(Product $product): void
     {
-        // Tipos CUSTOM: respetar tax_type del form (no sobreescribir).
-        if (filled($product->product_type) && ! $product->productTypeEnum) {
-            // Si el form no envió tax_type, default a Exento (caso típico
-            // de servicios profesionales como Honorarios).
+        // Servicios: respetar tax_type del form (Select expuesto al usuario).
+        // Si nada vino, default a Exento (caso típico de Honorarios).
+        if ($product->is_service) {
             if (! $product->tax_type) {
                 $product->tax_type = TaxType::Exento;
             }
             return;
         }
 
-        // Tipos ENUM: regla automática por condición.
+        // Productos físicos (enum o custom no-servicio): derivar de condition.
         $product->tax_type = $product->condition === ProductCondition::Used
             ? TaxType::Exento
             : TaxType::Gravado15;
@@ -433,24 +446,28 @@ class Product extends Model
 
     // ─── Helpers fiscales ────────────────────────────────────
 
+    /**
+     * Calcula el ISV que correspondería sobre sale_price (base NETA).
+     * Útil para descomponer la venta al facturar y para el accessor
+     * sale_price_with_isv que muestra el precio público al cliente.
+     */
     public function calculateSaleIsv(): float
     {
         return round($this->sale_price * $this->tax_type->rate(), 2);
     }
 
-    public function calculateCostIsv(): float
-    {
-        return round($this->cost_price * $this->tax_type->rate(), 2);
-    }
-
+    /**
+     * Precio público (con ISV) que el cliente paga.
+     *
+     * Para Gravado15: sale_price + 15% = sale_price × 1.15
+     * Para Exento: sale_price (sin cambio).
+     *
+     * Lo usa el POS, los infolists y la columna "Precio" de la tabla de
+     * productos para mostrar al cajero exactamente lo que va a cobrar.
+     */
     public function getSalePriceWithIsvAttribute(): float
     {
         return round($this->sale_price + $this->calculateSaleIsv(), 2);
-    }
-
-    public function getCostPriceWithIsvAttribute(): float
-    {
-        return round($this->cost_price + $this->calculateCostIsv(), 2);
     }
 
     public function getProfitMarginAttribute(): float
