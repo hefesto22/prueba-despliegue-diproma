@@ -51,7 +51,6 @@ class Product extends Model
 
     protected $fillable = [
         'name',
-        'slug',
         'sku',
         'description',
         'category_id',
@@ -126,10 +125,6 @@ class Product extends Model
             static::autoGenerateName($product);
             static::autoGenerateSku($product);
             static::persistCustomSpecOptions($product);
-
-            if (empty($product->slug)) {
-                $product->slug = Str::slug($product->name);
-            }
         });
 
         static::updating(function (Product $product) {
@@ -137,10 +132,6 @@ class Product extends Model
             static::enforceTaxType($product);
             static::autoGenerateName($product);
             static::persistCustomSpecOptions($product);
-
-            if ($product->isDirty('name') && !$product->isDirty('slug')) {
-                $product->slug = Str::slug($product->name);
-            }
         });
     }
 

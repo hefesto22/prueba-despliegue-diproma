@@ -27,8 +27,8 @@ class ProductFactory extends Factory
         $salePrice = round($costPrice * $margin, 2);
 
         return [
-            // name, slug y sku NO se definen aqui — Product::booted() los
-            // autogenera en `creating` a partir de type + brand + model + specs.
+            // name y sku NO se definen aqui — Product::booted() los autogenera
+            // en `creating` a partir de type + brand + model + specs.
             // Cualquier valor que intentemos pasar se sobreescribe y confunde
             // al lector del factory. Si un test necesita un name especifico
             // hay que forzarlo via ->state([...]) despues del create.

@@ -272,7 +272,6 @@ class ProductForm
                             ->visible(fn (string $operation) => $operation === 'edit'),
 
                         Hidden::make('name')->dehydrated(),
-                        Hidden::make('slug')->dehydrated(),
                     ]),
 
                 // ── 2.5. Datos del producto (SOLO tipos custom) ──────
