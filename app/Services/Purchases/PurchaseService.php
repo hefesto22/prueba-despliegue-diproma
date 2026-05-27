@@ -212,7 +212,13 @@ class PurchaseService
         }
 
         $product->update([
-            'cost_price' => round($newCost, 2),
+            // 4 decimales: la columna products.cost_price es DECIMAL(12,4)
+            // y la convención del proyecto es preservar precisión interna
+            // en fuentes de verdad. El kardex (inventory_movements) y los
+            // documentos fiscales sí redondean a 2 al persistir su snapshot,
+            // pero el cost_price del producto debe mantener precisión para
+            // que el CPP a lo largo de muchas compras no acumule drift.
+            'cost_price' => round($newCost, 4),
             'stock' => $currentStock + $quantity,
         ]);
     }

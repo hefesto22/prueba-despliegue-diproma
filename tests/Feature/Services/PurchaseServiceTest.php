@@ -345,8 +345,10 @@ class PurchaseServiceTest extends TestCase
         $this->service->confirm($purchase1);
 
         $product->refresh();
-        // Promedio: (10*800 + 5*1000) / 15 = 13000/15 = 866.67
-        $this->assertEquals(866.67, (float) $product->cost_price);
+        // Promedio: (10*800 + 5*1000) / 15 = 13000/15 = 866.6666... → round(4) = 866.6667
+        // (Precisión interna 4 decimales para no acumular drift en compras sucesivas;
+        // el display al usuario aplica round(_, 2) al final.)
+        $this->assertEquals(866.6667, (float) $product->cost_price);
         $this->assertEquals(15, $product->stock);
 
         // Compra 2: 5 unidades a L1,380 c/ISV (= L1,200 NETO)
@@ -356,7 +358,9 @@ class PurchaseServiceTest extends TestCase
         $this->service->confirm($purchase2);
 
         $product->refresh();
-        // Promedio: (15*866.67 + 5*1200) / 20 = (13000.05 + 6000) / 20 = 950.00
+        // Promedio: (15 × 866.6667 + 5 × 1200) / 20 = (13000.0005 + 6000) / 20 = 950.000025
+        // → round(4) = 950.0000. La precisión de 4 decimales del paso anterior
+        // ya NO contamina el resultado final — preserva exactitud, no la pierde.
         $this->assertEquals(950.00, (float) $product->cost_price);
         $this->assertEquals(20, $product->stock);
     }
@@ -629,8 +633,11 @@ class PurchaseServiceTest extends TestCase
         $this->service->confirm($purchase2);
         $product->refresh();
 
-        // (1 × 2250 + 2 × 2300) / 3 = 6850 / 3 = 2283.33
-        $this->assertEquals(2283.33, (float) $product->cost_price,
+        // (1 × 2250 + 2 × 2300) / 3 = 6850 / 3 = 2283.3333... → round(4) = 2283.3333
+        // Precisión interna 4 decimales en cost_price (DECIMAL(12,4)): el CPP
+        // ya no truncará centavos en cada compra sucesiva. Al mostrar al
+        // usuario el accessor / display aplica round(_, 2) al final.
+        $this->assertEquals(2283.3333, (float) $product->cost_price,
             'CPP debe usar SOLO el stock disponible (1 unidad a 2,250) — la unidad vendida no participa');
         $this->assertEquals(3, $product->stock);
     }

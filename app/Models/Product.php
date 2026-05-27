@@ -44,6 +44,26 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * Esta convención está alineada con SaleInventoryProcessor, RepairDeliveryService,
  * CreateInventoryMovement, CreditNoteInventoryProcessor, DashboardStatsService y
  * PurchaseService — todos consumen y producen cost_price/unit_cost en NETO.
+ *
+ * ─── Precisión interna vs precisión de output ──────────────────────────────
+ *
+ * Las columnas `sale_price` y `cost_price` son DECIMAL(12,4) — cuatro decimales
+ * de precisión interna. El cast Eloquent es `decimal:4` para preservar esos
+ * dígitos al hidratar.
+ *
+ * REGLA: redondear a 2 decimales SOLO en el punto de output (factura, POS,
+ * accessor para mostrar, Excel, PDF). NUNCA aplicar round(_, 2) en cálculos
+ * intermedios sobre sale_price/cost_price — destruye la precisión que
+ * estas columnas justamente existen para preservar.
+ *
+ * El motivo de los 4 decimales es matemático: el back-out de ISV 15% sobre
+ * precios con 2 decimales produce round-trip lossy (380 → 330.43 → 379.99).
+ * Con 4 decimales internos: 380 → 330.4348 → 380.00 ✓. Ver migración
+ * 2026_05_27_174348_increase_product_price_precision_to_four_decimals.
+ *
+ * Los snapshots inmutables (inventory_movements.unit_cost, sale_items.unit_price,
+ * purchases.*, sales.*) se mantienen en DECIMAL(12,2) — son historial fiscal,
+ * no fuente de recálculo, y el SAR opera a centavos.
  */
 class Product extends Model
 {
@@ -83,8 +103,12 @@ class Product extends Model
             // de los 8 cases conocidos.
             'condition' => ProductCondition::class,
             'tax_type' => TaxType::class,
-            'cost_price' => 'decimal:2',
-            'sale_price' => 'decimal:2',
+            // Precisión interna a 4 decimales para preservar el round-trip
+            // de ISV (back-out + display). El output al usuario sigue siendo
+            // a 2 decimales — los accessors y consumidores redondean al final.
+            // Ver docblock de la clase para la regla completa.
+            'cost_price' => 'decimal:4',
+            'sale_price' => 'decimal:4',
             'stock' => 'integer',
             'min_stock' => 'integer',
             'specs' => 'array',
@@ -450,15 +474,20 @@ class Product extends Model
     /**
      * Precio público (con ISV) que el cliente paga.
      *
-     * Para Gravado15: sale_price + 15% = sale_price × 1.15
-     * Para Exento: sale_price (sin cambio).
+     * Para Gravado15: sale_price × 1.15
+     * Para Exento:    sale_price × 1.00 = sale_price
      *
      * Lo usa el POS, los infolists y la columna "Precio" de la tabla de
      * productos para mostrar al cajero exactamente lo que va a cobrar.
+     *
+     * Implementación: multiplica directo sobre el sale_price de 4 decimales
+     * con UN solo round(_, 2) al final — no compone calculateSaleIsv (que
+     * redondea el ISV intermedio a 2 decimales) porque eso acumularía
+     * drift de centavos en algunos precios.
      */
     public function getSalePriceWithIsvAttribute(): float
     {
-        return round($this->sale_price + $this->calculateSaleIsv(), 2);
+        return round($this->sale_price * (1 + $this->tax_type->rate()), 2);
     }
 
     public function getProfitMarginAttribute(): float
@@ -475,17 +504,35 @@ class Product extends Model
     }
 
     /**
-     * Convertir precio con ISV a precio base.
-     * Usa el multiplicador centralizado en config/tax.php.
+     * Convertir precio con ISV a precio base NETO (back-out).
+     *
+     * Usa el multiplicador centralizado en config/tax.php (1.15 para HN).
+     *
+     * Precisión: 4 decimales. ESTE ES UN VALOR INTERMEDIO destinado a
+     * almacenarse en `products.sale_price` o `products.cost_price` (DECIMAL(12,4))
+     * y luego ser reexpuesto al usuario vía priceWithIsv(). Redondear a 2
+     * decimales aquí provoca round-trip lossy: 380 / 1.15 → 330.43 → 379.99.
+     * Con 4 decimales: 380 / 1.15 → 330.4348 → priceWithIsv → 380.00 ✓.
+     *
+     * NO usar este método para mostrar valores al usuario — usar el campo
+     * o accessor correspondiente que aplique round(_, 2) al final.
      */
     public static function priceWithoutIsv(float $priceWithIsv): float
     {
-        return round($priceWithIsv / config('tax.multiplier', 1.15), 2);
+        return round($priceWithIsv / config('tax.multiplier', 1.15), 4);
     }
 
     /**
-     * Convertir precio base a precio con ISV.
-     * Usa el multiplicador centralizado en config/tax.php.
+     * Convertir precio base NETO a precio con ISV (output).
+     *
+     * Usa el multiplicador centralizado en config/tax.php (1.15 para HN).
+     *
+     * Precisión: 2 decimales. ESTE ES UN VALOR DE OUTPUT destinado a mostrarse
+     * al usuario o persistirse en columnas de snapshot (sale_items.unit_price,
+     * inventory_movements.unit_cost, etc.) que sí van a DECIMAL(12,2).
+     *
+     * Multiplica directo sobre el valor de 4 decimales del producto — no hay
+     * round intermedio que pierda precisión. Por eso 330.4348 × 1.15 = 380.00.
      */
     public static function priceWithIsv(float $basePrice): float
     {

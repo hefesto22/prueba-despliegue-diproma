@@ -171,7 +171,10 @@ class CreateProductConvertPricesTest extends TestCase
 
     public function test_convierte_correctamente_decimales_no_redondos(): void
     {
-        // Verificar que el redondeo a 2 decimales funciona consistentemente.
+        // Verificar que el back-out preserva 4 decimales de precisión interna.
+        // La columna products.sale_price es DECIMAL(12,4) — el back-out
+        // intermedio NO debe truncar a 2 decimales (eso causaría el round-trip
+        // lossy que se documenta en 2026_05_27_174348_increase_product_price_precision).
         $data = [
             'product_type' => 'laptop',
             'condition' => ProductCondition::New->value,
@@ -183,7 +186,8 @@ class CreateProductConvertPricesTest extends TestCase
 
         $result = CreateProduct::convertPricesToBase($data);
 
-        // 1234.56 / 1.15 = 1073.5304... redondeado a 1073.53
-        $this->assertEquals(1073.53, $result['sale_price']);
+        // 1234.56 / 1.15 = 1073.5304347... redondeado a 4 = 1073.5304
+        $this->assertEquals(1073.5304, $result['sale_price'],
+            'El back-out debe preservar 4 decimales para que priceWithIsv reconstruya el original.');
     }
 }
