@@ -4,14 +4,17 @@ namespace App\Filament\Resources\Repairs\Actions;
 
 use App\Enums\PaymentMethod;
 use App\Enums\RepairStatus;
+use App\Filament\Resources\Repairs\Schemas\RepairItemSchema;
 use App\Models\Repair;
 use App\Services\Repairs\RepairDeliveryService;
 use App\Services\Repairs\RepairStatusService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\Width;
 
 /**
  * Factory de Filament Actions para las transiciones de Reparación.
@@ -39,8 +42,11 @@ class RepairTransitionActions
      *
      *   - Recibido      → Cotizar
      *   - Cotizado      → Aprobar + Rechazar (dos opciones simétricas)
-     *   - Aprobado      → Iniciar reparación
      *   - EnReparación  → Marcar completada
+     *
+     * Nota: NO hay botón "Iniciar reparación" — al aprobar, el service
+     * encadena la transición a EnReparacion automáticamente (decisión de
+     * negocio: aprobada la cotización, el trabajo comienza de inmediato).
      *
      * El cajero/técnico ve la próxima acción esperada como un botón directo,
      * sin tener que abrir un menú — UX más rápida y autoexplicativa.
@@ -53,7 +59,6 @@ class RepairTransitionActions
             self::cotizar(),
             self::aprobar(),
             self::rechazar(),
-            self::iniciarReparacion(),
             self::marcarCompletada(),
             self::entregar(),
         ];
@@ -89,6 +94,18 @@ class RepairTransitionActions
         return [...self::primary(), ...self::secondary()];
     }
 
+    /**
+     * Cotización rápida en un solo paso — diagnóstico + líneas + transición.
+     *
+     * Slide-over con Repeater de líneas (mismo schema que el relation
+     * manager, vía `RepairItemSchema`): el cajero cotiza directo desde el
+     * listado sin entrar a editar la reparación. Si el repair ya tiene
+     * líneas (flujo desde el editor), el Repeater arranca vacío y solo
+     * agrega líneas nuevas opcionales.
+     *
+     * Todo el submit es atómico vía `RepairStatusService::cotizarConLineas()`:
+     * si la transición falla, las líneas del modal hacen rollback.
+     */
     public static function cotizar(): Action
     {
         return Action::make('cotizar')
@@ -96,11 +113,34 @@ class RepairTransitionActions
             ->icon('heroicon-o-document-text')
             ->color('info')
             ->visible(fn (Repair $record) => $record->status === RepairStatus::Recibido)
-            ->requiresConfirmation()
+            ->slideOver()
+            ->modalWidth(Width::ThreeExtraLarge)
             ->modalHeading('Marcar como Cotizado')
-            ->modalDescription('La reparación pasa a estado Cotizado. El cliente podrá decidir si aprueba o rechaza.')
+            ->modalDescription(fn (Repair $record) => $record->items()->count() > 0
+                ? sprintf(
+                    'Ya hay %d línea(s) por L. %s. Puedes agregar más líneas y confirmar — la reparación pasa a estado Cotizado.',
+                    $record->items()->count(),
+                    number_format((float) $record->total, 2),
+                )
+                : 'Completa el diagnóstico, agrega las líneas y confirma — todo en un solo paso. La reparación pasa a estado Cotizado.')
             ->modalSubmitActionLabel('Cotizar')
             ->schema([
+                Textarea::make('diagnosis')
+                    ->label('Diagnóstico técnico')
+                    ->required()
+                    ->rows(2)
+                    ->default(fn (Repair $record) => $record->diagnosis)
+                    ->placeholder('Qué se revisó y qué se encontró en el equipo.'),
+                Repeater::make('items')
+                    ->label('Líneas de cotización')
+                    ->schema(RepairItemSchema::components(compact: true))
+                    ->columns(3)
+                    ->defaultItems(fn (Repair $record) => $record->items()->count() === 0 ? 1 : 0)
+                    ->minItems(fn (Repair $record) => $record->items()->count() === 0 ? 1 : 0)
+                    ->addActionLabel('Agregar línea')
+                    ->itemLabel(fn (array $state): ?string => $state['description'] ?? null)
+                    ->compact()
+                    ->collapsible(),
                 Textarea::make('note')
                     ->label('Nota (opcional)')
                     ->rows(2)
@@ -108,14 +148,30 @@ class RepairTransitionActions
             ])
             ->action(function (Repair $record, array $data, RepairStatusService $service) {
                 try {
-                    $service->cotizar($record, $data['note'] ?? null);
+                    $lines = array_map(
+                        fn (array $line) => RepairItemSchema::normalize($line),
+                        array_values($data['items'] ?? []),
+                    );
+
+                    $updated = $service->cotizarConLineas(
+                        $record,
+                        $lines,
+                        $data['diagnosis'] ?? null,
+                        $data['note'] ?? null,
+                    );
+
                     Notification::make()
                         ->success()
                         ->title('Cotización lista')
-                        ->body("Reparación {$record->repair_number} marcada como Cotizada.")
+                        ->body(sprintf(
+                            'Reparación %s cotizada — %d línea(s), total L. %s.',
+                            $updated->repair_number,
+                            $updated->items()->count(),
+                            number_format((float) $updated->total, 2),
+                        ))
                         ->send();
                 } catch (\Throwable $e) {
-                    Notification::make()->danger()->title('Error')->body($e->getMessage())->send();
+                    Notification::make()->danger()->title('Error al cotizar')->body($e->getMessage())->send();
                 }
             });
     }
@@ -128,7 +184,7 @@ class RepairTransitionActions
             ->color('success')
             ->visible(fn (Repair $record) => $record->status === RepairStatus::Cotizado)
             ->modalHeading('Aprobar cotización')
-            ->modalDescription('El cliente aprueba la cotización. Si deja anticipo, debe registrarse en caja.')
+            ->modalDescription('El cliente aprueba la cotización y la reparación pasa directo a "En reparación". Si deja anticipo, debe registrarse en caja.')
             ->modalSubmitActionLabel('Aprobar')
             ->schema([
                 TextInput::make('advance_payment')
@@ -151,10 +207,10 @@ class RepairTransitionActions
                     );
                     Notification::make()
                         ->success()
-                        ->title('Cotización aprobada')
+                        ->title('Cotización aprobada — reparación en proceso')
                         ->body((float) ($data['advance_payment'] ?? 0) > 0
-                            ? "Anticipo de L. " . number_format((float) $data['advance_payment'], 2) . " registrado en caja."
-                            : "Reparación {$record->repair_number} lista para iniciar.")
+                            ? "Anticipo de L. " . number_format((float) $data['advance_payment'], 2) . " registrado en caja. Reparación {$record->repair_number} en proceso."
+                            : "Reparación {$record->repair_number} en proceso.")
                         ->send();
                 } catch (\Throwable $e) {
                     Notification::make()->danger()->title('Error al aprobar')->body($e->getMessage())->send();
@@ -188,36 +244,6 @@ class RepairTransitionActions
                         ->warning()
                         ->title('Cotización rechazada')
                         ->body("Reparación {$record->repair_number} marcada como Rechazada.")
-                        ->send();
-                } catch (\Throwable $e) {
-                    Notification::make()->danger()->title('Error')->body($e->getMessage())->send();
-                }
-            });
-    }
-
-    public static function iniciarReparacion(): Action
-    {
-        return Action::make('iniciar_reparacion')
-            ->label('Iniciar reparación')
-            ->icon('heroicon-o-wrench-screwdriver')
-            ->color('primary')
-            ->visible(fn (Repair $record) => $record->status === RepairStatus::Aprobado)
-            ->requiresConfirmation()
-            ->modalHeading('Iniciar reparación')
-            ->modalDescription('El técnico comienza el trabajo. Si no había técnico asignado, se asigna el usuario actual.')
-            ->modalSubmitActionLabel('Iniciar')
-            ->schema([
-                Textarea::make('note')
-                    ->label('Nota (opcional)')
-                    ->rows(2),
-            ])
-            ->action(function (Repair $record, array $data, RepairStatusService $service) {
-                try {
-                    $service->iniciarReparacion($record, null, $data['note'] ?? null);
-                    Notification::make()
-                        ->success()
-                        ->title('Reparación iniciada')
-                        ->body("Reparación {$record->repair_number} en proceso.")
                         ->send();
                 } catch (\Throwable $e) {
                     Notification::make()->danger()->title('Error')->body($e->getMessage())->send();

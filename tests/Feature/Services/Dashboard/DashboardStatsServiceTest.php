@@ -205,6 +205,136 @@ class DashboardStatsServiceTest extends TestCase
             'Utilidad neta = 400 − 180 = 220.');
     }
 
+    // ─── Líneas de reparación (sin producto del catálogo) ───────────────
+
+    public function test_honorarios_y_pieza_externa_entran_a_ganancia_bruta(): void
+    {
+        // Venta tipo "entrega de reparación": honorarios exentos sin costo
+        // (ganancia pura) + pieza externa gravada con costo registrado.
+        $sale = Sale::factory()->create([
+            'establishment_id' => $this->matriz->id,
+            'date' => Carbon::now(),
+            'status' => SaleStatus::Completada,
+            'subtotal' => 1500.00, // 500 honorarios + 1000 base pieza
+            'isv' => 150.00,
+            'total' => 1650.00,
+            'discount_amount' => 0,
+        ]);
+
+        // Honorarios: exentos, sin producto, sin costo
+        SaleItem::create([
+            'sale_id' => $sale->id,
+            'product_id' => null,
+            'description' => 'Honorarios por reparación',
+            'quantity' => 1,
+            'unit_price' => 500.00,
+            'unit_cost' => null,
+            'tax_type' => TaxType::Exento,
+            'subtotal' => 500.00,
+            'isv_amount' => 0,
+            'total' => 500.00,
+        ]);
+
+        // Pieza externa nueva: 1150 con ISV (base 1000), costó 400
+        SaleItem::create([
+            'sale_id' => $sale->id,
+            'product_id' => null,
+            'description' => 'Pantalla 14" nueva',
+            'quantity' => 1,
+            'unit_price' => 1150.00,
+            'unit_cost' => 400.00,
+            'tax_type' => TaxType::Gravado15,
+            'subtotal' => 1000.00,
+            'isv_amount' => 150.00,
+            'total' => 1150.00,
+        ]);
+
+        $result = $this->service->grossProfitThisMonth();
+
+        $this->assertEquals(1500.00, $result['revenue'],
+            'Revenue = 500 honorarios + 1000 base de pieza (sin ISV).');
+        $this->assertEquals(400.00, $result['cost'],
+            'Costo = solo el de la pieza externa; honorarios sin costo.');
+        $this->assertEquals(1100.00, $result['gross_profit'],
+            'Ganancia = (500 − 0) honorarios + (1000 − 400) pieza = 1100.');
+    }
+
+    public function test_linea_de_producto_sin_kardex_sigue_excluida(): void
+    {
+        // Guard de honestidad estadística: una línea CON producto pero SIN
+        // movimiento de kardex (venta pre-migración) no debe entrar al
+        // cálculo ni como revenue ni como costo — aunque ahora el JOIN sea LEFT.
+        $product = Product::factory()->brandNew()->inCategory($this->category)->create([
+            'cost_price' => 600,
+            'sale_price' => 1000,
+            'stock' => 10,
+            'tax_type' => TaxType::Gravado15,
+        ]);
+
+        $sale = Sale::factory()->create([
+            'establishment_id' => $this->matriz->id,
+            'date' => Carbon::now(),
+            'status' => SaleStatus::Completada,
+            'subtotal' => 1000.00,
+            'isv' => 150.00,
+            'total' => 1150.00,
+            'discount_amount' => 0,
+        ]);
+
+        SaleItem::create([
+            'sale_id' => $sale->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 1150.00,
+            'tax_type' => TaxType::Gravado15,
+            'subtotal' => 1000.00,
+            'isv_amount' => 150.00,
+            'total' => 1150.00,
+        ]);
+        // Sin InventoryMovement SalidaVenta a propósito.
+
+        $result = $this->service->grossProfitThisMonth();
+
+        $this->assertEquals(0.00, $result['revenue'],
+            'Línea de producto sin kardex se excluye: no se inventan costos.');
+        $this->assertEquals(0.00, $result['gross_profit']);
+    }
+
+    public function test_mezcla_pos_y_reparacion_suma_ambas_fuentes_de_costo(): void
+    {
+        // POS: 1000 base − 600 costo (kardex) = 400
+        $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
+
+        // Reparación: honorarios exentos 300 sin costo = 300
+        $sale = Sale::factory()->create([
+            'establishment_id' => $this->matriz->id,
+            'date' => Carbon::now(),
+            'status' => SaleStatus::Completada,
+            'subtotal' => 300.00,
+            'isv' => 0,
+            'total' => 300.00,
+            'discount_amount' => 0,
+        ]);
+        SaleItem::create([
+            'sale_id' => $sale->id,
+            'product_id' => null,
+            'description' => 'Honorarios por mantenimiento',
+            'quantity' => 1,
+            'unit_price' => 300.00,
+            'unit_cost' => null,
+            'tax_type' => TaxType::Exento,
+            'subtotal' => 300.00,
+            'isv_amount' => 0,
+            'total' => 300.00,
+        ]);
+
+        $result = $this->service->grossProfitThisMonth();
+
+        $this->assertEquals(1300.00, $result['revenue'], '1000 POS + 300 honorarios.');
+        $this->assertEquals(600.00, $result['cost'], 'Solo el costo del kardex POS.');
+        $this->assertEquals(700.00, $result['gross_profit'], '400 POS + 300 honorarios.');
+    }
+
     // ─── Helpers ─────────────────────────────────────────────
 
     /**

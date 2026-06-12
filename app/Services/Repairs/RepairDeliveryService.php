@@ -191,6 +191,11 @@ class RepairDeliveryService
                     'description' => $item->product_id ? null : $item->description,
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
+                    // Snapshot del costo para el cálculo de ganancia bruta.
+                    // Relevante para piezas externas (sin kardex); en piezas
+                    // de inventario el kardex sigue siendo la fuente primaria
+                    // (CPP al momento de la venta) y esto queda de respaldo.
+                    'unit_cost' => $item->unit_cost,
                     'tax_type' => $item->tax_type,
                     'subtotal' => $item->subtotal,
                     'isv_amount' => $item->isv_amount,

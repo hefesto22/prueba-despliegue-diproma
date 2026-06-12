@@ -2,24 +2,17 @@
 
 namespace App\Filament\Resources\Repairs\RelationManagers;
 
-use App\Enums\RepairItemCondition;
 use App\Enums\RepairItemSource;
-use App\Models\Product;
+use App\Filament\Resources\Repairs\Schemas\RepairItemSchema;
 use App\Services\Repairs\RepairQuotationService;
 use BackedEnum;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -35,10 +28,11 @@ use Filament\Tables\Table;
  *   - recalcula los totales del Repair padre (subtotal/exempt_total/
  *     taxable_total/isv/total).
  *
- * El form usa `live()` en `source` y `condition` para refrescar los
- * campos visibles según el tipo de línea (mano de obra → solo precio;
- * pieza externa → precio + nueva/usada + proveedor; pieza inventario
- * → selector de producto + cantidad).
+ * Los campos del form viven en `RepairItemSchema` (compartidos con el
+ * modal "Marcar como Cotizado" de `RepairTransitionActions`): `live()`
+ * en `source` y `condition` refresca los campos visibles según el tipo
+ * de línea (mano de obra → solo precio; pieza externa → precio +
+ * nueva/usada + proveedor; pieza inventario → selector de producto).
  */
 class RepairItemsRelationManager extends RelationManager
 {
@@ -53,132 +47,7 @@ class RepairItemsRelationManager extends RelationManager
         return $schema->components([
             Section::make()
                 ->columns(2)
-                ->schema([
-                    Select::make('source')
-                        ->label('Tipo de línea')
-                        ->required()
-                        ->options(collect(RepairItemSource::selectable())->mapWithKeys(
-                            fn (RepairItemSource $s) => [$s->value => $s->getLabel()]
-                        ))
-                        ->live()
-                        ->afterStateUpdated(function ($state, Set $set) {
-                            // Limpiar campos dependientes al cambiar tipo
-                            $set('product_id', null);
-                            $set('condition', null);
-                            $set('external_supplier', null);
-                            // Default descripción amigable
-                            if ($state === RepairItemSource::HonorariosReparacion->value) {
-                                $set('description', 'Honorarios por reparación');
-                            } elseif ($state === RepairItemSource::HonorariosMantenimiento->value) {
-                                $set('description', 'Honorarios por mantenimiento');
-                            }
-                        })
-                        ->columnSpanFull(),
-
-                    // Solo cuando source = PiezaInventario
-                    Select::make('product_id')
-                        ->label('Producto del inventario')
-                        ->placeholder('Buscar por nombre, marca o SKU')
-                        ->searchable()
-                        ->visible(fn (Get $get) => $get('source') === RepairItemSource::PiezaInventario->value)
-                        ->required(fn (Get $get) => $get('source') === RepairItemSource::PiezaInventario->value)
-                        ->getSearchResultsUsing(function (string $search): array {
-                            return Product::query()
-                                ->where('is_active', true)
-                                ->where(function ($q) use ($search) {
-                                    $q->where('name', 'like', "%{$search}%")
-                                        ->orWhere('sku', 'like', "%{$search}%")
-                                        ->orWhere('brand', 'like', "%{$search}%");
-                                })
-                                ->where('stock', '>', 0)
-                                ->limit(20)
-                                ->get()
-                                // Mostrar precio público CON ISV — es el monto que el
-                                // cliente paga y con el que el técnico debe cuadrar
-                                // mentalmente. La BD guarda sale_price NETO; el
-                                // accessor sale_price_with_isv reconstruye el
-                                // precio con ISV (gravado: ×1.15, exento: igual).
-                                ->mapWithKeys(fn (Product $p) => [
-                                    $p->id => "{$p->name} (stock: {$p->stock} | L. " . number_format($p->sale_price_with_isv, 2) . ')',
-                                ])
-                                ->toArray();
-                        })
-                        ->getOptionLabelUsing(fn ($value) => Product::find($value)?->name)
-                        ->afterStateUpdated(function ($state, Set $set) {
-                            if ($state) {
-                                $p = Product::find($state);
-                                if ($p) {
-                                    $set('description', $p->name);
-                                    // unit_price: convención WITH ISV (igual que cart del POS
-                                    // y SaleItem). RepairQuotationService hace back-out por
-                                    // tax_type al persistir subtotal/isv_amount.
-                                    // unit_cost: convención NETA (igual que CPP del producto).
-                                    $set('unit_price', (string) $p->sale_price_with_isv);
-                                    $set('unit_cost', (string) $p->cost_price);
-                                }
-                            }
-                        })
-                        ->live()
-                        ->columnSpanFull(),
-
-                    // Solo cuando source = PiezaExterna
-                    Select::make('condition')
-                        ->label('Condición')
-                        ->options(collect(RepairItemCondition::cases())->mapWithKeys(
-                            fn (RepairItemCondition $c) => [$c->value => $c->getLabel()]
-                        ))
-                        ->visible(fn (Get $get) => $get('source') === RepairItemSource::PiezaExterna->value)
-                        ->required(fn (Get $get) => $get('source') === RepairItemSource::PiezaExterna->value)
-                        ->live()
-                        ->helperText(fn (Get $get) => match ($get('condition')) {
-                            'nueva' => 'Precio incluye 15% ISV',
-                            'usada' => 'Exento de ISV',
-                            default => null,
-                        }),
-                    TextInput::make('external_supplier')
-                        ->label('Comprado a (proveedor)')
-                        ->visible(fn (Get $get) => $get('source') === RepairItemSource::PiezaExterna->value)
-                        ->maxLength(200)
-                        ->placeholder('Nombre del local / proveedor'),
-
-                    TextInput::make('description')
-                        ->label('Descripción')
-                        ->required()
-                        ->maxLength(300)
-                        ->columnSpanFull(),
-
-                    TextInput::make('quantity')
-                        ->label('Cantidad')
-                        ->required()
-                        ->numeric()
-                        ->integer()
-                        ->step(1)
-                        ->default(1)
-                        ->minValue(1)
-                        ->helperText('Cantidades enteras únicamente. Para "media hora" ajusta el precio unitario.'),
-                    TextInput::make('unit_price')
-                        ->label(fn (Get $get) => match (true) {
-                            $get('source') === RepairItemSource::PiezaExterna->value && $get('condition') === RepairItemCondition::Nueva->value => 'Precio unitario (con ISV)',
-                            default => 'Precio unitario',
-                        })
-                        ->required()
-                        ->numeric()
-                        ->step('0.01')
-                        ->prefix('L.')
-                        ->minValue(0),
-                    TextInput::make('unit_cost')
-                        ->label('Costo (opcional)')
-                        ->numeric()
-                        ->step('0.01')
-                        ->prefix('L.')
-                        ->helperText('Lo que pagaste por la pieza. Solo para reportes internos.')
-                        ->columnSpanFull(),
-
-                    Textarea::make('notes')
-                        ->label('Notas')
-                        ->rows(2)
-                        ->columnSpanFull(),
-                ]),
+                ->schema(RepairItemSchema::components()),
         ]);
     }
 
@@ -260,16 +129,11 @@ class RepairItemsRelationManager extends RelationManager
 
     /**
      * Normalizar el array del form antes de pasarlo al service.
-     * Convierte strings en enums, limpia campos vacíos, garantiza tipos.
+     * Delegado a RepairItemSchema::normalize() — misma conversión que
+     * usa el modal "Marcar como Cotizado" (una sola fuente de verdad).
      */
     private function normalizeData(array $data): array
     {
-        if (isset($data['source']) && is_string($data['source'])) {
-            $data['source'] = RepairItemSource::from($data['source']);
-        }
-        if (isset($data['condition']) && is_string($data['condition'])) {
-            $data['condition'] = RepairItemCondition::from($data['condition']);
-        }
-        return $data;
+        return RepairItemSchema::normalize($data);
     }
 }

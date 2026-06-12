@@ -122,12 +122,19 @@ class DashboardStatsService
     /**
      * Ganancia bruta del mes = revenue - costo de ventas.
      *
-     * El costo usa el snapshot `unit_cost` del movimiento `SalidaVenta`
-     * correspondiente a cada `sale_item` — costo promedio ponderado exacto
-     * al momento de la venta, no el `cost_price` actual del producto.
+     * Fuente del costo según el tipo de línea:
+     *   - Línea CON producto (POS y piezas de inventario de reparaciones):
+     *     snapshot `unit_cost` del movimiento `SalidaVenta` del kardex —
+     *     costo promedio ponderado exacto al momento de la venta, no el
+     *     `cost_price` actual del producto.
+     *   - Línea SIN producto (honorarios y piezas externas de reparaciones):
+     *     `sale_items.unit_cost` copiado desde la cotización al entregar.
+     *     Honorarios no tienen costo (NULL → 0) = ganancia pura.
      *
-     * Las ventas pre-migración sin `unit_cost` se excluyen del cálculo
-     * (revenue y cost) por honestidad estadística: no se inventan costos.
+     * Honestidad estadística: las líneas de producto pre-migración sin
+     * snapshot de kardex se excluyen del cálculo (revenue y cost) — no se
+     * inventan costos. Las líneas sin producto siempre entran (su costo
+     * NULL significa "sin costo", no "costo desconocido").
      *
      * @return array{gross_profit: float, margin_percent: float, revenue: float, cost: float}
      */
@@ -137,11 +144,13 @@ class DashboardStatsService
             $start = Carbon::now()->startOfMonth();
             $end = Carbon::now()->endOfDay();
 
-            // JOIN al movimiento de kardex (SalidaVenta) para usar el unit_cost
-            // histórico. Una sola query agregada, sin N+1.
+            // LEFT JOIN al kardex: las líneas sin producto no tienen movimiento
+            // SalidaVenta y antes quedaban excluidas por el INNER JOIN — el
+            // dashboard ignoraba todo el ingreso de honorarios y piezas
+            // externas de reparaciones. Una sola query agregada, sin N+1.
             $row = SaleItem::query()
                 ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
-                ->join('inventory_movements as im', function ($join) {
+                ->leftJoin('inventory_movements as im', function ($join) {
                     $join->on('im.reference_id', '=', 'sales.id')
                         ->whereColumn('im.product_id', 'sale_items.product_id')
                         ->where('im.reference_type', Sale::class)
@@ -149,10 +158,13 @@ class DashboardStatsService
                 })
                 ->where('sales.status', SaleStatus::Completada)
                 ->whereBetween('sales.date', [$start, $end])
-                ->whereNotNull('im.unit_cost')
+                ->where(function ($query) {
+                    $query->whereNull('sale_items.product_id')   // honorarios / pieza externa
+                        ->orWhereNotNull('im.unit_cost');        // producto con kardex
+                })
                 ->selectRaw('
                     COALESCE(SUM(sale_items.subtotal), 0) as revenue,
-                    COALESCE(SUM(sale_items.quantity * im.unit_cost), 0) as cost
+                    COALESCE(SUM(sale_items.quantity * COALESCE(im.unit_cost, sale_items.unit_cost, 0)), 0) as cost
                 ')
                 ->first();
 

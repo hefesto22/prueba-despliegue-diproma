@@ -17,6 +17,7 @@ class SaleItem extends Model
         'description',
         'quantity',
         'unit_price',
+        'unit_cost',
         'tax_type',
         'subtotal',
         'isv_amount',
@@ -33,6 +34,11 @@ class SaleItem extends Model
             // RepairItems también guardan quantity como integer (mismo motivo).
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',
+            // unit_cost: snapshot NETO del costo para líneas sin producto del
+            // catálogo (honorarios/piezas externas de reparación). Las líneas
+            // con product_id usan el kardex como fuente de costo — acá queda
+            // NULL o de respaldo. Consumido por grossProfitThisMonth.
+            'unit_cost' => 'decimal:2',
             'tax_type' => TaxType::class,
             'subtotal' => 'decimal:2',
             'isv_amount' => 'decimal:2',

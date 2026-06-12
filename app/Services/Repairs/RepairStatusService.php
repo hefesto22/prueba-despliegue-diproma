@@ -50,6 +50,7 @@ class RepairStatusService
     public function __construct(
         private readonly CashSessionService $cashSessionService,
         private readonly EstablishmentResolver $establishmentResolver,
+        private readonly RepairQuotationService $quotationService,
     ) {}
 
     /**
@@ -88,13 +89,62 @@ class RepairStatusService
     }
 
     /**
-     * Aprobar la cotización (cliente acepta).
+     * Cotización rápida: diagnóstico + líneas + transición en UNA transacción.
+     *
+     * Diseñado para el modal "Marcar como Cotizado" del listado: el cajero
+     * cotiza sin entrar a editar la reparación. Atomicidad total — si falla
+     * la transición (p. ej. diagnóstico vacío), las líneas recién agregadas
+     * también hacen rollback y la reparación queda exactamente como estaba.
+     *
+     * Las líneas se delegan a `RepairQuotationService::addItem()` (resuelve
+     * tax_type y recalcula totales del Repair); la transición reusa
+     * `cotizar()` con sus mismas validaciones duras. Este método solo
+     * orquesta — no duplica reglas (DRY).
+     *
+     * @param  array<int, array<string, mixed>>  $lines  Líneas nuevas (formato de RepairQuotationService::addItem). Puede ser vacío si la reparación ya tiene líneas.
+     * @param  string|null  $diagnosis  Si viene lleno, sobreescribe el diagnóstico antes de validar.
+     *
+     * @throws RepairTransitionException si el estado actual no permite cotizar
+     * @throws \DomainException si tras agregar líneas sigue sin items o sin diagnóstico
+     */
+    public function cotizarConLineas(
+        Repair $repair,
+        array $lines,
+        ?string $diagnosis = null,
+        ?string $note = null,
+    ): Repair {
+        $this->assertCanTransitionTo($repair, RepairStatus::Cotizado);
+
+        return DB::transaction(function () use ($repair, $lines, $diagnosis, $note) {
+            if (filled($diagnosis)) {
+                $repair->update(['diagnosis' => $diagnosis]);
+            }
+
+            foreach ($lines as $line) {
+                $this->quotationService->addItem($repair, $line);
+            }
+
+            // cotizar() re-valida (items > 0, diagnóstico) y registra el log.
+            // Su DB::transaction interna se convierte en savepoint dentro de
+            // esta transacción — el rollback sigue siendo total.
+            return $this->cotizar($repair->fresh(), $note);
+        });
+    }
+
+    /**
+     * Aprobar la cotización (cliente acepta) — auto-inicia la reparación.
      *
      * Si el cliente deja anticipo > 0:
      *   - Requiere caja abierta en la sucursal.
      *   - Registra `CashMovementType::RepairAdvancePayment` (inflow).
      *   - Actualiza `repair.advance_payment` con el monto cobrado.
      *   - Registra evento `AdvancePaid` con metadata del cash_movement_id.
+     *
+     * Tras aprobar, encadena la transición a EnReparacion en la MISMA
+     * transacción (decisión de negocio 2026-06-12: aprobada la cotización
+     * el trabajo comienza de inmediato — el botón "Iniciar reparación" era
+     * un clic burocrático). El historial conserva ambas transiciones
+     * (Cotizado→Aprobado→EnReparacion) para auditoría y tracking público.
      *
      * @throws RepairTransitionException
      * @throws NoHayCajaAbiertaException si advance > 0 sin caja abierta
@@ -154,7 +204,9 @@ class RepairStatusService
                 ]);
             }
 
-            return $repair->fresh();
+            // Auto-iniciar: la transacción interna de iniciarReparacion()
+            // se vuelve savepoint — si falla, rollback total del aprobar.
+            return $this->iniciarReparacion($repair->fresh());
         });
     }
 
@@ -191,6 +243,10 @@ class RepairStatusService
 
     /**
      * Iniciar la reparación efectiva.
+     *
+     * Desde 2026-06-12 se invoca automáticamente al final de `aprobar()`
+     * (la UI ya no tiene botón "Iniciar reparación"). Se mantiene público
+     * por si un flujo futuro necesita la transición por separado.
      *
      * Si la reparación no tenía técnico asignado, se asigna ahora
      * (idealmente el usuario autenticado si tiene rol técnico, o el
