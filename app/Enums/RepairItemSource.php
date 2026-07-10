@@ -13,10 +13,15 @@ use Filament\Support\Contracts\HasLabel;
  * cotización ahora tiene origen explícito, lo que permite tipificar
  * correctamente cada concepto en la factura CAI:
  *
- *   - HonorariosReparacion / HonorariosMantenimiento → exentos de ISV.
+ *   - HonorariosReparacion / HonorariosMantenimiento /
+ *     HonorariosInstalacionSoftware → exentos de ISV.
  *     Respaldo: el contador los registra como honorarios profesionales
  *     por servicio prestado (no como mano de obra de servicio comercial),
  *     lo que los pone bajo Art. 15 inciso e del Decreto 194-2002.
+ *     InstalacionSoftware cubre instalación de Windows, Office, licencias
+ *     y formateos — mismo tratamiento fiscal que la venta de licencias
+ *     exentas del catálogo. Si la licencia se vende como producto del
+ *     inventario va aparte (PiezaInventario); esta línea es el SERVICIO.
  *
  *   - PiezaExterna → comprada puntualmente para esta reparación.
  *     El tax_type se deriva de `RepairItemCondition`:
@@ -31,6 +36,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
 {
     case HonorariosReparacion = 'honorarios_reparacion';
     case HonorariosMantenimiento = 'honorarios_mantenimiento';
+    case HonorariosInstalacionSoftware = 'honorarios_instalacion_software';
     case PiezaExterna = 'pieza_externa';
     case PiezaInventario = 'pieza_inventario';
 
@@ -39,6 +45,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
         return match ($this) {
             self::HonorariosReparacion => 'Honorarios por reparación',
             self::HonorariosMantenimiento => 'Honorarios por mantenimiento',
+            self::HonorariosInstalacionSoftware => 'Honorarios por instalación de software',
             self::PiezaExterna => 'Pieza (compra externa)',
             self::PiezaInventario => 'Pieza (inventario propio)',
         };
@@ -47,7 +54,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
     public function getColor(): string
     {
         return match ($this) {
-            self::HonorariosReparacion, self::HonorariosMantenimiento => 'info',
+            self::HonorariosReparacion, self::HonorariosMantenimiento, self::HonorariosInstalacionSoftware => 'info',
             self::PiezaExterna => 'warning',
             self::PiezaInventario => 'success',
         };
@@ -58,6 +65,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
         return match ($this) {
             self::HonorariosReparacion => 'heroicon-o-wrench',
             self::HonorariosMantenimiento => 'heroicon-o-cog-6-tooth',
+            self::HonorariosInstalacionSoftware => 'heroicon-o-computer-desktop',
             self::PiezaExterna => 'heroicon-o-shopping-bag',
             self::PiezaInventario => 'heroicon-o-cube',
         };
@@ -67,7 +75,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
     public function isService(): bool
     {
         return match ($this) {
-            self::HonorariosReparacion, self::HonorariosMantenimiento => true,
+            self::HonorariosReparacion, self::HonorariosMantenimiento, self::HonorariosInstalacionSoftware => true,
             default => false,
         };
     }
@@ -100,7 +108,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
     public function resolveTaxType(?RepairItemCondition $condition = null): ?TaxType
     {
         return match ($this) {
-            self::HonorariosReparacion, self::HonorariosMantenimiento => TaxType::Exento,
+            self::HonorariosReparacion, self::HonorariosMantenimiento, self::HonorariosInstalacionSoftware => TaxType::Exento,
             self::PiezaExterna => $condition?->toTaxType()
                 ?? throw new \InvalidArgumentException(
                     'PiezaExterna requiere RepairItemCondition (nueva o usada).'
@@ -115,6 +123,7 @@ enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
         return [
             self::HonorariosReparacion,
             self::HonorariosMantenimiento,
+            self::HonorariosInstalacionSoftware,
             self::PiezaExterna,
             self::PiezaInventario,
         ];

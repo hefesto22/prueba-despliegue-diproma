@@ -59,6 +59,8 @@ class RepairItemSchema
                         $set('description', 'Honorarios por reparación');
                     } elseif ($state === RepairItemSource::HonorariosMantenimiento->value) {
                         $set('description', 'Honorarios por mantenimiento');
+                    } elseif ($state === RepairItemSource::HonorariosInstalacionSoftware->value) {
+                        $set('description', 'Honorarios por instalación de software');
                     }
                 })
                 ->columnSpan($compact ? 2 : 'full'),
