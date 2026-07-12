@@ -53,7 +53,7 @@ class SaleInventoryProcessor
      *   5. Registra `InventoryMovement::SalidaVenta` con el costo snapshot.
      *   6. Decrementa `Product.stock`.
      *
-     * @param  array<int, array{product_id: int, quantity: int|string, unit_price: float|string, tax_type?: string|TaxType}>  $cartItems
+     * @param  array<int, array{product_id: int, quantity: int|string, unit_price: float|string, tax_type?: string|TaxType, description?: string|null}>  $cartItems
      *
      * @throws \RuntimeException Si falta stock para algún producto.
      */
@@ -76,6 +76,13 @@ class SaleInventoryProcessor
             SaleItem::create([
                 'sale_id' => $sale->id,
                 'product_id' => $product->id,
+                // description: solo la llenan los servicios (Honorarios) con
+                // detalle escrito por el cajero en el POS — ej: "HONORARIO POR
+                // ASESORÍA — Se impartió conferencia". La factura la prefiere
+                // sobre el nombre del catálogo. Productos físicos: null.
+                'description' => filled($item['description'] ?? null)
+                    ? mb_substr(trim($item['description']), 0, 300)
+                    : null,
                 'quantity' => $quantity,
                 'unit_price' => $item['unit_price'],
                 'tax_type' => $this->resolveTaxType($item, $product),

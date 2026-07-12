@@ -56,7 +56,7 @@ class SaleService
      *
      * Operación atómica:
      * 0. Validar que hay caja abierta en la sucursal (fail-fast fuera de la transacción)
-     * 1. Auto-crear cliente si tiene RTN
+     * 1. Auto-crear cliente si tiene nombre real Y RTN (ambos obligatorios)
      * 2. Crear la venta (Pendiente)
      * 3. `SaleInventoryProcessor::processCartItems` — lock productos, validar stock,
      *    crear SaleItems, registrar kardex SalidaVenta, decrementar stock
@@ -110,10 +110,23 @@ class SaleService
             $cartItems, $paymentMethod, $customerName, $customerRtn,
             $discountType, $discountValue, $notes, $establishment
         ) {
-            // 1. Auto-crear cliente si tiene RTN
+            // 1. Auto-crear cliente SOLO si vienen nombre Y RTN reales.
+            //    Con solo RTN se creaba un cliente llamado "Consumidor Final"
+            //    (dato basura en el directorio de clientes). Con solo nombre
+            //    no hay identidad fiscal única para deduplicar. El guard
+            //    contra "Consumidor Final" cubre el default que inyecta el
+            //    POS cuando el cajero deja el nombre vacío.
             $customerId = null;
-            if (filled($customerRtn)) {
-                $customer = $this->findOrCreateCustomer($customerName, $customerRtn);
+            // Mayúsculas SIEMPRE (misma regla que el mutator de Customer) —
+            // así el snapshot customer_name de la venta y la factura salen
+            // idénticos al directorio de clientes.
+            $realName = mb_strtoupper(trim($customerName), 'UTF-8');
+            if (
+                filled($customerRtn)
+                && filled($realName)
+                && strcasecmp($realName, 'Consumidor Final') !== 0
+            ) {
+                $customer = $this->findOrCreateCustomer($realName, $customerRtn);
                 $customerId = $customer->id;
             }
 
@@ -121,7 +134,7 @@ class SaleService
             $sale = Sale::create([
                 'establishment_id' => $establishment->id,
                 'customer_id' => $customerId,
-                'customer_name' => filled($customerName) ? $customerName : 'Consumidor Final',
+                'customer_name' => filled($realName) ? $realName : 'Consumidor Final',
                 'customer_rtn' => $customerRtn,
                 'date' => now(),
                 'status' => SaleStatus::Pendiente,

@@ -80,15 +80,30 @@
                                 @php
                                     $lineTotal = $item['unit_price'] * $item['quantity'];
                                     $isGravado = $item['tax_type'] === 'gravado_15';
+                                    $isService = $item['is_service'] ?? false;
                                 @endphp
                                 <tr wire:key="cart-row-{{ $index }}" style="border-bottom: 1px solid rgb(243 244 246);">
                                     {{-- Producto --}}
                                     <td style="padding: 0.75rem;">
                                         <div style="font-weight: 500; color: rgb(17 24 39);">{{ $item['name'] }}</div>
                                         <div style="font-size: 0.75rem; color: rgb(107 114 128); font-family: monospace;">{{ $item['sku'] }}</div>
+                                        @if($isService)
+                                            {{-- Detalle del servicio: qué se hizo. Viaja a
+                                                 sale_items.description como "NOMBRE — detalle"
+                                                 y se imprime en la factura. wire:change para no
+                                                 disparar un request por tecla. --}}
+                                            <input
+                                                type="text"
+                                                maxlength="200"
+                                                value="{{ $item['detail'] ?? '' }}"
+                                                wire:change="updateDetail({{ $index }}, $event.target.value)"
+                                                placeholder="Detalle para la factura. Ej: Se impartió conferencia de redes"
+                                                title="Se imprime en la factura junto al nombre del servicio"
+                                                style="margin-top: 0.375rem; width: 100%; max-width: 24rem; padding: 0.25rem 0.5rem; border: 1px dashed rgb(217 119 6); border-radius: 0.375rem; font-size: 0.75rem; color: rgb(55 65 81); background: rgb(255 251 235); text-transform: uppercase;"
+                                            />
+                                        @endif
                                     </td>
                                     {{-- Precio --}}
-                                    @php $isService = $item['is_service'] ?? false; @endphp
                                     <td style="padding: 0.75rem; text-align: right; color: rgb(55 65 81);">
                                         @if($isService)
                                             {{-- Servicios (Honorarios, etc.): precio editable.
@@ -225,14 +240,44 @@
                         Datos del Cliente
                     </h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                        <div>
+                        <div x-data="{ open: false }" @click.outside="open = false" style="position: relative;">
                             <label style="display: block; font-size: 0.75rem; color: rgb(107 114 128); margin-bottom: 0.25rem;">Nombre</label>
+                            {{-- Autocomplete: al escribir 2+ letras busca clientes
+                                 existentes por nombre o RTN. Seleccionar uno llena
+                                 nombre + RTN de golpe. Alpine controla visibilidad
+                                 (abre al tipear/enfocar, cierra al click afuera o
+                                 al seleccionar); Livewire trae las sugerencias. --}}
                             <input
                                 type="text"
-                                wire:model.blur="customerName"
+                                wire:model.live.debounce.400ms="customerName"
+                                @focus="open = true"
+                                @input="open = true"
                                 placeholder="Consumidor Final"
-                                style="width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid rgb(209 213 219); font-size: 0.875rem; background: white;"
+                                autocomplete="off"
+                                style="width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid rgb(209 213 219); font-size: 0.875rem; background: white; text-transform: uppercase;"
                             />
+                            @if(count($this->customerSuggestions) > 0)
+                                <div
+                                    x-show="open"
+                                    x-transition.opacity.duration.100ms
+                                    style="position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin-top: 0.25rem; background: white; border: 1px solid rgb(209 213 219); border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.12); overflow: hidden; max-height: 16rem; overflow-y: auto;"
+                                >
+                                    @foreach($this->customerSuggestions as $suggestion)
+                                        <button
+                                            type="button"
+                                            wire:key="customer-suggestion-{{ $suggestion['id'] }}"
+                                            wire:click="selectCustomer({{ $suggestion['id'] }})"
+                                            @click="open = false"
+                                            style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; background: white; border: none; border-bottom: 1px solid rgb(243 244 246); cursor: pointer; text-align: left; font-size: 0.875rem;"
+                                            onmouseover="this.style.backgroundColor='rgb(254 243 199)'"
+                                            onmouseout="this.style.backgroundColor='white'"
+                                        >
+                                            <span style="font-weight: 500; color: rgb(17 24 39);">{{ $suggestion['name'] }}</span>
+                                            <span style="font-size: 0.75rem; color: rgb(107 114 128); font-family: monospace; white-space: nowrap;">{{ $suggestion['rtn'] ?: 'Sin RTN' }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: rgb(107 114 128); margin-bottom: 0.25rem;">RTN (opcional)</label>
@@ -254,7 +299,7 @@
                         </div>
                     </div>
                     <p style="font-size: 0.75rem; color: rgb(156 163 175); margin-top: 0.5rem;">
-                        Si ingresa RTN, el cliente se guarda automáticamente para futuras ventas.
+                        El cliente se guarda automáticamente solo si ingresa nombre y RTN. Escriba 2+ letras en Nombre para buscar clientes guardados.
                     </p>
                 </div>
 

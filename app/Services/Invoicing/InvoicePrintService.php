@@ -96,7 +96,12 @@ class InvoicePrintService
             $lineTotal = $unitPrice * $quantity;
 
             return [
-                'description'    => $item->product?->name ?? $item->description ?? 'Producto',
+                // Precedencia: description explícita > nombre del catálogo.
+                // El POS llena description SOLO en servicios con detalle
+                // ("HONORARIO POR ASESORÍA — Se impartió conferencia") y las
+                // entregas de reparación la usan sin product_id. Los productos
+                // físicos siempre la dejan null → cae al nombre del catálogo.
+                'description'    => $item->description ?? $item->product?->name ?? 'Producto',
                 'sku'            => $item->product?->sku,
                 'quantity'       => $this->formatQuantity($quantity),
                 'unit_price'     => $this->formatMoney($unitPrice),

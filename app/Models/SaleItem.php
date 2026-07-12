@@ -51,19 +51,22 @@ class SaleItem extends Model
     /**
      * Nombre legible del item para la factura.
      *
-     * Si el SaleItem tiene producto (caso POS normal): retorna `product->name`.
-     * Si NO tiene producto (caso entrega de reparación): retorna `description`
-     * — texto libre como "Honorarios por reparación" o "Memoria RAM externa".
+     * Precedencia: `description` explícita > `product->name` del catálogo.
+     *   - Servicios del POS con detalle: description = "HONORARIO POR
+     *     ASESORÍA — Se impartió conferencia" (tiene product_id Y description).
+     *   - Entrega de reparación: description libre sin product_id.
+     *   - Producto físico del POS: description null → nombre del catálogo.
      *
      * Esto encapsula la lógica para que las views de impresión no tengan
      * que verificar `$item->product_id` en cada plantilla (Law of Demeter).
      */
     public function getDisplayNameAttribute(): string
     {
-        if ($this->product_id !== null) {
-            return $this->product?->name ?? '—';
+        if (filled($this->description)) {
+            return $this->description;
         }
-        return $this->description ?? '—';
+
+        return $this->product?->name ?? '—';
     }
 
     // ─── Relaciones ──────────────────────────────────────────

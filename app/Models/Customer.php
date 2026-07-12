@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasAuditFields;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +33,25 @@ class Customer extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    // ─── Mutators ────────────────────────────────────────────
+
+    /**
+     * Nombre SIEMPRE en mayúsculas (decisión de negocio 2026-07-10).
+     *
+     * Mutator a nivel de modelo para que aplique en TODOS los puntos de
+     * escritura sin duplicar lógica: auto-creación desde el POS, CRUD de
+     * Clientes en Filament y módulo de Reparaciones. `mb_strtoupper` con
+     * UTF-8 explícito uppercasea correctamente acentos y eñes (á→Á, ñ→Ñ).
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => $value !== null
+                ? mb_strtoupper(trim($value), 'UTF-8')
+                : null,
+        );
     }
 
     // ─── Activity Log ────────────────────────────────────────

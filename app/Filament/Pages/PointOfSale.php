@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\DiscountType;
 use App\Enums\PaymentMethod;
 use App\Enums\TaxType;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Services\Cash\Exceptions\NoHayCajaAbiertaException;
 use App\Services\Establishments\EstablishmentResolver;
@@ -67,7 +68,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
 
     // ─── Estado del carrito (Livewire) ──────────────────────
 
-    /** @var array<int, array{product_id: int, name: string, sku: string, unit_price: float, tax_type: string, quantity: int, stock: int}> */
+    /** @var array<int, array{product_id: int, name: string, sku: string, unit_price: float, tax_type: string, quantity: int, stock: int, is_service: bool, detail: string}> */
     public array $cart = [];
 
     public string $customerName = '';
@@ -283,6 +284,56 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
         return collect($this->cart)->sum('quantity');
     }
 
+    /**
+     * Sugerencias de clientes existentes para el autocomplete del campo
+     * Nombre. Busca por nombre O RTN (el cajero puede escanear/escribir
+     * cualquiera de los dos) sobre clientes activos.
+     *
+     * Query liviana: 2+ caracteres, LIKE con wildcards escapados (un cliente
+     * llamado "100%" no debe comportarse como comodín), límite 8 filas y solo
+     * las 3 columnas que la vista necesita. #[Computed] la cachea por request
+     * — el blade puede referenciarla varias veces sin re-query.
+     */
+    #[Computed]
+    public function customerSuggestions(): array
+    {
+        $term = trim($this->customerName);
+
+        if (mb_strlen($term) < 2) {
+            return [];
+        }
+
+        $like = '%' . addcslashes($term, '%_\\') . '%';
+
+        return Customer::query()
+            ->active()
+            ->where(function ($query) use ($like) {
+                $query->where('name', 'like', $like)
+                    ->orWhere('rtn', 'like', $like);
+            })
+            ->orderBy('name')
+            ->limit(8)
+            ->get(['id', 'name', 'rtn'])
+            ->toArray();
+    }
+
+    /**
+     * Seleccionar un cliente del autocomplete: llena nombre y RTN.
+     * Refetch por id (no confiar en datos del DOM — defense-in-depth
+     * consistente con updateUnitPrice).
+     */
+    public function selectCustomer(int $customerId): void
+    {
+        $customer = Customer::query()->active()->find($customerId);
+
+        if (! $customer) {
+            return;
+        }
+
+        $this->customerName = $customer->name;
+        $this->customerRtn = (string) ($customer->rtn ?? '');
+    }
+
     // ─── Helpers de stock vs carrito ────────────────────────
 
     /**
@@ -369,6 +420,11 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 // — los productos físicos (incluyendo custom como equipo de
                 // seguridad) tienen precio fijo del catálogo.
                 'is_service' => (bool) $product->is_service,
+                // detail: texto libre SOLO para servicios — el cajero
+                // especifica qué se hizo ("Se impartió conferencia de redes").
+                // Viaja a sale_items.description como "NOMBRE — detalle" y la
+                // factura lo imprime. Productos físicos lo ignoran.
+                'detail' => '',
             ];
 
             Notification::make()
@@ -435,6 +491,31 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
     }
 
     /**
+     * Actualizar el detalle de un servicio del carrito.
+     *
+     * Solo aplica a items `is_service=true` — misma defensa que
+     * updateUnitPrice: la vista solo expone el input en servicios, pero
+     * validamos también acá contra wire requests directos. Cap defensivo
+     * para que "NOMBRE — detalle" nunca exceda los 300 chars de la columna.
+     */
+    public function updateDetail(int $index, string $detail): void
+    {
+        if (! isset($this->cart[$index])) {
+            return;
+        }
+
+        if (! ($this->cart[$index]['is_service'] ?? false)) {
+            return;
+        }
+
+        // MAYÚSCULAS siempre — misma regla que el nombre de cliente. El
+        // detalle se imprime en la factura ("HONORARIO POR INSTALACIÓN —
+        // SE IMPARTIÓ CONFERENCIA") y debe verse uniforme con el nombre
+        // del servicio, que ya viene en mayúsculas del catálogo.
+        $this->cart[$index]['detail'] = mb_strtoupper(mb_substr(trim($detail), 0, 200), 'UTF-8');
+    }
+
+    /**
      * Eliminar item del carrito.
      */
     public function removeFromCart(int $index): void
@@ -486,6 +567,13 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'tax_type' => $item['tax_type'],
+                    // Servicios con detalle → description "NOMBRE — detalle"
+                    // (la factura la imprime tal cual, preservando la
+                    // tipificación del servicio para auditoría). Sin detalle
+                    // o producto físico → null (factura usa nombre catálogo).
+                    'description' => ($item['is_service'] ?? false) && filled($item['detail'] ?? '')
+                        ? $item['name'] . ' — ' . $item['detail']
+                        : null,
                 ])->toArray(),
                 paymentMethod: PaymentMethod::from($this->paymentMethod),
                 customerName: filled($this->customerName) ? $this->customerName : 'Consumidor Final',
