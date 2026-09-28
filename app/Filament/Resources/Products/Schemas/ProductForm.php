@@ -15,8 +15,8 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 
@@ -75,6 +75,7 @@ class ProductForm
         }
 
         $data['specs'] = $specs;
+
         return $data;
     }
 
@@ -165,6 +166,7 @@ class ProductForm
                                 if ($enum) {
                                     return $enum->getLabel();
                                 }
+
                                 // Si es custom, mostrarlo tal cual (MAYÚSCULAS).
                                 return $value;
                             })
@@ -238,13 +240,17 @@ class ProductForm
                                     // Tipo personalizado: tipo + marca + modelo
                                     // + subtype (si está). Ej: "HONORARIOS - INSTALACIÓN".
                                     $parts = [mb_strtoupper((string) $rawType)];
-                                    if (filled($brand)) $parts[] = mb_strtoupper((string) $brand);
-                                    if (filled($model)) $parts[] = mb_strtoupper((string) $model);
+                                    if (filled($brand)) {
+                                        $parts[] = mb_strtoupper((string) $brand);
+                                    }
+                                    if (filled($model)) {
+                                        $parts[] = mb_strtoupper((string) $model);
+                                    }
                                     $name = implode(' ', $parts);
 
                                     $subtype = $get('specs.subtype');
                                     if (filled($subtype)) {
-                                        $name .= ' - ' . mb_strtoupper((string) $subtype);
+                                        $name .= ' - '.mb_strtoupper((string) $subtype);
                                     }
 
                                     $clean = strtoupper(preg_replace('/[^a-zA-Z]/', '', (string) $rawType) ?: '');
@@ -258,9 +264,9 @@ class ProductForm
 
                                 return new HtmlString(
                                     "<div class='space-y-1'>"
-                                    . "<div class='font-semibold text-base'>{$name}</div>"
-                                    . "<div class='text-xs text-gray-500 dark:text-gray-400'>SKU: {$skuPreview} (se genera al guardar)</div>"
-                                    . "</div>"
+                                    ."<div class='font-semibold text-base'>{$name}</div>"
+                                    ."<div class='text-xs text-gray-500 dark:text-gray-400'>SKU: {$skuPreview} (se genera al guardar)</div>"
+                                    .'</div>'
                                 );
                             }),
 
@@ -410,8 +416,7 @@ class ProductForm
                         Placeholder::make('price_summary')
                             ->label('')
                             ->content(fn ($get) => static::buildPriceSummary($get))
-                            ->visible(fn ($get) =>
-                                (float) ($get('cost_price') ?? 0) > 0
+                            ->visible(fn ($get) => (float) ($get('cost_price') ?? 0) > 0
                                 || (float) ($get('sale_price') ?? 0) > 0),
 
                         // Hidden tax_type para productos físicos (lo setea el
@@ -440,7 +445,13 @@ class ProductForm
                                 ->label('Cantidad en stock')
                                 ->numeric()
                                 ->default(0)
-                                ->minValue(0),
+                                ->minValue(0)
+                                // El parámetro se llama $operation a propósito:
+                                // Filament v4 resuelve los argumentos de closure
+                                // por NOMBRE, no por posición.
+                                ->helperText(fn (string $operation): string => $operation === 'create'
+                                    ? 'Entra al Kardex como carga inicial del producto.'
+                                    : 'Si cambiás este número se genera un ajuste (+/−) en el Kardex.'),
                             TextInput::make('min_stock')
                                 ->label('Alerta de stock mínimo')
                                 ->numeric()
@@ -518,6 +529,7 @@ class ProductForm
         if ($val instanceof ProductType) {
             return false; // es enum
         }
+
         return ProductType::tryFrom(mb_strtolower((string) $val)) === null;
     }
 
@@ -604,6 +616,7 @@ class ProductForm
                         if ($selected instanceof ProductType) {
                             $selected = $selected->value;
                         }
+
                         return $selected === $type->value;
                     });
             }
@@ -620,6 +633,7 @@ class ProductForm
         if ($val instanceof ProductType) {
             return $val;
         }
+
         // Case-insensitive: los enum cases están en minúsculas ('laptop'),
         // pero un tipo custom guardado en spec_options está en MAYÚSCULAS
         // ('EQUIPO DE SEGURIDAD'). tryFrom devuelve null para custom, y el
@@ -687,16 +701,15 @@ class ProductForm
         if (! $type) {
             // Tipo personalizado o vacío: descripción genérica.
             $rawType = $get('product_type');
+
             return filled($rawType)
-                ? mb_strtoupper((string) $rawType) . ' — completá los datos del producto.'
+                ? mb_strtoupper((string) $rawType).' — completá los datos del producto.'
                 : 'Detalles';
         }
 
         return match ($type) {
-            ProductType::Accessory, ProductType::Component =>
-                $type->getLabel() . ' — solo el tipo es requerido, marca y modelo son opcionales.',
-            ProductType::Printer =>
-                $type->getLabel() . ' — marca opcional para genéricos.',
+            ProductType::Accessory, ProductType::Component => $type->getLabel().' — solo el tipo es requerido, marca y modelo son opcionales.',
+            ProductType::Printer => $type->getLabel().' — marca opcional para genéricos.',
             default => $type->getLabel(),
         };
     }
@@ -717,11 +730,13 @@ class ProductForm
     {
         if (static::isService($get)) {
             $taxType = $get('tax_type');
+
             return $taxType === TaxType::Gravado15->value
                 || $taxType === TaxType::Gravado15;
         }
 
         $condition = $get('condition');
+
         return $condition !== ProductCondition::Used->value
             && $condition !== ProductCondition::Used;
     }
@@ -740,6 +755,7 @@ class ProductForm
                 $specs[$field['key']] = $val;
             }
         }
+
         return $specs;
     }
 
@@ -759,7 +775,7 @@ class ProductForm
             $saleBase = round($sale / $multiplier, 2);
             $saleIsv = round($sale - $saleBase, 2);
             $parts[] = "<span class='text-gray-500 dark:text-gray-400'>Venta: L "
-                . number_format($saleBase, 2) . " + ISV L " . number_format($saleIsv, 2) . "</span>";
+                .number_format($saleBase, 2).' + ISV L '.number_format($saleIsv, 2).'</span>';
         }
 
         if ($cost > 0 && $sale > 0) {
@@ -770,11 +786,11 @@ class ProductForm
             $margin = $cost > 0 ? round(($profit / $cost) * 100, 2) : 0;
             $color = $margin >= 20 ? 'text-green-500' : ($margin >= 10 ? 'text-yellow-500' : 'text-red-500');
             $parts[] = "<span class='{$color} font-semibold'>Ganancia: L "
-                . number_format($profit, 2) . " ({$margin}%)</span>";
+                .number_format($profit, 2)." ({$margin}%)</span>";
         }
 
         return new HtmlString(
-            empty($parts) ? '' : "<div class='text-sm'>" . implode(' &nbsp;·&nbsp; ', $parts) . "</div>"
+            empty($parts) ? '' : "<div class='text-sm'>".implode(' &nbsp;·&nbsp; ', $parts).'</div>'
         );
     }
 }

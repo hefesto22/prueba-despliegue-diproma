@@ -6,15 +6,67 @@ use App\Enums\TaxType;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
+use App\Services\Inventory\ProductStockLedger;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
+
+    /**
+     * Ver nota de serialización en CreateProduct::$stockLedger.
+     */
+    protected ProductStockLedger $stockLedger;
+
+    public function boot(ProductStockLedger $stockLedger): void
+    {
+        $this->stockLedger = $stockLedger;
+    }
+
+    /**
+     * Guardar el producto y, si el operador cambió el stock a mano, dejar el
+     * ajuste correspondiente en el Kardex — todo en una transacción.
+     *
+     * ─── Por qué el stock previo se relee de la BD con lock ──────────────────
+     *
+     * El valor que el formulario cargó puede estar rancio: entre que el
+     * operador abrió la ficha y le dio Guardar, una venta en el POS pudo bajar
+     * el stock. Filament va a escribir igual el número del formulario, así que
+     * si tomáramos el stock del form como punto de partida, el Kardex diría
+     * "5 → 5, sin cambio" mientras la BD realmente pasó de 4 a 5 — una unidad
+     * apareciendo de la nada, sin rastro.
+     *
+     * Releyendo bajo `lockForUpdate()` el asiento refleja lo que de verdad
+     * ocurrió en la tabla, y el lock cierra la ventana entre la lectura y el
+     * UPDATE para que ninguna venta se cuele en el medio.
+     *
+     * Los Services (ventas, compras, notas de crédito, reparaciones) NO pasan
+     * por aquí — escriben `$product->update(['stock' => ...])` directo y
+     * registran su propio movimiento. Por eso este camino no puede producir
+     * doble conteo.
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        return DB::transaction(function () use ($record, $data) {
+            $previousStock = (int) Product::query()
+                ->whereKey($record->getKey())
+                ->lockForUpdate()
+                ->value('stock');
+
+            /** @var Product $product */
+            $product = parent::handleRecordUpdate($record, $data);
+
+            $this->stockLedger->recordManualAdjustment($product, $previousStock);
+
+            return $product;
+        });
+    }
 
     /**
      * Al cargar el formulario:

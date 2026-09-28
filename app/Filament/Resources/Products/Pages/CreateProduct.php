@@ -7,11 +7,52 @@ use App\Enums\TaxType;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
+use App\Services\Inventory\ProductStockLedger;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
+
+    /**
+     * Inyectado vía boot() — Livewire 3 soporta method injection en páginas
+     * Filament. Propiedad `protected` (no public) para que NO se serialice
+     * entre requests: un servicio con dependencias no es payload de Livewire.
+     * Mismo patrón que CreateInventoryMovement con EstablishmentResolver.
+     */
+    protected ProductStockLedger $stockLedger;
+
+    public function boot(ProductStockLedger $stockLedger): void
+    {
+        $this->stockLedger = $stockLedger;
+    }
+
+    /**
+     * Crear el producto y su asiento de Kardex en la MISMA transacción.
+     *
+     * Por qué transacción y no un `afterCreate()`: si el registro del
+     * movimiento falla (sucursal sin configurar, por ejemplo), un afterCreate
+     * dejaría el producto ya insertado con stock y sin respaldo en el Kardex —
+     * exactamente el agujero que esta fase vino a cerrar. Con transacción, o
+     * entran los dos o no entra ninguno.
+     *
+     * La carga inicial se registra como AjusteEntrada con `stock_before = 0`;
+     * ver ProductStockLedger para el detalle de por qué el override es
+     * necesario.
+     */
+    protected function handleRecordCreation(array $data): Model
+    {
+        return DB::transaction(function () use ($data) {
+            /** @var Product $product */
+            $product = parent::handleRecordCreation($data);
+
+            $this->stockLedger->recordInitialLoad($product);
+
+            return $product;
+        });
+    }
 
     /**
      * Transformar datos del formulario antes de crear el producto.
@@ -93,6 +134,7 @@ class CreateProduct extends CreateRecord
         // 1. Servicio: respetar tax_type del form (Select expuesto).
         if (! empty($data['is_service'])) {
             $taxType = $data['tax_type'] ?? null;
+
             return $taxType === TaxType::Gravado15->value
                 || $taxType === TaxType::Gravado15;
         }
@@ -100,6 +142,7 @@ class CreateProduct extends CreateRecord
         // 2. Producto físico (enum o custom no-servicio): derivar de condition.
         //    Nuevo = Gravado15, Usado = Exento. Mismo criterio que el modelo.
         $condition = $data['condition'] ?? null;
+
         return $condition === ProductCondition::New->value
             || $condition === ProductCondition::New;
     }

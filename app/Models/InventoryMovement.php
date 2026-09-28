@@ -134,14 +134,31 @@ class InventoryMovement extends Model
      * No modifica Product.stock — eso lo hace el caller (PurchaseService, etc.)
      *
      * @param  float|null  $unitCost  Costo unitario al momento del movimiento.
-     *                                 Obligatorio semánticamente para todos los movimientos
-     *                                 nuevos (ver PurchaseService, SaleService). Permanece
-     *                                 null solo para ajustes manuales sin costo asociado.
+     *                                Obligatorio semánticamente para todos los movimientos
+     *                                nuevos (ver PurchaseService, SaleService). Permanece
+     *                                null solo para ajustes manuales sin costo asociado.
      * @param  Establishment|null  $establishment  Sucursal en la que ocurre el movimiento.
-     *                                 Si es null, se resuelve a la matriz (backward compat
-     *                                 con callers pre-F6a). F6b reemplaza este método por
-     *                                 InventoryService::adjustStock que siempre inyecta la
-     *                                 sucursal correcta.
+     *                                             Si es null, se resuelve a la matriz (backward compat
+     *                                             con callers pre-F6a). F6b reemplaza este método por
+     *                                             InventoryService::adjustStock que siempre inyecta la
+     *                                             sucursal correcta.
+     * @param  int|null  $stockBefore  Stock de partida del movimiento. Por defecto se lee
+     *                                 de `$product->stock`, que es lo correcto para el flujo
+     *                                 normal: el caller registra el movimiento ANTES de
+     *                                 persistir el nuevo stock.
+     *
+     *                                 Se sobrescribe cuando el modelo en memoria YA refleja
+     *                                 el stock posterior al movimiento y por lo tanto leerlo
+     *                                 produciría un encadenamiento falso. Dos casos reales:
+     *                                   - Carga inicial (ProductStockLedger::recordInitialLoad):
+     *                                     el producto se acaba de INSERTAR con stock = N, pero
+     *                                     el kardex de esa unidad debe arrancar en 0 → N.
+     *                                   - Ajuste manual desde la ficha del producto: Filament
+     *                                     ya hizo fill()+save() con el stock nuevo, así que el
+     *                                     stock de partida es el original, no el actual.
+     *
+     *                                 Pasar este valor NO altera el stock del producto — igual
+     *                                 que el resto del método, `record()` solo deja constancia.
      */
     public static function record(
         Product $product,
@@ -151,8 +168,15 @@ class InventoryMovement extends Model
         ?string $notes = null,
         ?float $unitCost = null,
         ?Establishment $establishment = null,
+        ?int $stockBefore = null,
     ): static {
         $establishmentId = $establishment?->id ?? static::resolveDefaultEstablishmentId();
+
+        // Null coalescing (no `?:`) a propósito: stockBefore = 0 es un valor
+        // legítimo y frecuente (toda carga inicial lo usa). Con `?:` el 0 sería
+        // falsy y caería al stock del producto, rompiendo justo el caso que
+        // este parámetro existe para cubrir.
+        $before = $stockBefore ?? (int) $product->stock;
 
         return static::create([
             'establishment_id' => $establishmentId,
@@ -160,10 +184,10 @@ class InventoryMovement extends Model
             'type' => $type,
             'quantity' => $quantity,
             'unit_cost' => $unitCost !== null ? round($unitCost, 2) : null,
-            'stock_before' => $product->stock,
+            'stock_before' => $before,
             'stock_after' => $type->isEntry()
-                ? $product->stock + $quantity
-                : max(0, $product->stock - $quantity),
+                ? $before + $quantity
+                : max(0, $before - $quantity),
             'reference_type' => $reference ? get_class($reference) : null,
             'reference_id' => $reference?->id,
             'notes' => $notes,
