@@ -6,6 +6,7 @@ namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Models\Expense;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -100,7 +101,7 @@ class ExpenseInfolist
                                 ->placeholder('—'),
                         ]),
 
-                        Grid::make(3)->schema([
+                        Grid::make(4)->schema([
                             TextEntry::make('provider_invoice_number')
                                 ->label('# Factura')
                                 ->copyable()
@@ -111,8 +112,13 @@ class ExpenseInfolist
                                 ->date('d/m/Y')
                                 ->placeholder('—'),
 
+                            TextEntry::make('taxable_amount')
+                                ->label('Importe gravado 15%')
+                                ->money('HNL')
+                                ->placeholder('—'),
+
                             TextEntry::make('isv_amount')
-                                ->label('ISV desglosado')
+                                ->label('ISV de la factura')
                                 ->money('HNL')
                                 ->placeholder('—'),
                         ]),
@@ -123,13 +129,27 @@ class ExpenseInfolist
                             ->fontFamily('mono')
                             ->placeholder('—'),
 
-                        IconEntry::make('is_isv_deductible')
-                            ->label('Deducible de ISV')
-                            ->boolean()
-                            ->trueIcon('heroicon-o-check-circle')
-                            ->falseIcon('heroicon-o-x-circle')
-                            ->trueColor('success')
-                            ->falseColor('gray'),
+                        Grid::make(2)->schema([
+                            IconEntry::make('is_isv_deductible')
+                                ->label('Factura con CAI (Libro de Compras)')
+                                ->boolean()
+                                ->trueIcon('heroicon-o-check-circle')
+                                ->falseIcon('heroicon-o-x-circle')
+                                ->trueColor('success')
+                                ->falseColor('gray'),
+
+                            // Copia del gasto en el Libro de Compras (Fase 1b). Los
+                            // deducibles anteriores a esa fase no tienen copia.
+                            TextEntry::make('fiscalDocument.purchase_number')
+                                ->label('Registro en Compras')
+                                ->icon('heroicon-o-document-text')
+                                ->url(fn (Expense $record): ?string => $record->fiscalDocument
+                                    ? PurchaseResource::getUrl('view', ['record' => $record->fiscalDocument])
+                                    : null)
+                                ->placeholder(fn (Expense $record): string => $record->isLegacyDeductible()
+                                    ? 'No enviado (registrado antes del cambio; cargue el gravado para enviarlo)'
+                                    : '—'),
+                        ]),
                     ]),
 
                 // ── Vinculación con caja (solo si Efectivo) ──────────

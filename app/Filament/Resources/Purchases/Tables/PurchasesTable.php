@@ -9,10 +9,10 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -30,6 +30,8 @@ class PurchasesTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
+                    // Compras copiadas desde un gasto con factura (Fase 1b).
+                    ->description(fn ($record) => $record->expense_id ? "Desde gasto #{$record->expense_id}" : null)
                     ->icon('heroicon-o-shopping-cart'),
                 TextColumn::make('supplier.name')
                     ->label('Proveedor')
@@ -53,10 +55,6 @@ class PurchasesTable
                     ->label('Fecha')
                     ->date('d/m/Y')
                     ->sortable(),
-                TextColumn::make('items_count')
-                    ->label('Items')
-                    ->badge()
-                    ->color('gray'),
                 TextColumn::make('total')
                     ->label('Total')
                     ->money('HNL')
@@ -66,8 +64,8 @@ class PurchasesTable
                     ->label('Estado')
                     ->badge()
                     ->sortable(),
-                // Pago: oculto en Borrador. Una compra en Borrador todavía no se
-                // ejecutó (no afectó stock, no actualizó costo) — decir que está
+                // Pago: oculto en Borrador. Un borrador todavía no es un documento
+                // registrado (no entró al Libro de Compras) — decir que está
                 // "Pagada" o "Pendiente" en ese estado es prematuro. El badge
                 // aparece solo cuando la compra ya tiene una historia operativa
                 // real (Confirmada o Anulada). El payment_status se resuelve en

@@ -66,7 +66,6 @@ class PurchaseResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with(['supplier', 'establishment', 'createdBy'])
-            ->withCount('items')
             ->withoutGlobalScopes([SoftDeletingScope::class]);
     }
 

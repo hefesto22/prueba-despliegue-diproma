@@ -6,11 +6,11 @@ namespace App\Filament\Resources\Expenses\Schemas;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Filament\Resources\Expenses\Schemas\Components\ExpenseFiscalSection;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -30,10 +30,9 @@ use Filament\Schemas\Schema;
  *      provider_*, isv_amount, is_isv_deductible. Es lo que el contador
  *      corrige al revisar el cierre mensual antes de declarar.
  *
- * Validación condicional:
- *   - Si is_isv_deductible = true → exige RTN, número de factura y CAI.
- *     Mismo criterio que en RecordExpenseAction — sin esos datos SAR rechaza
- *     el crédito fiscal en una eventual auditoría.
+ * Validación condicional: la sección fiscal es la misma del modal de caja
+ * (ExpenseFiscalSection). Con "Factura con CAI" el gasto se copia al Libro de
+ * Compras al guardar — ver EditExpense y ExpenseFiscalDocumentSync.
  */
 class ExpenseForm
 {
@@ -112,81 +111,9 @@ class ExpenseForm
                     ]),
 
                 // ── 3. Datos fiscales del proveedor (EDITABLES) ──────
-                // No colapsable acá (a diferencia del modal de caja): el
-                // contador entra explícitamente a editar gastos cuando va a
-                // revisar fiscales del mes — no agregamos fricción extra.
-                Section::make('Datos fiscales del proveedor')
-                    ->aside()
-                    ->description('Completá si el gasto tiene factura. Obligatorio si se marca como deducible de ISV.')
-                    ->schema([
-                        Grid::make(2)->schema([
-                            TextInput::make('provider_name')
-                                ->label('Proveedor')
-                                ->maxLength(200)
-                                ->placeholder('Ej. Uno Honduras, Office Depot, Taller Mendoza'),
-
-                            TextInput::make('provider_rtn')
-                                ->label('RTN del proveedor')
-                                ->maxLength(14)
-                                ->minLength(14)
-                                ->regex('/^\d{14}$/')
-                                ->requiredIf('is_isv_deductible', true)
-                                ->validationMessages([
-                                    'regex' => 'El RTN debe tener exactamente 14 dígitos sin guiones.',
-                                    'required_if' => 'El RTN del proveedor es obligatorio si el gasto se marca como deducible de ISV.',
-                                ])
-                                ->placeholder('06459877498120'),
-                        ]),
-
-                        Grid::make(2)->schema([
-                            TextInput::make('provider_invoice_number')
-                                ->label('Número de factura')
-                                ->maxLength(50)
-                                ->requiredIf('is_isv_deductible', true)
-                                ->validationMessages([
-                                    'required_if' => 'El número de factura es obligatorio si el gasto se marca como deducible de ISV.',
-                                ])
-                                ->placeholder('000-001-01-00001234'),
-
-                            DatePicker::make('provider_invoice_date')
-                                ->label('Fecha de la factura')
-                                ->native(false)
-                                ->maxDate(now()),
-                        ]),
-
-                        TextInput::make('provider_invoice_cai')
-                            ->label('CAI del proveedor')
-                            // 43 = 36 hexadecimales (6-6-6-6-6-2-2-2) + 7 guiones del
-                            // formato oficial SAR. La columna en BD acepta hasta 50.
-                            ->maxLength(43)
-                            ->mask('******-******-******-******-******-**-**-**')
-                            ->placeholder('XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX-XX-XX')
-                            ->regex('/^[A-F0-9\-]+$/i')
-                            ->requiredIf('is_isv_deductible', true)
-                            ->validationMessages([
-                                'regex' => 'El CAI solo puede contener hexadecimales (0-9, A-F) y guiones.',
-                                'required_if' => 'El CAI del proveedor es obligatorio si el gasto se marca como deducible de ISV.',
-                                'max' => 'El CAI no puede exceder 43 caracteres (formato SAR).',
-                            ])
-                            ->dehydrateStateUsing(fn (?string $state) => $state ? strtoupper(trim($state)) : null)
-                            ->helperText('Código de Autorización de Impresión que aparece en la factura del proveedor.'),
-
-                        Grid::make(2)->schema([
-                            TextInput::make('isv_amount')
-                                ->label('ISV desglosado (Lempiras)')
-                                ->numeric()
-                                ->minValue(0)
-                                ->step(0.01)
-                                ->prefix('L')
-                                ->helperText('Monto de ISV indicado en la factura, si lo desglosa.'),
-
-                            Toggle::make('is_isv_deductible')
-                                ->label('Deducible de ISV')
-                                ->live()
-                                ->default(false)
-                                ->helperText('Marcar si el gasto genera crédito fiscal — exige RTN, factura y CAI.'),
-                        ]),
-                    ]),
+                // Misma sección que el modal de caja (ExpenseFiscalSection), sin
+                // colapsar: el contador entra aquí justamente a revisar fiscales.
+                ExpenseFiscalSection::make(collapsed: false),
             ]);
     }
 }

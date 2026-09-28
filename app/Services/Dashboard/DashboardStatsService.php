@@ -183,12 +183,15 @@ class DashboardStatsService
     }
 
     /**
-     * Total de gastos operativos del mes en curso.
+     * Total de gastos operativos del mes en curso, SIN el ISV recuperable.
      *
-     * Incluye TODOS los gastos del mes — deducibles y no deducibles. La
-     * distinción "deducible" aplica solo al ISV-353 (crédito fiscal). Para
-     * P&L (utilidad neta), todo gasto reduce ganancia sin importar si tiene
-     * crédito fiscal asociado.
+     * Incluye todos los gastos del mes, deducibles y no deducibles. Pero en
+     * los deducibles (factura con CAI) el ISV no es gasto: se recupera como
+     * crédito fiscal en la Declaración ISV. Las ventas ya entran a la
+     * utilidad sin ISV (sale_items.subtotal), así que restar el ISV de los
+     * gastos deducibles mezclaba criterios y subestimaba la utilidad
+     * (corregido 2026-09-28). En los no deducibles el ISV sí es costo y se
+     * resta el monto completo.
      *
      * Filtra por `expense_date` (no por created_at) para alinear con el
      * período fiscal correcto — un gasto registrado tarde con fecha del mes
@@ -201,7 +204,7 @@ class DashboardStatsService
 
             return (float) Expense::query()
                 ->forMonth($now->year, $now->month)
-                ->sum('amount_total');
+                ->sum(DB::raw('amount_total - CASE WHEN is_isv_deductible THEN COALESCE(isv_amount, 0) ELSE 0 END'));
         });
     }
 
@@ -209,7 +212,7 @@ class DashboardStatsService
      * Utilidad neta del mes = ganancia bruta − gastos operativos.
      *
      * Ganancia bruta = revenue − COGS (ya calculado por grossProfitThisMonth).
-     * Gastos operativos = suma de Expense.amount_total del mes.
+     * Gastos operativos = expensesThisMonth() (sin el ISV recuperable de los deducibles).
      *
      * El COGS NO se vuelve a restar acá — ya está descontado en la ganancia
      * bruta. Tampoco se mezcla el ISV (crédito fiscal de compras o débito de
@@ -336,7 +339,7 @@ class DashboardStatsService
         ];
 
         foreach ($keys as $key) {
-            Cache::forget(self::CACHE_PREFIX . $key);
+            Cache::forget(self::CACHE_PREFIX.$key);
         }
     }
 
@@ -375,13 +378,14 @@ class DashboardStatsService
 
     /**
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     private function remember(string $key, callable $callback)
     {
         return Cache::remember(
-            self::CACHE_PREFIX . $key,
+            self::CACHE_PREFIX.$key,
             self::CACHE_TTL,
             $callback
         );

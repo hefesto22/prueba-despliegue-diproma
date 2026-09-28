@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Enums\PurchaseStatus;
 use App\Traits\HasAuditFields;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -43,6 +45,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property ExpenseCategory $category
  * @property PaymentMethod $payment_method
  * @property string $amount_total
+ * @property string|null $taxable_amount
  * @property string|null $isv_amount
  * @property bool $is_isv_deductible
  * @property string $description
@@ -55,7 +58,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class Expense extends Model
 {
-    use HasFactory, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity;
 
     protected $fillable = [
         'establishment_id',
@@ -65,6 +68,7 @@ class Expense extends Model
         'category',
         'payment_method',
         'amount_total',
+        'taxable_amount',
         'isv_amount',
         'is_isv_deductible',
         'description',
@@ -81,13 +85,14 @@ class Expense extends Model
     protected function casts(): array
     {
         return [
-            'expense_date'           => 'date',
-            'category'               => ExpenseCategory::class,
-            'payment_method'         => PaymentMethod::class,
-            'amount_total'           => 'decimal:2',
-            'isv_amount'             => 'decimal:2',
-            'is_isv_deductible'      => 'boolean',
-            'provider_invoice_date'  => 'date',
+            'expense_date' => 'date',
+            'category' => ExpenseCategory::class,
+            'payment_method' => PaymentMethod::class,
+            'amount_total' => 'decimal:2',
+            'taxable_amount' => 'decimal:2',
+            'isv_amount' => 'decimal:2',
+            'is_isv_deductible' => 'boolean',
+            'provider_invoice_date' => 'date',
         ];
     }
 
@@ -102,6 +107,7 @@ class Expense extends Model
                 'category',
                 'payment_method',
                 'amount_total',
+                'taxable_amount',
                 'isv_amount',
                 'is_isv_deductible',
                 'provider_rtn',
@@ -146,6 +152,25 @@ class Expense extends Model
         return $this->hasOne(CashMovement::class, 'expense_id');
     }
 
+    /**
+     * Documentos de Compras generados desde este gasto (Fase 1b). Como máximo
+     * uno vigente; los anulados quedan como rastro de cuando se desmarcó la
+     * factura. Ver ExpenseFiscalDocumentSync.
+     */
+    public function purchases(): HasMany
+    {
+        return $this->hasMany(Purchase::class);
+    }
+
+    /**
+     * La compra vigente que lleva este gasto al Libro de Compras, si existe.
+     */
+    public function fiscalDocument(): HasOne
+    {
+        return $this->hasOne(Purchase::class)
+            ->where('status', '!=', PurchaseStatus::Anulada->value);
+    }
+
     // ─── Scopes ──────────────────────────────────────────────
 
     /**
@@ -173,6 +198,7 @@ class Expense extends Model
     public function scopeOfCategory(Builder $query, ExpenseCategory|string $category): Builder
     {
         $value = $category instanceof ExpenseCategory ? $category->value : $category;
+
         return $query->where('category', $value);
     }
 
@@ -185,6 +211,7 @@ class Expense extends Model
     public function scopeOfPaymentMethod(Builder $query, PaymentMethod|string $method): Builder
     {
         $value = $method instanceof PaymentMethod ? $method->value : $method;
+
         return $query->where('payment_method', $value);
     }
 
@@ -222,6 +249,19 @@ class Expense extends Model
     public function affectsCashBalance(): bool
     {
         return $this->payment_method->affectsCashBalance();
+    }
+
+    /**
+     * ¿Es un gasto marcado deducible ANTES de la Fase 1b?
+     *
+     * Esos gastos no tienen importe gravado (la columna no existía) y, por
+     * decisión del 2026-09-28, no se copian al Libro de Compras. Dejan de ser
+     * "heredados" en cuanto alguien les carga el importe gravado: esa es la
+     * forma explícita de mandar un gasto viejo al libro.
+     */
+    public function isLegacyDeductible(): bool
+    {
+        return (bool) $this->is_isv_deductible && $this->taxable_amount === null;
     }
 
     /**

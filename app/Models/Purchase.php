@@ -19,11 +19,12 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[ObservedBy([PurchaseObserver::class])]
 class Purchase extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'purchase_number',
         'establishment_id',
+        'expense_id',
         'supplier_invoice_number',
         'supplier_cai',
         'document_type',
@@ -111,7 +112,7 @@ class Purchase extends Model
             $sequence = 1;
         }
 
-        return $prefix . str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
     }
 
     // ─── Activity Log ────────────────────────────────────────
@@ -149,6 +150,16 @@ class Purchase extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * Gasto del que se generó esta compra (Fase 1b), o null si se registró
+     * directamente en Compras. Una compra generada desde un gasto se corrige
+     * desde el gasto, no desde Compras — ver ExpenseFiscalDocumentSync.
+     */
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
     }
 
     public function items(): HasMany
@@ -205,6 +216,15 @@ class Purchase extends Model
     }
 
     /**
+     * ¿Se generó desde un gasto con factura? Entonces no se edita ni se
+     * anula desde Compras: el gasto es la fuente de verdad.
+     */
+    public function isFromExpense(): bool
+    {
+        return $this->expense_id !== null;
+    }
+
+    /**
      * ¿Está vencida?
      */
     public function isOverdue(): bool
@@ -226,5 +246,4 @@ class Purchase extends Model
 
         return (int) now()->startOfDay()->diffInDays($this->due_date, false);
     }
-
 }

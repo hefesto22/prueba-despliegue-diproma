@@ -3,13 +3,19 @@
 namespace App\Models;
 
 use App\Enums\TaxType;
-use App\Observers\PurchaseItemObserver;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[ObservedBy([PurchaseItemObserver::class])]
+/**
+ * Línea de producto de una compra — SOLO HISTÓRICO.
+ *
+ * Desde la Fase 1 del rediseño Compras + Producto-lote (2026-07-25) las
+ * compras son documentos fiscales sin líneas: el sistema ya no crea
+ * PurchaseItems. La tabla se conserva porque las compras anteriores la usan
+ * como registro de lo que entró al inventario, y PurchaseService::cancel()
+ * la lee para revertir el stock de esas compras si se anulan.
+ */
 class PurchaseItem extends Model
 {
     use HasFactory;
@@ -49,45 +55,5 @@ class PurchaseItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────
-
-    /**
-     * Costo base unitario (sin ISV).
-     *
-     * Deriva del `subtotal` ya persistido por PurchaseTotalsCalculator —
-     * fuente única de verdad. Esto importa porque la separación de ISV
-     * depende del document_type del Purchase padre (factura sí separa, RI no),
-     * no solo del tax_type del item. Confiar en `subtotal/quantity` evita
-     * duplicar esa regla aquí y mantiene el accessor consistente con lo que
-     * se reporta y se persiste.
-     */
-    public function getUnitCostBaseAttribute(): float
-    {
-        $quantity = (int) $this->quantity;
-
-        if ($quantity <= 0) {
-            return 0.0;
-        }
-
-        return round((float) $this->subtotal / $quantity, 2);
-    }
-
-    /**
-     * ISV unitario.
-     *
-     * Deriva de `isv_amount/quantity`. En compras tipo RI siempre es 0
-     * porque el calculator no separa ISV (ver SupplierDocumentType::separatesIsv).
-     */
-    public function getUnitIsvAttribute(): float
-    {
-        $quantity = (int) $this->quantity;
-
-        if ($quantity <= 0) {
-            return 0.0;
-        }
-
-        return round((float) $this->isv_amount / $quantity, 2);
     }
 }

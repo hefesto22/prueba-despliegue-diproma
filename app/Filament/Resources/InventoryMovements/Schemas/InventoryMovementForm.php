@@ -5,17 +5,18 @@ namespace App\Filament\Resources\InventoryMovements\Schemas;
 use App\Enums\MovementType;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class InventoryMovementForm
 {
     /**
      * Formulario para ajustes manuales de inventario.
-     * Solo permite AjusteEntrada y AjusteSalida — los automáticos
-     * los genera PurchaseService internamente.
+     * Solo permite AjusteEntrada y AjusteSalida — los automáticos los
+     * generan los Services de ventas, notas de crédito, reparaciones y la
+     * ficha del producto (ProductStockLedger).
      */
     public static function configure(Schema $schema): Schema
     {
@@ -58,6 +59,7 @@ class InventoryMovementForm
                                 return 'Seleccione un producto';
                             }
                             $product = \App\Models\Product::find($productId);
+
                             return $product ? "{$product->stock} unidades" : '—';
                         }),
                 ]),

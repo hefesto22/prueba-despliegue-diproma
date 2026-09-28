@@ -6,7 +6,6 @@ namespace Tests\Feature\Filament\Purchases;
 
 use App\Enums\SupplierDocumentType;
 use App\Filament\Resources\Purchases\Pages\CreatePurchase;
-use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\User;
@@ -52,13 +51,11 @@ use Tests\TestCase;
  */
 class CreatePurchaseReciboInternoTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     private User $admin;
 
     private Supplier $generico;
-
-    private Product $producto;
 
     protected function setUp(): void
     {
@@ -66,12 +63,6 @@ class CreatePurchaseReciboInternoTest extends TestCase
 
         // El genérico lo crea la migración — si no aparece el módulo RI está roto.
         $this->generico = Supplier::forInternalReceipts();
-
-        // Producto real para el Repeater de items (cualquier producto activo sirve).
-        $this->producto = Product::factory()->create([
-            'cost_price' => 100.00,
-            'is_active' => true,
-        ]);
 
         // Mismo patrón de bypass de Gate que CashSessionResourceTest: evitamos
         // configurar permisos finos por test — el foco está en el flujo operativo.
@@ -112,13 +103,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
-                'items' => [
-                    [
-                        'product_id' => $this->producto->id,
-                        'quantity' => 2,
-                        'unit_cost' => 100.00,
-                    ],
-                ],
+                'exempt_total' => 200.00,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -138,6 +123,11 @@ class CreatePurchaseReciboInternoTest extends TestCase
             'Un RI no tiene CAI por definición.');
         $this->assertSame(0, $purchase->credit_days,
             'Un RI es siempre contado — no hay proveedor con crédito.');
+        $this->assertEquals(200.00, (float) $purchase->exempt_total,
+            'En RI el total pagado se registra como exento.');
+        $this->assertEquals(0.0, (float) $purchase->taxable_total);
+        $this->assertEquals(0.0, (float) $purchase->isv);
+        $this->assertEquals(200.00, (float) $purchase->total);
 
         CarbonImmutable::setTestNow();
         \Carbon\Carbon::setTestNow();
@@ -168,13 +158,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
                 'supplier_id' => $proveedorReal->id,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
-                'items' => [
-                    [
-                        'product_id' => $this->producto->id,
-                        'quantity' => 1,
-                        'unit_cost' => 50.00,
-                    ],
-                ],
+                'exempt_total' => 50.00,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -201,7 +185,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
 
     // ─── Secuencia diaria ───────────────────────────────────
 
-    public function test_dos_RIs_del_mismo_dia_incrementan_el_correlativo(): void
+    public function test_dos_r_is_del_mismo_dia_incrementan_el_correlativo(): void
     {
         $hoy = CarbonImmutable::parse('2026-04-19');
         CarbonImmutable::setTestNow($hoy);
@@ -215,11 +199,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
-                'items' => [[
-                    'product_id' => $this->producto->id,
-                    'quantity' => 1,
-                    'unit_cost' => 50.00,
-                ]],
+                'exempt_total' => 50.00,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -230,11 +210,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
-                'items' => [[
-                    'product_id' => $this->producto->id,
-                    'quantity' => 1,
-                    'unit_cost' => 75.00,
-                ]],
+                'exempt_total' => 75.00,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -272,11 +248,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
                 // CAI dentro del maxLength(43) y regex /^[A-F0-9\-]+$/i del form.
                 'supplier_cai' => 'ABCDEF-123456-789ABC-DEF012-345678-AB',
                 'date' => '2026-04-19',
-                'items' => [[
-                    'product_id' => $this->producto->id,
-                    'quantity' => 1,
-                    'unit_cost' => 100.00,
-                ]],
+                'exempt_total' => 100.00,
             ])
             ->call('create')
             ->assertHasNoFormErrors();

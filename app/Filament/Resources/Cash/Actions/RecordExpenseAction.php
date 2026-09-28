@@ -8,15 +8,18 @@ use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
 use App\Exceptions\Cash\MovimientoEnSesionCerradaException;
 use App\Exceptions\Cash\NoHayCajaAbiertaException;
+use App\Filament\Resources\Expenses\Schemas\Components\ExpenseFiscalSection;
 use App\Models\CashSession;
 use App\Services\Expenses\ExpenseService;
+use App\Services\FiscalPeriods\Exceptions\PeriodoFiscalCerradoException;
+use App\Services\Purchases\Exceptions\FacturaYaRegistradaException;
+use App\Services\Purchases\Exceptions\MontosDocumentoInvalidosException;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -67,10 +70,11 @@ use Filament\Schemas\Components\Section;
  * fiscales viven en una Section colapsada — visible cuando el cajero la
  * expande para anotar la factura del proveedor, transparente cuando no.
  *
- * Reglas de validación condicional:
- *   - Si `is_isv_deductible = true` → exige provider_rtn + invoice_number + cai.
- *     Sin esos datos, SAR rechaza el crédito fiscal en una eventual auditoría.
- *   - Si `is_isv_deductible = false` → todos los campos fiscales son opcionales.
+ * Reglas de validación condicional (ver ExpenseFiscalSection):
+ *   - Con "Factura con CAI" (`is_isv_deductible = true`) → exige proveedor,
+ *     RTN, número de factura, CAI e importe gravado, y el gasto se copia al
+ *     Libro de Compras (ExpenseFiscalDocumentSync, Fase 1b).
+ *   - Sin factura → todos los campos fiscales son opcionales.
  *
  * NO se ocupa de:
  *   - Validar permisos (responsabilidad de la Page/Resource vía Policy Shield).
@@ -80,7 +84,7 @@ final class RecordExpenseAction
 {
     /**
      * @param  Closure(): ?CashSession  $sessionResolver  Retorna la sesión abierta donde se registra el gasto, o null si no aplica.
-     * @param  ExpenseService            $expenses        Servicio de orquestación de gastos (inyectado desde la Page con DI).
+     * @param  ExpenseService  $expenses  Servicio de orquestación de gastos (inyectado desde la Page con DI).
      */
     public static function make(Closure $sessionResolver, ExpenseService $expenses): Action
     {
@@ -138,99 +142,9 @@ final class RecordExpenseAction
                     ->maxLength(500)
                     ->helperText('Breve — ej. "Gasolina moto mensajero", "Resma papel bond Office Depot".'),
 
-                // ── Datos fiscales del proveedor (opcional) ─────────────
-                // Colapsada por default: la mayoría de gastos menores no tienen
-                // factura. Cuando hay (gasolina, papelería, mantenimiento), el
-                // cajero/contador la expande y carga RTN/CAI/número de factura.
-                //
-                // Si toggle is_isv_deductible se activa, los campos clave del
-                // SAR (RTN, número de factura, CAI) pasan a ser obligatorios:
-                // sin ellos no se puede sostener el crédito fiscal ante una
-                // auditoría.
-                Section::make('Datos fiscales del proveedor')
-                    ->description('Opcional — completá si el gasto tiene factura del proveedor.')
-                    ->icon('heroicon-o-document-text')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Grid::make(2)->schema([
-                            TextInput::make('provider_name')
-                                ->label('Proveedor')
-                                ->maxLength(200)
-                                ->placeholder('Ej. Uno Honduras, Office Depot, Taller Mendoza'),
-
-                            TextInput::make('provider_rtn')
-                                ->label('RTN del proveedor')
-                                ->maxLength(14)
-                                ->minLength(14)
-                                ->regex('/^\d{14}$/')
-                                ->requiredIf('is_isv_deductible', true)
-                                // Mensajes custom: evitamos el placeholder :attribute
-                                // porque Filament aplica Str::lcfirst() al label, y
-                                // "RTN" → "rTN" queda mal escrito. Mensaje explícito
-                                // sin placeholder soluciona y de paso evita el "es true"
-                                // genérico que Laravel inyecta para required_if.
-                                ->validationMessages([
-                                    'regex' => 'El RTN debe tener exactamente 14 dígitos sin guiones.',
-                                    'required_if' => 'El RTN del proveedor es obligatorio si el gasto se marca como deducible de ISV.',
-                                ])
-                                ->placeholder('06459877498120')
-                                ->helperText('Obligatorio si se marca como deducible de ISV.'),
-                        ]),
-
-                        Grid::make(2)->schema([
-                            TextInput::make('provider_invoice_number')
-                                ->label('Número de factura')
-                                ->maxLength(50)
-                                ->requiredIf('is_isv_deductible', true)
-                                ->validationMessages([
-                                    'required_if' => 'El número de factura es obligatorio si el gasto se marca como deducible de ISV.',
-                                ])
-                                ->placeholder('000-001-01-00001234'),
-
-                            DatePicker::make('provider_invoice_date')
-                                ->label('Fecha de la factura')
-                                ->native(false)
-                                ->maxDate(now()),
-                        ]),
-
-                        TextInput::make('provider_invoice_cai')
-                            ->label('CAI del proveedor')
-                            // 43 = 36 hexadecimales (6-6-6-6-6-2-2-2) + 7 guiones del
-                            // formato oficial SAR. La columna en BD acepta hasta 50 (margen
-                            // por si SAR cambia formato en el futuro).
-                            ->maxLength(43)
-                            ->mask('******-******-******-******-******-**-**-**')
-                            ->placeholder('XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX-XX-XX')
-                            ->regex('/^[A-F0-9\-]+$/i')
-                            ->requiredIf('is_isv_deductible', true)
-                            ->validationMessages([
-                                'regex' => 'El CAI solo puede contener hexadecimales (0-9, A-F) y guiones.',
-                                'required_if' => 'El CAI del proveedor es obligatorio si el gasto se marca como deducible de ISV.',
-                                // 'max' explícito: sin esto Filament inyecta el label
-                                // ("CAI") con Str::lcfirst() y queda "cAI" — feo y poco
-                                // profesional. Mensaje hardcodeado lo evita.
-                                'max' => 'El CAI no puede exceder 43 caracteres (formato SAR).',
-                            ])
-                            ->dehydrateStateUsing(fn (?string $state) => $state ? strtoupper(trim($state)) : null)
-                            ->helperText('Código de Autorización de Impresión que aparece en la factura del proveedor.'),
-
-                        Grid::make(2)->schema([
-                            TextInput::make('isv_amount')
-                                ->label('ISV desglosado (Lempiras)')
-                                ->numeric()
-                                ->minValue(0)
-                                ->step(0.01)
-                                ->prefix('L')
-                                ->helperText('Monto de ISV indicado en la factura, si lo desglosa.'),
-
-                            Toggle::make('is_isv_deductible')
-                                ->label('Deducible de ISV')
-                                ->live()
-                                ->default(false)
-                                ->helperText('Marcar si el gasto genera crédito fiscal — exige RTN, factura y CAI.'),
-                        ]),
-                    ]),
+                // Datos fiscales colapsados: la mayoría de gastos menores no
+                // traen factura. Ver ExpenseFiscalSection.
+                ExpenseFiscalSection::make(collapsed: true),
             ])
             ->action(fn (array $data) => self::handle($sessionResolver, $expenses, $data));
     }
@@ -273,22 +187,25 @@ final class RecordExpenseAction
             // $data['payment_method'] tal cual — los casts en Expense
             // serializan al string al guardar, sea instancia o string crudo.
             $expense = $expenses->register([
-                'establishment_id'        => $session->establishment_id,
-                'user_id'                 => auth()->id(),
-                'expense_date'            => $data['expense_date'],
-                'category'                => $data['category'],
-                'payment_method'          => $data['payment_method'],
-                'amount_total'            => (float) $data['amount_total'],
-                'isv_amount'              => isset($data['isv_amount']) && $data['isv_amount'] !== ''
+                'establishment_id' => $session->establishment_id,
+                'user_id' => auth()->id(),
+                'expense_date' => $data['expense_date'],
+                'category' => $data['category'],
+                'payment_method' => $data['payment_method'],
+                'amount_total' => (float) $data['amount_total'],
+                'taxable_amount' => isset($data['taxable_amount']) && $data['taxable_amount'] !== ''
+                    ? (float) $data['taxable_amount']
+                    : null,
+                'isv_amount' => isset($data['isv_amount']) && $data['isv_amount'] !== ''
                     ? (float) $data['isv_amount']
                     : null,
-                'is_isv_deductible'       => (bool) ($data['is_isv_deductible'] ?? false),
-                'description'             => $data['description'],
-                'provider_name'           => $data['provider_name'] ?? null,
-                'provider_rtn'            => $data['provider_rtn'] ?? null,
+                'is_isv_deductible' => (bool) ($data['is_isv_deductible'] ?? false),
+                'description' => $data['description'],
+                'provider_name' => $data['provider_name'] ?? null,
+                'provider_rtn' => $data['provider_rtn'] ?? null,
                 'provider_invoice_number' => $data['provider_invoice_number'] ?? null,
-                'provider_invoice_cai'    => $data['provider_invoice_cai'] ?? null,
-                'provider_invoice_date'   => $data['provider_invoice_date'] ?? null,
+                'provider_invoice_cai' => $data['provider_invoice_cai'] ?? null,
+                'provider_invoice_date' => $data['provider_invoice_date'] ?? null,
             ]);
 
             // Mensaje diferenciado: el cajero necesita saber si el monto SALIÓ
@@ -324,6 +241,15 @@ final class RecordExpenseAction
                 ->title('Sesión ya cerrada')
                 ->body('No se pueden registrar movimientos en sesiones cerradas.')
                 ->warning()
+                ->send();
+        } catch (FacturaYaRegistradaException|MontosDocumentoInvalidosException|PeriodoFiscalCerradoException $e) {
+            // Solo con "Factura con CAI": la copia en el Libro de Compras no se
+            // pudo crear y el gasto completo se revirtió (ver ExpenseFiscalDocumentSync).
+            Notification::make()
+                ->title('No se registró el gasto')
+                ->body($e->getMessage())
+                ->danger()
+                ->persistent()
                 ->send();
         } catch (\Throwable $e) {
             report($e);

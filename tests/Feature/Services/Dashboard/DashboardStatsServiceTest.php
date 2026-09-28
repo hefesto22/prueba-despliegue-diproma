@@ -35,10 +35,11 @@ use Tests\TestCase;
  */
 class DashboardStatsServiceTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private DashboardStatsService $service;
+
     private Category $category;
 
     protected function setUp(): void
@@ -176,9 +177,9 @@ class DashboardStatsServiceTest extends TestCase
 
     public function test_gastos_no_deducibles_tambien_restan_utilidad(): void
     {
-        // Para P&L (utilidad neta) no importa si el gasto es deducible de
-        // ISV o no — TODO gasto reduce ganancia. El flag is_isv_deductible
-        // solo afecta el ISV-353 (crédito fiscal).
+        // Deducibles y no deducibles restan utilidad. Aquí el deducible no
+        // desglosa ISV (isv_amount null), así que resta completo; el caso con
+        // ISV recuperable está en el test siguiente.
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
         $today = Carbon::now()->toDateString();
@@ -203,6 +204,37 @@ class DashboardStatsServiceTest extends TestCase
             'Ambos gastos suman: 100 deducible + 80 no deducible = 180.');
         $this->assertEquals(220.00, $result['net_profit'],
             'Utilidad neta = 400 − 180 = 220.');
+    }
+
+    public function test_el_isv_recuperable_de_un_gasto_deducible_no_resta_utilidad(): void
+    {
+        // Las ventas entran a la utilidad sin ISV; el ISV de un gasto con
+        // factura se recupera como crédito fiscal, así que tampoco es gasto.
+        $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
+
+        $today = Carbon::now()->toDateString();
+
+        Expense::factory()->create([
+            'establishment_id' => $this->matriz->id,
+            'expense_date' => $today,
+            'amount_total' => 115.00,
+            'isv_amount' => 15.00,
+            'is_isv_deductible' => true,
+        ]);
+
+        // No deducible con ISV desglosado: ese ISV sí es costo.
+        Expense::factory()->create([
+            'establishment_id' => $this->matriz->id,
+            'expense_date' => $today,
+            'amount_total' => 57.50,
+            'isv_amount' => 7.50,
+            'is_isv_deductible' => false,
+        ]);
+
+        $result = $this->service->netProfitThisMonth();
+
+        $this->assertEquals(157.50, $result['expenses'], '100 (115 − 15 recuperable) + 57.50 completo.');
+        $this->assertEquals(242.50, $result['net_profit'], '400 − 157.50.');
     }
 
     // ─── Líneas de reparación (sin producto del catálogo) ───────────────

@@ -9,21 +9,25 @@ use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
+use App\Enums\TaxType;
 use App\Models\Customer;
 use App\Models\Establishment;
 use App\Models\Product;
 use App\Models\Purchase;
-use App\Models\PurchaseItem;
 use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Cash\CashBalanceCalculator;
 use App\Services\Cash\CashSessionService;
 use App\Services\Expenses\ExpenseService;
+use App\Services\Inventory\ProductStockLedger;
 use App\Services\Invoicing\InvoiceService;
+use App\Services\Purchases\PurchaseDocumentAmounts;
 use App\Services\Purchases\PurchaseService;
 use App\Services\Sales\SaleService;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
 
@@ -98,6 +102,7 @@ class HistoricalOperationsSeeder extends Seeder
         private readonly CashSessionService $cashSessionService,
         private readonly CashBalanceCalculator $cashCalculator,
         private readonly ExpenseService $expenseService,
+        private readonly ProductStockLedger $stockLedger,
     ) {}
 
     public function run(): void
@@ -164,57 +169,34 @@ class HistoricalOperationsSeeder extends Seeder
     // ─── Reposición inicial ──────────────────────────────────────────────
 
     /**
-     * Compra inicial con CAI: agrega ~25 unidades a cada producto activo.
-     * Asegura stock para todo el período histórico.
+     * Reposición inicial: ~25 unidades a cada producto activo, respaldadas por
+     * una factura de "El Sol". Asegura stock para todo el período histórico.
+     *
+     * Desde la Fase 1 (Compras = documento fiscal sin líneas) son dos cosas
+     * separadas, igual que en la operación real: el stock entra por la ficha
+     * del producto (ProductStockLedger → Kardex) y la factura se registra en
+     * Compras solo con sus montos.
      */
     private function initialStockReplenishment(User $carlos, Establishment $matriz): void
     {
         $supplier = Supplier::where('rtn', '08019998765432')->firstOrFail(); // El Sol
 
-        $products = Product::active()->get();
-
-        $purchase = Purchase::create([
-            'establishment_id' => $matriz->id,
-            'supplier_id' => $supplier->id,
-            'document_type' => SupplierDocumentType::Factura,
-            'supplier_invoice_number' => '001-001-01-00102345',
-            'supplier_cai' => 'B7C3D8-1A2B3C-4D5E6F-7A8B9C-0D1E2F-AB',
-            'date' => Carbon::today(),
-            'credit_days' => 0, // Histórico: 30 — restaurar al implementar CxP (módulo de Cuentas por Pagar)
-            'notes' => 'Reposición inicial de stock — temporada marzo 2026.',
-            'created_by' => $carlos->id,
-            // status explícito: el default DB es 'borrador' pero no se hidrata
-            // al modelo en memoria — sin esto, $purchase->status queda null y
-            // PurchaseService::confirm() truena al llamar canConfirm().
-            'status' => PurchaseStatus::Borrador,
-            // subtotal/isv/total los recalcula PurchaseService::confirm
-            'subtotal' => 0,
-            'taxable_total' => 0,
-            'exempt_total' => 0,
-            'isv' => 0,
-            'total' => 0,
-        ]);
-
-        foreach ($products as $product) {
+        $restocked = $this->restockProducts(
+            Product::active()->where('is_service', false)->get(),
             // 25 unidades para nuevos (gravado), 15 para usados (exento).
-            $qty = $product->tax_type->value === 'gravado_15' ? 25 : 15;
-            // Costo unitario = costo actual del producto (el que ya tiene el seeder).
-            $unitCost = (float) $product->cost_price;
+            fn (Product $product): int => $product->tax_type === TaxType::Gravado15 ? 25 : 15,
+        );
 
-            PurchaseItem::create([
-                'purchase_id' => $purchase->id,
-                'product_id' => $product->id,
-                'quantity' => $qty,
-                'unit_cost' => $unitCost,
-                'tax_type' => $product->tax_type,
-                // Se recalculan en confirm(); valores mínimos por NOT NULL.
-                'subtotal' => 0,
-                'isv_amount' => 0,
-                'total' => 0,
-            ]);
-        }
-
-        $this->purchaseService->confirm($purchase);
+        $this->registerPurchaseDocument(
+            carlos: $carlos,
+            matriz: $matriz,
+            supplier: $supplier,
+            documentType: SupplierDocumentType::Factura,
+            supplierInvoiceNumber: '001-001-01-00102345',
+            supplierCai: 'B7C3D8-1A2B3C-4D5E6F-7A8B9C-0D1E2F-AB',
+            restocked: $restocked,
+            notes: 'Reposición inicial de stock — temporada marzo 2026.',
+        );
     }
 
     // ─── Loop diario ─────────────────────────────────────────────────────
@@ -434,45 +416,123 @@ class HistoricalOperationsSeeder extends Seeder
             $roll <= 65 => PaymentMethod::Efectivo,
             $roll <= 87 => PaymentMethod::TarjetaCredito,
             $roll <= 95 => PaymentMethod::TarjetaDebito,
-            default     => PaymentMethod::Transferencia,
+            default => PaymentMethod::Transferencia,
         };
     }
 
     // ─── Generación de compra ────────────────────────────────────────────
 
     /**
-     * Carlos registra una compra mediana con 3-5 productos. Mix:
+     * Carlos registra una compra mediana de 3-5 productos. Mix:
      *   - 80% con factura (CAI del proveedor).
      *   - 20% Recibo Interno (proveedor genérico, sin CAI).
+     *
+     * Igual que en la reposición inicial, el stock entra por la ficha del
+     * producto y la compra registra solo el documento con sus montos.
      */
     private function processOnePurchase(User $carlos, Establishment $matriz): void
     {
         $useReciboInterno = mt_rand(1, 100) <= 20;
 
-        if ($useReciboInterno) {
-            $supplier = Supplier::forInternalReceipts();
-            $documentType = SupplierDocumentType::ReciboInterno;
-            $supplierInvoiceNumber = 'RI-' . Carbon::today()->format('Ymd') . '-' . mt_rand(100, 999);
-            $supplierCai = null;
-            $creditDays = 0;
-        } else {
-            $supplier = Supplier::operational()->where('is_active', true)->inRandomOrder()->firstOrFail();
-            $documentType = SupplierDocumentType::Factura;
-            $supplierInvoiceNumber = sprintf('001-001-01-%08d', mt_rand(100000, 999999));
-            $supplierCai = $this->generateCaiString();
-            // Forzado a 0 mientras el módulo de Cuentas por Pagar (crédito a proveedores)
-            // esté pendiente de implementación. Cuando se construya CxP, restaurar:
-            //     $creditDays = $supplier->credit_days;
-            $creditDays = 0;
-        }
-
-        // 3-5 productos en la compra.
-        $itemCount = mt_rand(3, 5);
-        $products = Product::active()->inRandomOrder()->limit($itemCount)->get();
+        $products = Product::active()
+            ->where('is_service', false)
+            ->inRandomOrder()
+            ->limit(mt_rand(3, 5))
+            ->get();
 
         if ($products->isEmpty()) {
             return;
         }
+
+        $restocked = $this->restockProducts($products, fn (): int => mt_rand(3, 8));
+
+        if ($useReciboInterno) {
+            $this->registerPurchaseDocument(
+                carlos: $carlos,
+                matriz: $matriz,
+                supplier: Supplier::forInternalReceipts(),
+                documentType: SupplierDocumentType::ReciboInterno,
+                supplierInvoiceNumber: 'RI-'.Carbon::today()->format('Ymd').'-'.mt_rand(100, 999),
+                supplierCai: null,
+                restocked: $restocked,
+            );
+
+            return;
+        }
+
+        $this->registerPurchaseDocument(
+            carlos: $carlos,
+            matriz: $matriz,
+            supplier: Supplier::operational()->where('is_active', true)->inRandomOrder()->firstOrFail(),
+            documentType: SupplierDocumentType::Factura,
+            supplierInvoiceNumber: sprintf('001-001-01-%08d', mt_rand(100000, 999999)),
+            supplierCai: $this->generateCaiString(),
+            restocked: $restocked,
+        );
+    }
+
+    /**
+     * Sube el stock de cada producto como lo haría el operador desde la ficha,
+     * dejando su asiento en el Kardex.
+     *
+     * @param  Collection<int, Product>  $products
+     * @param  Closure(Product): int  $quantityFor
+     * @return list<array{product: Product, quantity: int}>
+     */
+    private function restockProducts(Collection $products, Closure $quantityFor): array
+    {
+        $restocked = [];
+
+        foreach ($products as $product) {
+            $quantity = $quantityFor($product);
+            $previousStock = (int) $product->stock;
+
+            $product->update(['stock' => $previousStock + $quantity]);
+            $this->stockLedger->recordManualAdjustment($product, $previousStock);
+
+            $restocked[] = ['product' => $product, 'quantity' => $quantity];
+        }
+
+        return $restocked;
+    }
+
+    /**
+     * Registra y confirma el documento de compra que respalda un reabastecimiento.
+     *
+     * Los montos se derivan del costo NETO de lo recibido: la base gravada
+     * lleva su 15% de ISV encima; en Recibo Interno todo va como exento.
+     *
+     * @param  list<array{product: Product, quantity: int}>  $restocked
+     */
+    private function registerPurchaseDocument(
+        User $carlos,
+        Establishment $matriz,
+        Supplier $supplier,
+        SupplierDocumentType $documentType,
+        string $supplierInvoiceNumber,
+        ?string $supplierCai,
+        array $restocked,
+        ?string $notes = null,
+    ): void {
+        $taxable = 0.0;
+        $exempt = 0.0;
+
+        foreach ($restocked as ['product' => $product, 'quantity' => $quantity]) {
+            $lineCost = round((float) $product->cost_price * $quantity, 2);
+
+            if ($product->tax_type === TaxType::Gravado15) {
+                $taxable += $lineCost;
+            } else {
+                $exempt += $lineCost;
+            }
+        }
+
+        $amounts = PurchaseDocumentAmounts::forDocument(
+            $documentType,
+            $taxable,
+            $exempt,
+            PurchaseDocumentAmounts::suggestedIsv($taxable),
+        );
 
         $purchase = Purchase::create([
             'establishment_id' => $matriz->id,
@@ -481,39 +541,21 @@ class HistoricalOperationsSeeder extends Seeder
             'supplier_invoice_number' => $supplierInvoiceNumber,
             'supplier_cai' => $supplierCai,
             'date' => Carbon::today(),
-            'credit_days' => $creditDays,
+            // Forzado a 0 mientras no exista Cuentas por Pagar.
+            'credit_days' => 0,
+            'notes' => $notes,
             'created_by' => $carlos->id,
-            // Mismo motivo que initialStockReplenishment: defaults SQL no se
-            // hidratan al modelo en memoria.
+            // status explícito: el default SQL no se hidrata al modelo en
+            // memoria y PurchaseService::confirm() necesita leerlo.
             'status' => PurchaseStatus::Borrador,
-            'subtotal' => 0,
-            'taxable_total' => 0,
-            'exempt_total' => 0,
-            'isv' => 0,
-            'total' => 0,
+            ...$amounts->toAttributes(),
         ]);
-
-        foreach ($products as $product) {
-            $qty = mt_rand(3, 8);
-            $unitCost = (float) $product->cost_price;
-
-            PurchaseItem::create([
-                'purchase_id' => $purchase->id,
-                'product_id' => $product->id,
-                'quantity' => $qty,
-                'unit_cost' => $unitCost,
-                'tax_type' => $product->tax_type,
-                'subtotal' => 0,
-                'isv_amount' => 0,
-                'total' => 0,
-            ]);
-        }
 
         try {
             $this->purchaseService->confirm($purchase);
         } catch (\Throwable) {
-            // Si la confirmación falla (período cerrado por algún seed previo),
-            // dejar la compra como Borrador. El observer protege integridad fiscal.
+            // Período cerrado por algún seed previo: la compra queda en
+            // Borrador. El observer fiscal protege la integridad.
         }
     }
 
@@ -570,8 +612,13 @@ class HistoricalOperationsSeeder extends Seeder
         ];
 
         if ($type['has_invoice']) {
+            // Factura con CAI: ExpenseService la copia al Libro de Compras
+            // (ExpenseFiscalDocumentSync), como en la operación real.
             $isvBase = round($amount / 1.15, 2);
+            $attributes['taxable_amount'] = $isvBase;
             $attributes['isv_amount'] = round($amount - $isvBase, 2);
+            $attributes['provider_invoice_cai'] = $this->generateCaiString();
+            $attributes['provider_invoice_date'] = Carbon::today();
             $attributes['provider_name'] = match ($type['category']) {
                 ExpenseCategory::Combustible => 'Gasolinera UNO La Granja',
                 ExpenseCategory::Papeleria => 'Librería Universal',

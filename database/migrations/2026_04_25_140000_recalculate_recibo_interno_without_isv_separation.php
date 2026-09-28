@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\Purchase;
-use App\Services\Purchases\PurchaseTotalsCalculator;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -24,11 +22,16 @@ use Illuminate\Support\Facades\DB;
  * Qué hace este fix
  * ─────────────────
  * Para cada Purchase con document_type=99 (RI):
- *   1. Recalcula sus totales con el calculator actual (que ya respeta la
- *      nueva regla via separatesIsv()).
- *   2. El calculator persiste subtotal/isv_amount/total por línea y a nivel
- *      compra usando updateQuietly — no contamina activity log.
- *   3. taxable_total queda en 0 y exempt_total absorbe la base completa.
+ *   1. Cada línea queda con subtotal = total = unit_cost × quantity, ISV 0.
+ *   2. La compra queda con taxable_total 0, isv 0 y exempt_total = subtotal =
+ *      total = suma de sus líneas.
+ * Escribe con DB::table() — no dispara observers ni activity log.
+ *
+ * Nota 2026-09: originalmente delegaba en PurchaseTotalsCalculator. Ese
+ * servicio se eliminó en la Fase 1 del rediseño Compras + Producto-lote
+ * (las compras ya no tienen líneas), así que la aritmética del RI quedó
+ * inline aquí — es exactamente la que el calculator aplicaba a un RI. En
+ * entornos donde esta migración ya corrió no cambia nada.
  *
  * Idempotente: si un RI ya tiene isv=0, recalcular no cambia nada.
  *
@@ -45,26 +48,43 @@ return new class extends Migration
         $rIsAfectados = DB::table('purchases')
             ->where('document_type', '99')
             ->where('isv', '>', 0)
+            ->whereNull('deleted_at')
             ->pluck('id');
 
         if ($rIsAfectados->isEmpty()) {
             echo "  → No hay Recibos Internos con ISV separado para corregir.\n";
+
             return;
         }
 
-        $calculator = app(PurchaseTotalsCalculator::class);
-        $corregidos = 0;
-
         foreach ($rIsAfectados as $purchaseId) {
-            $purchase = Purchase::with('items')->find($purchaseId);
+            DB::transaction(function () use ($purchaseId) {
+                // En RI no se separa ISV: lo pagado por línea es su base.
+                DB::table('purchase_items')
+                    ->where('purchase_id', $purchaseId)
+                    ->update([
+                        'subtotal' => DB::raw('ROUND(unit_cost * quantity, 2)'),
+                        'isv_amount' => 0,
+                        'total' => DB::raw('ROUND(unit_cost * quantity, 2)'),
+                    ]);
 
-            if (! $purchase) {
-                continue; // soft-deleted u otro race; ignorar
-            }
+                $base = round((float) DB::table('purchase_items')
+                    ->where('purchase_id', $purchaseId)
+                    ->sum('total'), 2);
 
-            $calculator->recalculate($purchase);
-            $corregidos++;
+                DB::table('purchases')
+                    ->where('id', $purchaseId)
+                    ->update([
+                        'subtotal' => $base,
+                        'taxable_total' => 0,
+                        'exempt_total' => $base,
+                        'isv' => 0,
+                        'total' => $base,
+                    ]);
+            });
         }
+
+        $corregidos = $rIsAfectados->count();
 
         echo "  → Recibos Internos recalculados sin separación de ISV: {$corregidos}\n";
     }

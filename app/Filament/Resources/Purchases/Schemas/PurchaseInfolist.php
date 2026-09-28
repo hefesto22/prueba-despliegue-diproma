@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\Purchases\Schemas;
 
 use App\Enums\PurchaseStatus;
-use Filament\Infolists\Components\IconEntry;
+use App\Enums\SupplierDocumentType;
+use App\Filament\Resources\Expenses\ExpenseResource;
+use App\Models\Purchase;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class PurchaseInfolist
@@ -17,6 +19,20 @@ class PurchaseInfolist
         return $schema
             ->columns(1)
             ->components([
+                // Compras generadas desde un gasto con factura (Fase 1b): el gasto
+                // es la fuente de verdad y aquí solo se consulta.
+                Section::make('Generada desde un gasto')
+                    ->icon('heroicon-o-banknotes')
+                    ->description('Esta compra es la copia en el Libro de Compras de un gasto con factura. Para corregirla o quitarla del libro, edite el gasto.')
+                    ->visible(fn (Purchase $record) => $record->isFromExpense())
+                    ->schema([
+                        TextEntry::make('expense_id')
+                            ->label('Gasto')
+                            ->formatStateUsing(fn (int $state) => "Gasto #{$state}")
+                            ->url(fn (Purchase $record) => ExpenseResource::getUrl('view', ['record' => $record->expense_id]))
+                            ->icon('heroicon-o-arrow-top-right-on-square'),
+                    ]),
+
                 Section::make('Compra')
                     ->aside()
                     ->schema([
@@ -110,8 +126,40 @@ class PurchaseInfolist
                         ]),
                     ]),
 
-                Section::make('Productos')
+                Section::make('Montos del documento')
                     ->aside()
+                    ->schema([
+                        Grid::make(4)->schema([
+                            TextEntry::make('exempt_total')
+                                ->label(fn (Purchase $record) => $record->document_type === SupplierDocumentType::ReciboInterno
+                                    ? 'Total pagado (sin ISV)'
+                                    : 'Importe exento')
+                                ->money('HNL'),
+                            TextEntry::make('taxable_total')
+                                ->label('Importe gravado 15%')
+                                ->money('HNL')
+                                ->visible(fn (Purchase $record) => $record->document_type !== SupplierDocumentType::ReciboInterno),
+                            TextEntry::make('isv')
+                                ->label('ISV (crédito fiscal)')
+                                ->money('HNL')
+                                ->color('warning')
+                                ->visible(fn (Purchase $record) => $record->document_type !== SupplierDocumentType::ReciboInterno),
+                            TextEntry::make('total')
+                                ->label('Total')
+                                ->money('HNL')
+                                ->weight('bold')
+                                ->size('lg'),
+                        ]),
+                    ]),
+
+                // Solo compras capturadas antes de la Fase 1 (formato con productos).
+                // Se conservan como histórico de lo que entró al inventario.
+                // loadMissing: una sola query para líneas + productos (sin N+1 en
+                // el RepeatableEntry) y solo cuando se abre una compra, nunca en el listado.
+                Section::make('Productos (formato anterior)')
+                    ->aside()
+                    ->description('Compra registrada con líneas de producto antes del cambio a documento fiscal.')
+                    ->visible(fn (Purchase $record) => $record->loadMissing('items.product')->items->isNotEmpty())
                     ->schema([
                         RepeatableEntry::make('items')
                             ->label('')
@@ -131,25 +179,6 @@ class PurchaseInfolist
                                         ->weight('bold'),
                                 ]),
                             ]),
-                    ]),
-
-                Section::make('Totales')
-                    ->aside()
-                    ->schema([
-                        Grid::make(3)->schema([
-                            TextEntry::make('subtotal')
-                                ->label('Subtotal (sin ISV)')
-                                ->money('HNL'),
-                            TextEntry::make('isv')
-                                ->label('ISV (crédito fiscal)')
-                                ->money('HNL')
-                                ->color('warning'),
-                            TextEntry::make('total')
-                                ->label('Total')
-                                ->money('HNL')
-                                ->weight('bold')
-                                ->size('lg'),
-                        ]),
                     ]),
 
                 Section::make('Notas')

@@ -21,24 +21,24 @@ class ExpenseFactory extends Factory
         $amountTotal = $this->faker->randomFloat(2, 50, 5000);
 
         return [
-            'establishment_id'   => Establishment::factory(),
-            'user_id'            => User::factory(),
-            'expense_date'       => now()->toDateString(),
-            'category'           => ExpenseCategory::Otros->value,
-            'payment_method'     => PaymentMethod::Efectivo->value,
-            'amount_total'       => $amountTotal,
-            'isv_amount'         => null,
-            'is_isv_deductible'  => false,
-            'description'        => $this->faker->sentence(6),
+            'establishment_id' => Establishment::factory(),
+            'user_id' => User::factory(),
+            'expense_date' => now()->toDateString(),
+            'category' => ExpenseCategory::Otros->value,
+            'payment_method' => PaymentMethod::Efectivo->value,
+            'amount_total' => $amountTotal,
+            'isv_amount' => null,
+            'is_isv_deductible' => false,
+            'description' => $this->faker->sentence(6),
 
             // Sin proveedor por default — el caller que necesite gasto con
             // factura usa el state `withProvider()`.
-            'provider_name'           => null,
-            'provider_rtn'            => null,
+            'provider_name' => null,
+            'provider_rtn' => null,
             'provider_invoice_number' => null,
-            'provider_invoice_cai'    => null,
-            'provider_invoice_date'   => null,
-            'attachment_path'         => null,
+            'provider_invoice_cai' => null,
+            'provider_invoice_date' => null,
+            'attachment_path' => null,
         ];
     }
 
@@ -54,16 +54,19 @@ class ExpenseFactory extends Factory
             $total = (float) $attrs['amount_total'];
             // Asume gravado 15%: total = base + base*0.15 → base = total/1.15
             $base = round($total / 1.15, 2);
-            $isv  = round($total - $base, 2);
+            $isv = round($total - $base, 2);
 
             return [
-                'provider_name'           => $name ?? $this->faker->company(),
-                'provider_rtn'            => $rtn ?? $this->faker->numerify('0801##########'),
-                'provider_invoice_number' => '000-001-01-' . $this->faker->numerify('########'),
-                'provider_invoice_cai'    => strtoupper($this->faker->bothify('??????-??????-??????-??????-??????-##')),
-                'provider_invoice_date'   => $attrs['expense_date'],
-                'isv_amount'              => $isv,
-                'is_isv_deductible'       => true,
+                'provider_name' => $name ?? $this->faker->company(),
+                'provider_rtn' => $rtn ?? $this->faker->numerify('0801##########'),
+                'provider_invoice_number' => '000-001-01-'.$this->faker->numerify('########'),
+                // Hexadecimal, como exige el formulario (formato SAR): con bothify('?')
+                // salían letras G-Z y el gasto no se podía volver a guardar desde la UI.
+                'provider_invoice_cai' => $this->faker->regexify('[A-F0-9]{6}-[A-F0-9]{6}-[A-F0-9]{6}-[A-F0-9]{6}-[A-F0-9]{6}-[A-F0-9]{2}'),
+                'provider_invoice_date' => $attrs['expense_date'],
+                'taxable_amount' => $base,
+                'isv_amount' => $isv,
+                'is_isv_deductible' => true,
             ];
         });
     }

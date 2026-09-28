@@ -9,11 +9,15 @@ use Filament\Support\Contracts\HasLabel;
 /**
  * Flujo de estados de una compra:
  *
- * borrador → confirmada (incrementa stock, actualiza costo promedio)
- * borrador → anulada (sin efecto en inventario)
- * confirmada → anulada (reversa stock, NO reversa costo promedio)
+ * borrador → confirmada (el documento entra al Libro de Compras; contado = Pagada)
+ * borrador → anulada (descarta el borrador, sin efectos)
+ * confirmada → anulada (sale del Libro de Compras; si es una compra heredada
+ *                       con productos, además revierte su stock — NO el costo)
+ *
+ * Desde la Fase 1 (2026-07-25) ninguna transición mete stock: el inventario
+ * entra por la ficha del producto. Ver PurchaseService.
  */
-enum PurchaseStatus: string implements HasLabel, HasColor, HasIcon
+enum PurchaseStatus: string implements HasColor, HasIcon, HasLabel
 {
     case Borrador = 'borrador';
     case Confirmada = 'confirmada';

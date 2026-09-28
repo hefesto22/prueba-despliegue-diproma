@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
  *   - Si payment_method = Efectivo, crear el CashMovement vinculado y
  *     atomicamente asociar ambas filas (Expense.id ↔ CashMovement.expense_id)
  *   - Si payment_method ≠ Efectivo, NO crear CashMovement (no afecta caja)
+ *   - Si el gasto trae factura con CAI (deducible), mantener su copia en el
+ *     Libro de Compras vía ExpenseFiscalDocumentSync (Fase 1b)
  *
  * Por qué esta separación:
  *   - SRP: el ExpenseService sabe del dominio "gasto contable"; el
@@ -34,8 +36,25 @@ use Illuminate\Support\Facades\DB;
  */
 class ExpenseService
 {
+    /**
+     * Campos que EditExpense puede modificar. El resto es estructural.
+     */
+    private const EDITABLE_FIELDS = [
+        'category',
+        'description',
+        'provider_name',
+        'provider_rtn',
+        'provider_invoice_number',
+        'provider_invoice_cai',
+        'provider_invoice_date',
+        'taxable_amount',
+        'isv_amount',
+        'is_isv_deductible',
+    ];
+
     public function __construct(
         private readonly CashSessionService $cashSessions,
+        private readonly ExpenseFiscalDocumentSync $fiscalDocuments,
     ) {}
 
     /**
@@ -54,6 +73,7 @@ class ExpenseService
      *   - payment_method          (PaymentMethod|string, requerido)
      *   - amount_total            (float, requerido, > 0)
      *   - description             (string, requerido)
+     *   - taxable_amount          (float|null — requerido si es deducible)
      *   - isv_amount              (float|null)
      *   - is_isv_deductible       (bool, default false)
      *   - provider_name           (string|null)
@@ -65,9 +85,13 @@ class ExpenseService
      * @param  array<string, mixed>  $attributes
      *
      * @throws \App\Exceptions\Cash\NoHayCajaAbiertaException
-     *         Si payment_method = Efectivo y no hay caja abierta en la sucursal.
+     *                                                        Si payment_method = Efectivo y no hay caja abierta en la sucursal.
      * @throws \App\Exceptions\Cash\MovimientoEnSesionCerradaException
-     *         Defense in depth — si la sesión se cerró entre el lock y el insert.
+     *                                                                 Defense in depth — si la sesión se cerró entre el lock y el insert.
+     * @throws \App\Services\Purchases\Exceptions\FacturaYaRegistradaException
+     * @throws \App\Services\Purchases\Exceptions\MontosDocumentoInvalidosException
+     * @throws \App\Services\FiscalPeriods\Exceptions\PeriodoFiscalCerradoException
+     *                                                                              Las tres, solo si el gasto es deducible (ver ExpenseFiscalDocumentSync).
      */
     public function register(array $attributes): Expense
     {
@@ -81,19 +105,48 @@ class ExpenseService
                 $this->cashSessions->recordMovementWithinTransaction(
                     establishmentId: $expense->establishment_id,
                     attributes: [
-                        'user_id'        => $expense->user_id,
-                        'type'           => CashMovementType::Expense,
+                        'user_id' => $expense->user_id,
+                        'type' => CashMovementType::Expense,
                         'payment_method' => PaymentMethod::Efectivo,
-                        'amount'         => (float) $expense->amount_total,
-                        'category'       => $expense->category,
-                        'description'    => $expense->description,
-                        'occurred_at'    => $expense->expense_date,
-                        'expense_id'     => $expense->id,
+                        'amount' => (float) $expense->amount_total,
+                        'category' => $expense->category,
+                        'description' => $expense->description,
+                        'occurred_at' => $expense->expense_date,
+                        'expense_id' => $expense->id,
                     ],
                 );
             }
 
+            $this->fiscalDocuments->sync($expense);
+
             return $expense->fresh(['cashMovement']);
+        });
+    }
+
+    /**
+     * Guardar los datos descriptivos y fiscales editables de un gasto
+     * (EditExpense) y resincronizar su copia en el Libro de Compras.
+     *
+     * Los campos estructurales (monto, fecha, método de pago, sucursal) no se
+     * editan: el form los bloquea y aquí se descartan por si el payload llega
+     * manipulado — cambiarlos exigiría mover el kardex de caja.
+     *
+     * @param  array<string, mixed>  $attributes
+     *
+     * @throws \App\Services\Purchases\Exceptions\FacturaYaRegistradaException
+     * @throws \App\Services\Purchases\Exceptions\MontosDocumentoInvalidosException
+     * @throws \App\Services\FiscalPeriods\Exceptions\PeriodoFiscalCerradoException
+     */
+    public function updateFiscalData(Expense $expense, array $attributes): Expense
+    {
+        $editable = array_intersect_key($attributes, array_flip(self::EDITABLE_FIELDS));
+
+        return DB::transaction(function () use ($expense, $editable) {
+            $expense->fill($editable)->save();
+
+            $this->fiscalDocuments->sync($expense);
+
+            return $expense;
         });
     }
 

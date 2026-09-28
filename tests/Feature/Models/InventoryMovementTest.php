@@ -3,26 +3,24 @@
 namespace Tests\Feature\Models;
 
 use App\Enums\MovementType;
-use App\Enums\PurchaseStatus;
 use App\Enums\TaxType;
 use App\Models\Category;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Purchase;
-use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use App\Models\User;
-use App\Services\Purchases\PurchaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesMatriz;
 use Tests\TestCase;
 
 class InventoryMovementTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private Category $category;
+
     private Supplier $supplier;
 
     protected function setUp(): void
@@ -189,102 +187,9 @@ class InventoryMovementTest extends TestCase
         $this->assertEquals($user->id, $movement->created_by);
     }
 
-    // ─── Tests de integración con PurchaseService ───────────
-
-    public function test_confirm_purchase_creates_entry_movements(): void
-    {
-        $service = app(PurchaseService::class);
-        $product = $this->makeProduct(costPrice: 1000, stock: 5);
-
-        $purchase = Purchase::factory()->fromSupplier($this->supplier)->create([
-            'date' => now(),
-            'status' => PurchaseStatus::Borrador,
-        ]);
-
-        PurchaseItem::factory()->forPurchase($purchase)->create([
-            'product_id' => $product->id,
-            'quantity' => 3,
-            'unit_cost' => 1200,
-            'tax_type' => TaxType::Gravado15,
-        ]);
-
-        $purchase->load('items');
-        $service->confirm($purchase);
-
-        // Debe existir un movimiento de entrada
-        $movement = InventoryMovement::where('product_id', $product->id)
-            ->where('type', MovementType::EntradaCompra)
-            ->first();
-
-        $this->assertNotNull($movement);
-        $this->assertEquals(3, $movement->quantity);
-        $this->assertEquals(5, $movement->stock_before);
-        $this->assertEquals(8, $movement->stock_after);
-        $this->assertEquals(Purchase::class, $movement->reference_type);
-        $this->assertEquals($purchase->id, $movement->reference_id);
-    }
-
-    public function test_cancel_confirmed_purchase_creates_exit_movements(): void
-    {
-        $service = app(PurchaseService::class);
-        $product = $this->makeProduct(costPrice: 1000, stock: 5);
-
-        $purchase = Purchase::factory()->fromSupplier($this->supplier)->create([
-            'date' => now(),
-            'status' => PurchaseStatus::Borrador,
-        ]);
-
-        PurchaseItem::factory()->forPurchase($purchase)->create([
-            'product_id' => $product->id,
-            'quantity' => 3,
-            'unit_cost' => 1200,
-            'tax_type' => TaxType::Gravado15,
-        ]);
-
-        $purchase->load('items');
-        $service->confirm($purchase);
-
-        // Ahora anular
-        $service->cancel($purchase->refresh());
-
-        // Deben existir 2 movimientos: 1 entrada + 1 salida
-        $movements = InventoryMovement::where('product_id', $product->id)
-            ->orderBy('created_at')
-            ->get();
-
-        $this->assertCount(2, $movements);
-        $this->assertEquals(MovementType::EntradaCompra, $movements[0]->type);
-        $this->assertEquals(MovementType::SalidaAnulacionCompra, $movements[1]->type);
-
-        // La salida registra el stock antes de la reversión
-        $exit = $movements[1];
-        $this->assertEquals(3, $exit->quantity);
-        $this->assertEquals(8, $exit->stock_before); // stock después de confirmar
-    }
-
-    public function test_cancel_borrador_does_not_create_movements(): void
-    {
-        $service = app(PurchaseService::class);
-        $product = $this->makeProduct(costPrice: 1000, stock: 5);
-
-        $purchase = Purchase::factory()->fromSupplier($this->supplier)->create([
-            'date' => now(),
-            'status' => PurchaseStatus::Borrador,
-        ]);
-
-        PurchaseItem::factory()->forPurchase($purchase)->create([
-            'product_id' => $product->id,
-            'quantity' => 3,
-            'unit_cost' => 1200,
-            'tax_type' => TaxType::Gravado15,
-        ]);
-
-        $purchase->load('items');
-        $service->cancel($purchase);
-
-        // No debe haber movimientos
-        $this->assertEquals(0, InventoryMovement::count());
-    }
+    // Los contratos de Kardex de Compras (reversa de compras heredadas) viven
+    // en PurchaseServiceTest: desde la Fase 1 confirmar una compra ya no
+    // registra movimientos.
 
     // ─── Test: relación product→inventoryMovements ──────────
 

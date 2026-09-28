@@ -19,9 +19,10 @@ use Maatwebsite\Excel\Facades\Excel;
  * Kardex por producto: aparece como pestaña al ver/editar un producto.
  *
  * Read-only por diseño — los movimientos se crean únicamente vía:
- *   - PurchaseService (confirm/cancel)
- *   - SaleService (processSale/cancel)
+ *   - Ficha del producto (ProductStockLedger: carga inicial y ajustes)
+ *   - SaleService (processSale/cancel), notas de crédito y reparaciones
  *   - CreateInventoryMovement page (ajustes manuales)
+ *   - PurchaseService (solo al anular compras heredadas con productos)
  *
  * Esto garantiza la inmutabilidad y auditoría del kardex.
  */
@@ -60,8 +61,7 @@ class KardexRelationManager extends RelationManager
                     ->alignCenter()
                     ->color(fn ($record): string => $record->type->isEntry() ? 'success' : 'danger')
                     ->formatStateUsing(
-                        fn ($state, $record): string =>
-                        ($record->type->isEntry() ? '+' : '−') . number_format((int) $state)
+                        fn ($state, $record): string => ($record->type->isEntry() ? '+' : '−').number_format((int) $state)
                     ),
 
                 TextColumn::make('unit_cost')
@@ -116,7 +116,8 @@ class KardexRelationManager extends RelationManager
                         if (! $from && ! $until) {
                             return null;
                         }
-                        return 'Rango: ' . ($from ?? '…') . ' → ' . ($until ?? '…');
+
+                        return 'Rango: '.($from ?? '…').' → '.($until ?? '…');
                     })
                     ->schema([
                         DatePicker::make('from')->label('Desde'),
@@ -142,7 +143,7 @@ class KardexRelationManager extends RelationManager
                     ->action(function ($livewire) {
                         $product = $livewire->getOwnerRecord();
                         $safeSku = preg_replace('/[^A-Za-z0-9_-]/', '_', (string) $product->sku);
-                        $filename = "kardex-{$safeSku}-" . now()->format('Ymd-His') . '.xlsx';
+                        $filename = "kardex-{$safeSku}-".now()->format('Ymd-His').'.xlsx';
 
                         return Excel::download(
                             new KardexExport(

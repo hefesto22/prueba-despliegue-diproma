@@ -6,7 +6,6 @@ use App\Enums\ProductCondition;
 use App\Enums\ProductType;
 use App\Enums\TaxType;
 use App\Traits\HasAuditFields;
-use App\Models\SpecOption;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,9 +24,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
  *   - Carga inicial vía form de Producto (CreateProduct): el operador ingresa
  *     el costo real pagado. NO genera crédito fiscal — no hay documento SAR
  *     detrás. Se almacena tal cual (sin back-out).
- *   - Compra confirmada vía PurchaseService: aplica CPP móvil contra el costo
- *     NETO derivado del unit_cost de cada línea. El crédito fiscal del 15% va
- *     a `purchases.isv` como activo tributario separado.
+ *   - Compras: desde la Fase 1 del rediseño Compras + Producto-lote
+ *     (2026-07-25) una compra es un documento fiscal sin líneas y NO toca
+ *     cost_price. Antes, confirmar una compra aplicaba CPP móvil; los costos
+ *     calculados así quedan como están. El crédito fiscal del 15% vive en
+ *     `purchases.isv` como activo tributario separado.
  *   - Ajustes manuales de inventario: usan el cost_price actual del producto
  *     como snapshot del kardex.
  *
@@ -42,8 +43,9 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * confunde al operador. Si necesitás "lo que pagué" usá `purchases.total`.
  *
  * Esta convención está alineada con SaleInventoryProcessor, RepairDeliveryService,
- * CreateInventoryMovement, CreditNoteInventoryProcessor, DashboardStatsService y
- * PurchaseService — todos consumen y producen cost_price/unit_cost en NETO.
+ * CreateInventoryMovement, CreditNoteInventoryProcessor, DashboardStatsService,
+ * ProductStockLedger y PurchaseService (reversa de compras heredadas) — todos
+ * consumen y producen cost_price/unit_cost en NETO.
  *
  * ─── Precisión interna vs precisión de output ──────────────────────────────
  *
@@ -67,7 +69,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class Product extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -176,12 +178,18 @@ class Product extends Model
             return;
         }
 
-        $value = (string) $product->product_type;
+        // product_type no tiene cast: puede llegar como string (form) o como
+        // case del enum (ProductSeeder, código de dominio). Un enum no se
+        // puede castear a string, así que se toma su value.
+        $value = $product->product_type instanceof ProductType
+            ? $product->product_type->value
+            : (string) $product->product_type;
 
         // Si es un case del enum (case-insensitive), guardar como su value oficial.
         $enum = ProductType::tryFrom(mb_strtolower($value));
         if ($enum) {
             $product->product_type = $enum->value; // ej: 'laptop', 'desktop'
+
             return;
         }
 
@@ -220,6 +228,7 @@ class Product extends Model
             if (! $product->tax_type) {
                 $product->tax_type = TaxType::Exento;
             }
+
             return;
         }
 
@@ -259,8 +268,12 @@ class Product extends Model
 
         // Tipo personalizado: tipo + marca + modelo + subtype.
         $parts = [mb_strtoupper((string) $product->product_type)];
-        if (filled($product->brand)) $parts[] = mb_strtoupper((string) $product->brand);
-        if (filled($product->model)) $parts[] = mb_strtoupper((string) $product->model);
+        if (filled($product->brand)) {
+            $parts[] = mb_strtoupper((string) $product->brand);
+        }
+        if (filled($product->model)) {
+            $parts[] = mb_strtoupper((string) $product->model);
+        }
 
         $base = implode(' ', $parts);
 
@@ -282,7 +295,7 @@ class Product extends Model
         $subtype = $specs['subtype'] ?? null;
 
         if (filled($subtype)) {
-            $base .= ' - ' . mb_strtoupper((string) $subtype);
+            $base .= ' - '.mb_strtoupper((string) $subtype);
         }
 
         $product->name = $base;
@@ -325,7 +338,7 @@ class Product extends Model
             $nextNumber = 1;
         }
 
-        $product->sku = $prefix . str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
+        $product->sku = $prefix.str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -456,6 +469,7 @@ class Product extends Model
         // Acepta enum (legacy) o string (custom). Internamente normaliza
         // a string ya que la columna es VARCHAR.
         $value = $type instanceof ProductType ? $type->value : $type;
+
         return $query->where('product_type', $value);
     }
 
@@ -495,6 +509,7 @@ class Product extends Model
         if ($this->cost_price <= 0) {
             return 0;
         }
+
         return round((($this->sale_price - $this->cost_price) / $this->cost_price) * 100, 2);
     }
 

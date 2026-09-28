@@ -27,7 +27,7 @@ use Filament\Support\Contracts\HasLabel;
  * módulo de NC/ND de proveedores, `purchases.document_type` las discriminará
  * sin necesidad de migración.
  */
-enum SupplierDocumentType: string implements HasLabel, HasColor, HasIcon
+enum SupplierDocumentType: string implements HasColor, HasIcon, HasLabel
 {
     case Factura = '01';
     case NotaCredito = '03';
@@ -137,7 +137,7 @@ enum SupplierDocumentType: string implements HasLabel, HasColor, HasIcon
      * del inventario (un L 100 pagado quedaría como L 86.96 base + L 13.04
      * ISV no deducible — eso es data corruption contable).
      *
-     * Esta regla es la fuente de verdad para PurchaseTotalsCalculator.
+     * Esta regla es la fuente de verdad para PurchaseDocumentAmounts.
      */
     public function separatesIsv(): bool
     {
@@ -145,5 +145,36 @@ enum SupplierDocumentType: string implements HasLabel, HasColor, HasIcon
             self::Factura, self::NotaCredito, self::NotaDebito => true,
             self::ReciboInterno => false,
         };
+    }
+
+    /**
+     * Normaliza el state de un campo de formulario a enum.
+     *
+     * Filament entrega el valor de `document_type` de dos formas según el
+     * momento: string ('99') durante la edición del form y en el payload de
+     * `mutateFormData*` / `handleRecord*`, o instancia del enum cuando el cast
+     * del modelo ya lo hidrató. Antes cada caller (PurchaseForm, CreatePurchase,
+     * EditPurchase) tenía su propia copia de esta comparación.
+     *
+     * También acepta int: PHP convierte la llave '99' de un array de opciones
+     * en el entero 99 (no así '01', por el cero inicial), así que el Select de
+     * tipo de documento entrega el Recibo Interno como int.
+     */
+    public static function fromState(mixed $state): ?self
+    {
+        return match (true) {
+            $state instanceof self => $state,
+            is_int($state) => self::tryFrom((string) $state),
+            is_string($state) && $state !== '' => self::tryFrom($state),
+            default => null,
+        };
+    }
+
+    /**
+     * ¿El state recibido corresponde a Recibo Interno? Acepta string o enum.
+     */
+    public static function isReciboInterno(mixed $state): bool
+    {
+        return self::fromState($state) === self::ReciboInterno;
     }
 }
