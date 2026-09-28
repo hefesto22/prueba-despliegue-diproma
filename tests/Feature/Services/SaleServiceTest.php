@@ -27,12 +27,15 @@ use Tests\TestCase;
 
 class SaleServiceTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private SaleService $service;
+
     private Category $category;
+
     private User $cajero;
+
     private CashSession $cajaMatriz;
 
     protected function setUp(): void
@@ -177,7 +180,7 @@ class SaleServiceTest extends TestCase
             paymentMethod: PaymentMethod::Efectivo,
         );
 
-        $this->assertStringStartsWith('VTA-' . now()->year . '-', $sale->sale_number);
+        $this->assertStringStartsWith('VTA-'.now()->year.'-', $sale->sale_number);
     }
 
     // ─── Tests de cliente ───────────────────────────────────
@@ -195,7 +198,8 @@ class SaleServiceTest extends TestCase
         );
 
         $this->assertNull($sale->customer_id);
-        $this->assertEquals('Juan Pérez', $sale->customer_name);
+        // Nombres en mayúsculas por decisión de negocio 2026-07-10 (SaleService + mutator de Customer).
+        $this->assertEquals('JUAN PÉREZ', $sale->customer_name);
         $this->assertNull($sale->customer_rtn);
     }
 
@@ -216,11 +220,12 @@ class SaleServiceTest extends TestCase
 
         $this->assertEquals(1, Customer::count());
         $this->assertNotNull($sale->customer_id);
-        $this->assertEquals('María López', $sale->customer_name);
+        // Nombres en mayúsculas por decisión de negocio 2026-07-10 (SaleService + mutator de Customer).
+        $this->assertEquals('MARÍA LÓPEZ', $sale->customer_name);
         $this->assertEquals('0801-1999-123456', $sale->customer_rtn);
 
         $customer = Customer::first();
-        $this->assertEquals('María López', $customer->name);
+        $this->assertEquals('MARÍA LÓPEZ', $customer->name);
         $this->assertEquals('0801-1999-123456', $customer->rtn);
     }
 
