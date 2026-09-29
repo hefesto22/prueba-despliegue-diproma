@@ -1,51 +1,99 @@
 {{--
-    Total del documento de compra — al pie de la sección "Montos del documento".
+    Resumen de la compra — columna derecha del formulario de Compras.
 
-    El total NO es un campo editable: se deriva de exento + gravado + ISV en
-    PurchaseDocumentAmounts, así que el invariante no se puede romper. Se
-    muestra grande para que el operador lo compare contra el total impreso en
-    la factura: si no coincide, transcribió mal algún importe.
+    Muestra el total del documento y lo que pasará al confirmar (Libro de
+    Compras, caja, utilidad). El total NO es un campo editable: se deriva de
+    exento + gravado + ISV en PurchaseDocumentAmounts, así que el invariante
+    no se puede romper. Se muestra grande para que el operador lo compare
+    contra el total impreso en el documento.
 
     Aviso de ISV: si el ISV difiere de gravado × 15% más allá de la tolerancia
     de redondeo, se avisa SIN bloquear — manda lo que dice el documento.
 
-    @var \App\Services\Purchases\PurchaseDocumentAmounts|null $amounts  null mientras los montos son inválidos o están vacíos
-    @var bool  $isReciboInterno
---}}
-<div class="fi-purchase-summary flex w-full justify-end pt-2">
-    @if ($amounts)
-        <div class="w-full max-w-md space-y-2 rounded-xl bg-gray-50 p-4 dark:bg-white/5">
-            @if ($isReciboInterno)
-                <div class="text-xs italic text-gray-500 dark:text-gray-400">
-                    Sin desglose de ISV — el Recibo Interno no genera crédito fiscal.
-                </div>
-            @elseif (! $amounts->isvMatchesRate())
-                <div class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
-                    <strong>Revise el ISV:</strong>
-                    el 15% del importe gravado es
-                    L {{ number_format(\App\Services\Purchases\PurchaseDocumentAmounts::suggestedIsv($amounts->taxable), 2) }}
-                    y se ingresó L {{ number_format($amounts->isv, 2) }}
-                    (diferencia L {{ number_format($amounts->isvDifference(), 2) }}).
-                    Si la factura dice exactamente eso, déjelo así: se guarda lo que dice el documento.
-                </div>
-            @endif
+    Solo usa clases que ya existen en el tema compilado (public/build), para
+    no tener que recompilar assets.
 
-            <div class="flex items-baseline justify-between">
-                <span class="text-base font-semibold text-gray-950 dark:text-white">Total del documento</span>
+    @var \App\Services\Purchases\PurchaseDocumentAmounts|null $amounts  null mientras los montos son inválidos o están vacíos
+    @var \App\Enums\PurchaseKind|null $kind
+    @var bool $isReciboInterno
+    @var \App\Enums\PaymentMethod|null $paymentMethod
+    @var string|null $supplierName
+    @var string|null $purchaseNumber  solo al editar
+--}}
+<div class="fi-purchase-summary space-y-3 text-sm">
+    <div class="space-y-1">
+        @if ($purchaseNumber)
+            <div class="font-semibold text-gray-950 dark:text-white">{{ $purchaseNumber }}</div>
+        @endif
+        <div class="text-gray-700 dark:text-gray-300">
+            {{ $kind?->getLabel() ?? 'Compra' }} · {{ $isReciboInterno ? 'Recibo sin CAI' : 'Factura con CAI' }}
+        </div>
+        @if ($supplierName)
+            <div class="text-gray-500 dark:text-gray-400">{{ $supplierName }}</div>
+        @endif
+    </div>
+
+    @if ($amounts)
+        <div class="space-y-1 rounded-xl bg-gray-50 p-4 dark:bg-white/5">
+            @unless ($isReciboInterno)
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Exento</span>
+                    <span class="tabular-nums">L {{ number_format($amounts->exempt, 2) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Gravado 15%</span>
+                    <span class="tabular-nums">L {{ number_format($amounts->taxable, 2) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>ISV</span>
+                    <span class="tabular-nums">L {{ number_format($amounts->isv, 2) }}</span>
+                </div>
+            @endunless
+            <div class="flex items-baseline justify-between pt-2">
+                <span class="text-base font-semibold text-gray-950 dark:text-white">Total</span>
                 <span class="text-2xl font-bold tabular-nums text-primary-600 dark:text-primary-400">
                     L {{ number_format($amounts->total(), 2) }}
                 </span>
             </div>
+        </div>
 
-            @unless ($isReciboInterno)
-                <div class="text-xs text-gray-500 dark:text-gray-400">
-                    Debe coincidir con el total impreso en la factura.
-                </div>
-            @endunless
+        @if (! $isReciboInterno && ! $amounts->isvMatchesRate())
+            <div class="rounded-lg bg-amber-50 p-3 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+                <strong>Revise el ISV:</strong>
+                el 15% del gravado es
+                L {{ number_format(\App\Services\Purchases\PurchaseDocumentAmounts::suggestedIsv($amounts->taxable), 2) }}
+                y se ingresó L {{ number_format($amounts->isv, 2) }}.
+                Si la factura dice exactamente eso, déjelo así.
+            </div>
+        @endif
+
+        <div class="space-y-1 text-gray-700 dark:text-gray-300">
+            <div class="font-semibold text-gray-950 dark:text-white">Al confirmar:</div>
+            <ul class="list-disc list-inside space-y-1">
+                @if ($isReciboInterno)
+                    <li>No entra al Libro de Compras.</li>
+                @else
+                    <li>Entra al Libro de Compras con L {{ number_format($amounts->isv, 2) }} de crédito fiscal.</li>
+                @endif
+
+                @if ($paymentMethod === \App\Enums\PaymentMethod::Efectivo)
+                    <li>Salen <strong>L {{ number_format($amounts->total(), 2) }}</strong> de la caja abierta.</li>
+                @elseif ($paymentMethod)
+                    <li>Pago con {{ mb_strtolower($paymentMethod->getLabel()) }}: la caja no cambia.</li>
+                @else
+                    <li>Falta elegir la forma de pago.</li>
+                @endif
+
+                @if ($kind === \App\Enums\PurchaseKind::Gasto)
+                    <li>Resta de la utilidad del mes.</li>
+                @else
+                    <li>El inventario se ingresa desde Productos.</li>
+                @endif
+            </ul>
         </div>
     @else
-        <div class="text-sm italic text-gray-400 dark:text-gray-500">
-            Ingrese los importes del documento para ver el total.
+        <div class="italic text-gray-400 dark:text-gray-500">
+            Ingrese el monto del documento para ver el total.
         </div>
     @endif
 </div>

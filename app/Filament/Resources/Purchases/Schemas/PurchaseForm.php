@@ -9,6 +9,7 @@ use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Models\Establishment;
 use App\Models\Purchase;
+use App\Models\Supplier;
 use App\Services\Purchases\Exceptions\MontosDocumentoInvalidosException;
 use App\Services\Purchases\PurchaseDocumentAmounts;
 use App\Services\Purchases\SupplierDocumentPrefill;
@@ -21,303 +22,385 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 
 /**
- * Formulario de Compras — documento fiscal del proveedor.
+ * Formulario de Compras — documento del proveedor, mercadería o gasto.
  *
- * Desde la Fase 1 del rediseño Compras + Producto-lote (2026-07-25) la compra
- * no lleva líneas de producto: se transcriben los montos impresos en el
- * documento (exento / gravado / ISV) para el Libro de Compras. El inventario
- * entra por la ficha del producto.
+ * Diseño guiado (aprobado 2026-09-29): cuatro pasos numerados en el orden en
+ * que el operador tiene la información en la mano, y un resumen fijo a la
+ * derecha con el total y sus efectos (Libro de Compras, caja).
  *
- * Se mantiene en Sections apiladas (no Tabs) a propósito: el operador está
- * transcribiendo una factura en papel y necesita ver todo el documento a la
- * vez para compararlo contra el original.
+ *   1. ¿Qué vas a registrar?      → Mercadería / Gasto operativo
+ *   2. ¿Qué documento te dieron?  → Factura con CAI / Recibo sin CAI
+ *      Va antes que el proveedor porque decide qué campos se piden.
+ *   3. Datos del documento        → concepto, proveedor, fecha, # y CAI
+ *   4. Monto y pago
+ *
+ * Al elegir el tipo se sugieren documento y forma de pago
+ * (PurchaseKind::suggestedDocumentType / suggestedPaymentMethod).
+ *
+ * Sin pestañas a propósito: el operador está transcribiendo un documento en
+ * papel y necesita verlo completo para compararlo contra el original.
+ *
+ * Desde la Fase 1 (2026-07-25) la compra no lleva líneas de producto: se
+ * transcriben los montos impresos (exento / gravado / ISV) para el Libro de
+ * Compras. El inventario entra por la ficha del producto.
  */
 class PurchaseForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->columns(1)
+            ->columns(['default' => 1, 'lg' => 3])
             ->components([
-                self::purchaseSection(),
-                self::fiscalDocumentSection(),
-                self::amountsSection(),
-                self::notesSection(),
+                Group::make([
+                    self::kindSection(),
+                    self::documentTypeSection(),
+                    self::detailsSection(),
+                    self::amountsAndPaymentSection(),
+                    self::notesSection(),
+                ])->columnSpan(['lg' => 2]),
+                Group::make([
+                    self::summarySection(),
+                ])
+                    ->columnSpan(['lg' => 1])
+                    // Estilo en línea y no clases de Tailwind: el tema compilado
+                    // (public/build) no incluye `sticky` y así no hay que
+                    // recompilar assets para un solo uso.
+                    ->extraAttributes(['style' => 'position: sticky; top: 5rem; align-self: start;']),
             ]);
     }
 
-    // ─── 1. Información de la compra ────────────────────────────────────────
+    // ─── 1. ¿Qué vas a registrar? ───────────────────────────────────────────
 
-    private static function purchaseSection(): Section
+    private static function kindSection(): Section
     {
-        return Section::make('Información de la compra')
-            ->icon('heroicon-o-building-storefront')
-            ->description('Qué se compró, a quién, dónde y cómo se pagó.')
+        return Section::make('1. ¿Qué vas a registrar?')
+            ->description('Mercadería: lo que se compra para vender o usar en reparaciones. Gasto: taxi, gasolina, papelería, servicios…')
+            ->compact()
             ->schema([
-                // "Todo en Compras" (2026-09-28): aquí se registran también los
-                // gastos operativos. El tipo decide si resta de la Utilidad Neta
-                // (gasto) o entra por el costo de lo vendido (mercadería).
-                Grid::make(3)->schema([
-                    ToggleButtons::make('kind')
-                        ->label('¿Qué se compró?')
-                        ->options(PurchaseKind::class)
-                        ->default(PurchaseKind::Mercaderia->value)
-                        ->inline()
-                        ->required()
-                        ->live(),
-                    Select::make('expense_category')
-                        ->label('Categoría del gasto')
-                        ->options(ExpenseCategory::class)
-                        ->native(false)
-                        ->visible(fn (callable $get) => self::isExpense($get('kind')))
-                        ->required(fn (callable $get) => self::isExpense($get('kind'))),
-                    TextInput::make('description')
-                        ->label('Concepto')
-                        ->placeholder('Ej. Gasolina moto mensajero')
-                        ->maxLength(500)
-                        ->visible(fn (callable $get) => self::isExpense($get('kind')))
-                        ->required(fn (callable $get) => self::isExpense($get('kind'))),
-                ]),
-                Grid::make(3)->schema([
-                    Select::make('supplier_id')
-                        ->label('Proveedor')
-                        ->relationship(
-                            name: 'supplier',
-                            titleAttribute: 'name',
-                            // Excluye genéricos: el genérico de RI se asigna solo como
-                            // fallback cuando el operador no elige proveedor real
-                            // (ver CreatePurchase::resolveReciboInternoFields).
-                            modifyQueryUsing: fn ($query) => $query->active()->operational(),
-                        )
-                        ->searchable()
-                        ->preload()
-                        // Factura: SAR exige proveedor identificado. RI: opcional
-                        // (trazabilidad interna); vacío cae al genérico.
-                        ->required(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                        ->live()
-                        ->dehydrated()
-                        ->helperText(fn (callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
-                            ? 'Opcional. Si lo deja vacío se asignará "Varios / Sin identificar".'
-                            : null)
-                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                            // Crédito a proveedores pausado hasta que exista Cuentas por
-                            // Pagar: credit_days NO se hereda del proveedor (queda en 0
-                            // vía Hidden más abajo). Restaurar
-                            // `$set('credit_days', $supplier->credit_days)` cuando CxP exista.
-                            if (! $state || SupplierDocumentType::isReciboInterno($get('document_type'))) {
-                                return;
-                            }
-
-                            self::prefillFromLastDocument((int) $state, $set, $get);
-                        }),
-                    Select::make('establishment_id')
-                        ->label('Sucursal')
-                        ->relationship(
-                            name: 'establishment',
-                            titleAttribute: 'name',
-                            modifyQueryUsing: fn ($query) => $query->where('is_active', true),
-                        )
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->native(false)
-                        ->default(fn () => Establishment::main()->value('id'))
-                        ->helperText('Sucursal que recibió el documento.')
-                        // Solo editable en Borrador: una compra confirmada ya está en
-                        // el Libro de Compras filtrable por sucursal.
-                        ->disabled(fn (?Purchase $record) => $record !== null && $record->status !== PurchaseStatus::Borrador)
-                        ->dehydrated(),
-                    DatePicker::make('date')
-                        ->label('Fecha del documento')
-                        ->required()
-                        ->default(now())
-                        ->native(false),
-                ]),
-                // credit_days forzado a 0 mientras Cuentas por Pagar no exista:
-                // PurchaseService::confirm() marca Pagada las compras de contado.
-                Hidden::make('credit_days')
-                    ->default(0)
-                    ->dehydrated(),
-                Grid::make(2)->schema([
-                    Select::make('payment_method')
-                        ->label('Forma de pago')
-                        ->options(PaymentMethod::class)
-                        ->required()
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn (callable $get) => self::isCash($get('payment_method'))
-                            ? 'Al confirmar, el dinero sale de la caja abierta de la sucursal.'
-                            : 'Contado. Solo "Efectivo" descuenta de la caja.'),
-                    TextInput::make('purchase_number')
-                        ->label('# Compra')
-                        ->disabled()
-                        ->dehydrated()
-                        ->placeholder('Se genera automáticamente')
-                        ->visible(fn (string $operation) => $operation === 'edit'),
-                ]),
+                ToggleButtons::make('kind')
+                    ->hiddenLabel()
+                    ->options(PurchaseKind::class)
+                    ->default(PurchaseKind::Mercaderia->value)
+                    ->inline()
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get, string $operation): void {
+                        // Solo al crear: en una edición el operador ya eligió
+                        // documento y pago a propósito.
+                        if ($operation === 'create') {
+                            self::applyKindSuggestions($state, $set, $get);
+                        }
+                    }),
             ]);
     }
 
-    // ─── 2. Documento fiscal del proveedor ──────────────────────────────────
-
-    private static function fiscalDocumentSection(): Section
+    /**
+     * Preselecciona el documento y la forma de pago habituales del tipo
+     * elegido. La forma de pago solo se completa si está vacía.
+     */
+    private static function applyKindSuggestions(mixed $kind, callable $set, callable $get): void
     {
-        return Section::make('Documento fiscal del proveedor')
-            ->icon('heroicon-o-document-text')
-            ->description('Factura: entra al Libro de Compras con su ISV. Recibo Interno: compras sin CAI (taxi, mercado, particulares).')
+        $kind = PurchaseKind::fromState($kind);
+
+        if ($kind === null) {
+            return;
+        }
+
+        $documentType = $kind->suggestedDocumentType();
+        $set('document_type', $documentType->value);
+        self::applyDocumentType($documentType->value, $set);
+
+        $payment = $kind->suggestedPaymentMethod();
+
+        if ($payment !== null && blank($get('payment_method'))) {
+            $set('payment_method', $payment->value);
+        }
+    }
+
+    // ─── 2. ¿Qué documento te dieron? ───────────────────────────────────────
+
+    private static function documentTypeSection(): Section
+    {
+        return Section::make('2. ¿Qué documento te dieron?')
+            ->compact()
+            ->schema([
+                ToggleButtons::make('document_type')
+                    ->hiddenLabel()
+                    ->options([
+                        // Solo los dos documentos que Diproma recibe en la práctica.
+                        // NC/ND de proveedor existen en el enum por estructura SAR
+                        // pero no se registran en este negocio.
+                        SupplierDocumentType::Factura->value => 'Factura con CAI',
+                        SupplierDocumentType::ReciboInterno->value => 'Recibo sin CAI',
+                    ])
+                    ->icons([
+                        SupplierDocumentType::Factura->value => 'heroicon-o-document-check',
+                        SupplierDocumentType::ReciboInterno->value => 'heroicon-o-pencil-square',
+                    ])
+                    ->default(SupplierDocumentType::Factura->value)
+                    ->inline()
+                    ->required()
+                    ->live()
+                    ->helperText(fn (callable $get): string => SupplierDocumentType::isReciboInterno($get('document_type'))
+                        ? 'Para quien no emite factura (taxi, mercado, particulares). No entra al Libro de Compras ni genera crédito fiscal.'
+                        : 'Entra al Libro de Compras y su ISV cuenta como crédito fiscal.')
+                    ->afterStateUpdated(fn ($state, callable $set) => self::applyDocumentType($state, $set)),
+            ]);
+    }
+
+    /**
+     * Al pasar a Recibo Interno se limpia lo que deja de aplicar (CAI,
+     * # proveedor, gravado, ISV) para que lo validado y lo guardado coincidan.
+     * El proveedor NO se limpia: el operador pudo elegirlo a propósito.
+     */
+    private static function applyDocumentType(mixed $documentType, callable $set): void
+    {
+        if (! SupplierDocumentType::isReciboInterno($documentType)) {
+            return;
+        }
+
+        // '' (no null): evita que la máscara de Alpine pinte "null" si el
+        // operador vuelve a Factura y el campo reaparece.
+        $set('supplier_cai', '');
+        $set('supplier_invoice_number', '');
+        $set('credit_days', 0);
+        $set('_prefill_source_date', null);
+        $set('taxable_total', 0);
+        $set('isv', 0);
+    }
+
+    // ─── 3. Datos del documento ─────────────────────────────────────────────
+
+    private static function detailsSection(): Section
+    {
+        return Section::make('3. Datos del documento')
+            ->compact()
             ->schema([
                 // Flag del auto-fill: solo vive en el cliente para que los helperText
                 // del # de documento y del CAI muestren de qué compra se heredaron.
                 Hidden::make('_prefill_source_date')
                     ->dehydrated(false),
 
-                // Aviso ANTES de completar la compra: el uso incorrecto más común
-                // del RI es registrar así a un proveedor que sí tiene CAI.
-                Placeholder::make('recibo_interno_info')
-                    ->label('')
-                    ->visible(fn (callable $get) => SupplierDocumentType::isReciboInterno($get('document_type')))
-                    ->content(new HtmlString(
-                        '<div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-4 text-sm">'
-                        .'<div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">📝 Recibo Interno (sin CAI)</div>'
-                        .'<div class="text-gray-700 dark:text-gray-300">'
-                        .'Se registra una compra informal para control interno. '
-                        .'<strong>No entra al Libro de Compras SAR</strong>, no genera crédito fiscal ni es deducible de ISR. '
-                        .'Úsese solo cuando el proveedor no emite factura con CAI (mercado, venta informal, etc.).'
-                        .'</div></div>'
-                    )),
-                Grid::make(3)->schema([
-                    Select::make('document_type')
-                        ->label('Tipo de documento')
-                        ->options([
-                            // Solo los dos documentos que Diproma recibe en la práctica.
-                            // NC/ND de proveedor existen en el enum por estructura SAR
-                            // pero no se registran en este negocio.
-                            SupplierDocumentType::Factura->value => SupplierDocumentType::Factura->getLabel(),
-                            SupplierDocumentType::ReciboInterno->value => SupplierDocumentType::ReciboInterno->getLabel(),
-                        ])
-                        ->default(SupplierDocumentType::Factura->value)
-                        ->required()
-                        ->native(false)
-                        ->live()
-                        // Al pasar a RI se limpia lo que deja de aplicar (CAI, # proveedor,
-                        // gravado, ISV) para que lo validado y lo guardado coincidan. El
-                        // proveedor NO se limpia: el operador pudo elegirlo a propósito.
-                        ->afterStateUpdated(function ($state, callable $set) {
-                            if (! SupplierDocumentType::isReciboInterno($state)) {
-                                return;
-                            }
+                // credit_days forzado a 0 mientras Cuentas por Pagar no exista:
+                // PurchaseService::confirm() marca Pagada las compras de contado.
+                Hidden::make('credit_days')
+                    ->default(0)
+                    ->dehydrated(),
 
-                            // '' (no null): evita que la máscara de Alpine pinte "null"
-                            // si el operador vuelve a Factura y el campo reaparece.
-                            $set('supplier_cai', '');
-                            $set('supplier_invoice_number', '');
-                            $set('credit_days', 0);
-                            $set('_prefill_source_date', null);
-                            $set('taxable_total', 0);
-                            $set('isv', 0);
-                        }),
-                    TextInput::make('supplier_invoice_number')
-                        ->label('# documento del proveedor')
-                        ->placeholder('000-001-01-00000123')
-                        ->default('')
-                        // Los guiones aparecen solos; acepta pegar desde PDF con o sin guiones.
-                        ->mask('999-999-99-99999999')
-                        ->helperText(fn (callable $get) => filled($get('_prefill_source_date'))
-                            ? "Prefijo heredado de compra del {$get('_prefill_source_date')}. Escribí solo los 8 dígitos del correlativo y verificá que coincida con la factura actual."
-                            : 'Formato SAR: establecimiento-punto-tipo-correlativo')
-                        // En RI el número lo genera InternalReceiptNumberGenerator.
-                        ->visible(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                        ->required(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                        ->dehydrated(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                        ->maxLength(30)
-                        ->regex('/^\d{3}-\d{3}-\d{2}-\d{8}$/')
-                        ->validationMessages([
-                            'regex' => 'El formato debe ser XXX-XXX-XX-XXXXXXXX (18 dígitos con guiones).',
-                        ])
-                        ->rules(fn (?Purchase $record, callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
-                            ? []
-                            : [
-                                // Un documento del proveedor solo puede estar registrado UNA
-                                // vez vigente. Las anuladas y las eliminadas no cuentan: sin
-                                // esto, una factura anulada por error (o un borrador heredado
-                                // que hay que recapturar) no se podía volver a registrar.
-                                Rule::unique('purchases', 'supplier_invoice_number')
-                                    ->where('supplier_id', $get('supplier_id'))
-                                    ->where('document_type', $get('document_type'))
-                                    ->whereNot('status', PurchaseStatus::Anulada->value)
-                                    ->whereNull('deleted_at')
-                                    ->ignore($record?->id),
-                            ])
-                        ->columnSpan(2),
+                // Solo en gastos: qué se pagó y en qué rubro del Reporte de Gastos cae.
+                Grid::make(3)
+                    ->visible(fn (callable $get): bool => self::isExpense($get('kind')))
+                    ->schema([
+                        TextInput::make('description')
+                            ->label('Concepto')
+                            ->placeholder('Ej. Taxi a la SAR, gasolina moto mensajero')
+                            ->maxLength(500)
+                            ->required(fn (callable $get): bool => self::isExpense($get('kind')))
+                            ->columnSpan(2),
+                        Select::make('expense_category')
+                            ->label('Categoría')
+                            ->options(ExpenseCategory::class)
+                            ->native(false)
+                            ->required(fn (callable $get): bool => self::isExpense($get('kind'))),
+                    ]),
+
+                Grid::make(3)->schema([
+                    self::supplierSelect()
+                        ->columnSpan(fn (): int => self::hasSeveralEstablishments() ? 1 : 2),
+                    DatePicker::make('date')
+                        ->label('Fecha del documento')
+                        ->required()
+                        ->default(now())
+                        ->native(false),
+                    self::establishmentSelect(),
                 ]),
-                TextInput::make('supplier_cai')
-                    ->label('CAI')
-                    ->placeholder('XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX-XX-XX')
-                    ->default('')
-                    // Alfanuméricos + guiones automáticos; mayúsculas al persistir.
-                    ->mask('******-******-******-******-******-**-**-**')
-                    ->helperText(fn (callable $get) => filled($get('_prefill_source_date'))
-                        ? "CAI heredado de compra del {$get('_prefill_source_date')}. Verificá que sea el mismo que aparece en esta factura (el proveedor pudo haber renovado)."
-                        : 'Código de Autorización de Impresión impreso en la factura.')
-                    ->visible(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                    ->required(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                    ->dehydrated(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
-                    // 36 hexadecimales (6-6-6-6-6-2-2-2) + 7 guiones del formato SAR.
-                    ->maxLength(43)
-                    ->regex('/^[A-F0-9\-]+$/i')
-                    ->validationMessages([
-                        'regex' => 'El CAI solo puede contener hexadecimales (0-9, A-F) y guiones.',
-                        'max' => 'El CAI no puede exceder 43 caracteres (formato SAR).',
-                    ])
-                    ->formatStateUsing(fn (?string $state) => $state ? strtoupper($state) : '')
-                    ->dehydrateStateUsing(fn (?string $state) => $state ? strtoupper(trim($state)) : null),
+
+                // Solo en factura: en un Recibo Interno el número lo genera
+                // InternalReceiptNumberGenerator y no hay CAI.
+                Grid::make(3)
+                    ->visible(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+                    ->schema([
+                        self::supplierInvoiceNumberInput(),
+                        self::caiInput()->columnSpan(2),
+                    ]),
             ]);
     }
 
-    // ─── 3. Montos del documento ────────────────────────────────────────────
-
-    private static function amountsSection(): Section
+    private static function supplierSelect(): Select
     {
-        return Section::make('Montos del documento')
-            ->icon('heroicon-o-calculator')
-            ->description(fn (callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
+        return Select::make('supplier_id')
+            ->label(fn (callable $get): string => SupplierDocumentType::isReciboInterno($get('document_type'))
+                ? 'Proveedor (opcional)'
+                : 'Proveedor')
+            ->relationship(
+                name: 'supplier',
+                titleAttribute: 'name',
+                // Excluye genéricos: el genérico de RI se asigna solo como
+                // fallback cuando el operador no elige proveedor real
+                // (ver ResolvesPurchaseDocument::resolveReciboInternoFields).
+                modifyQueryUsing: fn ($query) => $query->active()->operational(),
+            )
+            ->searchable()
+            ->preload()
+            // Factura: SAR exige proveedor identificado. RI: opcional
+            // (trazabilidad interna); vacío cae al genérico.
+            ->required(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+            ->live()
+            ->dehydrated()
+            ->helperText(fn (callable $get): ?string => SupplierDocumentType::isReciboInterno($get('document_type'))
+                ? 'Si lo deja vacío se registra como "Varios / Sin identificar".'
+                : null)
+            ->afterStateUpdated(function ($state, callable $set, callable $get): void {
+                // Crédito a proveedores pausado hasta que exista Cuentas por
+                // Pagar: credit_days NO se hereda del proveedor (queda en 0 vía
+                // Hidden). Restaurar `$set('credit_days', $supplier->credit_days)`
+                // cuando CxP exista.
+                if (! $state || SupplierDocumentType::isReciboInterno($get('document_type'))) {
+                    return;
+                }
+
+                self::prefillFromLastDocument((int) $state, $set, $get);
+            });
+    }
+
+    /**
+     * Con una sola sucursal activa el campo se oculta (siempre sería la
+     * misma) pero se sigue enviando con su valor por defecto.
+     */
+    private static function establishmentSelect(): Select
+    {
+        return Select::make('establishment_id')
+            ->label('Sucursal')
+            ->relationship(
+                name: 'establishment',
+                titleAttribute: 'name',
+                modifyQueryUsing: fn ($query) => $query->where('is_active', true),
+            )
+            ->searchable()
+            ->preload()
+            ->required()
+            ->native(false)
+            ->default(fn () => Establishment::main()->value('id'))
+            // Solo editable en Borrador: una compra confirmada ya está en el
+            // Libro de Compras filtrable por sucursal.
+            ->disabled(fn (?Purchase $record) => $record !== null && $record->status !== PurchaseStatus::Borrador)
+            ->visible(fn (): bool => self::hasSeveralEstablishments())
+            ->dehydrated()
+            ->dehydratedWhenHidden();
+    }
+
+    private static function hasSeveralEstablishments(): bool
+    {
+        return once(fn (): bool => Establishment::query()->where('is_active', true)->count() > 1);
+    }
+
+    private static function supplierInvoiceNumberInput(): TextInput
+    {
+        return TextInput::make('supplier_invoice_number')
+            ->label('# de factura')
+            ->placeholder('000-001-01-00000123')
+            ->default('')
+            // Los guiones aparecen solos; acepta pegar desde PDF con o sin guiones.
+            ->mask('999-999-99-99999999')
+            ->helperText(fn (callable $get): ?string => filled($get('_prefill_source_date'))
+                ? "Prefijo de la compra del {$get('_prefill_source_date')}: escriba solo los 8 dígitos del correlativo."
+                : null)
+            ->required(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+            ->dehydrated(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+            ->maxLength(30)
+            ->regex('/^\d{3}-\d{3}-\d{2}-\d{8}$/')
+            ->validationMessages([
+                'regex' => 'El formato debe ser XXX-XXX-XX-XXXXXXXX (18 dígitos con guiones).',
+            ])
+            ->rules(fn (?Purchase $record, callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
+                ? []
+                : [
+                    // Un documento del proveedor solo puede estar registrado UNA
+                    // vez vigente. Las anuladas y las eliminadas no cuentan: sin
+                    // esto, una factura anulada por error (o un borrador heredado
+                    // que hay que recapturar) no se podía volver a registrar.
+                    Rule::unique('purchases', 'supplier_invoice_number')
+                        ->where('supplier_id', $get('supplier_id'))
+                        ->where('document_type', $get('document_type'))
+                        ->whereNot('status', PurchaseStatus::Anulada->value)
+                        ->whereNull('deleted_at')
+                        ->ignore($record?->id),
+                ]);
+    }
+
+    private static function caiInput(): TextInput
+    {
+        return TextInput::make('supplier_cai')
+            ->label('CAI')
+            ->placeholder('XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX-XX-XX')
+            ->default('')
+            // Alfanuméricos + guiones automáticos; mayúsculas al persistir.
+            ->mask('******-******-******-******-******-**-**-**')
+            ->helperText(fn (callable $get): ?string => filled($get('_prefill_source_date'))
+                ? "CAI de la compra del {$get('_prefill_source_date')}. Verifique que sea el de esta factura (el proveedor pudo renovarlo)."
+                : null)
+            ->required(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+            ->dehydrated(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+            // 36 hexadecimales (6-6-6-6-6-2-2-2) + 7 guiones del formato SAR.
+            ->maxLength(43)
+            ->regex('/^[A-F0-9\-]+$/i')
+            ->validationMessages([
+                'regex' => 'El CAI solo puede contener hexadecimales (0-9, A-F) y guiones.',
+                'max' => 'El CAI no puede exceder 43 caracteres (formato SAR).',
+            ])
+            ->formatStateUsing(fn (?string $state) => $state ? strtoupper($state) : '')
+            ->dehydrateStateUsing(fn (?string $state) => $state ? strtoupper(trim($state)) : null);
+    }
+
+    // ─── 4. Monto y pago ────────────────────────────────────────────────────
+
+    private static function amountsAndPaymentSection(): Section
+    {
+        return Section::make('4. Monto y pago')
+            ->description(fn (callable $get): string => SupplierDocumentType::isReciboInterno($get('document_type'))
                 ? 'Lo que se pagó, tal como aparece en el recibo.'
-                : 'Copie los importes tal como vienen impresos en la factura del proveedor.')
+                : 'Copie los importes tal como vienen impresos en la factura.')
+            ->compact()
             ->schema([
                 Grid::make(3)->schema([
                     self::amountInput('exempt_total')
-                        ->label(fn (callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
+                        ->label(fn (callable $get): string => SupplierDocumentType::isReciboInterno($get('document_type'))
                             ? 'Total pagado'
                             : 'Importe exento')
-                        ->helperText(fn (callable $get) => SupplierDocumentType::isReciboInterno($get('document_type'))
-                            ? 'Recibo Interno: todo se registra como exento, sin ISV.'
-                            : 'Productos usados, servicios exentos, combustible.'),
+                        ->helperText(fn (callable $get): ?string => SupplierDocumentType::isReciboInterno($get('document_type'))
+                            ? null
+                            : 'Usados, servicios exentos, combustible.'),
                     self::amountInput('taxable_total')
                         ->label('Importe gravado 15%')
                         ->helperText('Base sin ISV.')
-                        ->visible(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type')))
+                        ->visible(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type')))
                         // Recalcula el ISV sugerido cada vez que cambia la base; el
-                        // operador puede corregirlo después para que coincida con
-                        // el documento.
+                        // operador puede corregirlo para que coincida con el documento.
                         ->afterStateUpdated(fn ($state, callable $set) => $set(
                             'isv',
                             PurchaseDocumentAmounts::suggestedIsv((float) $state),
                         )),
                     self::amountInput('isv')
                         ->label('ISV 15%')
-                        ->helperText('Se calcula solo. Corríjalo si la factura dice otra cifra.')
-                        ->visible(fn (callable $get) => ! SupplierDocumentType::isReciboInterno($get('document_type'))),
+                        ->helperText('Se calcula solo; corríjalo si la factura dice otra cifra.')
+                        ->visible(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type'))),
                 ]),
-                Placeholder::make('document_total')
-                    ->hiddenLabel()
-                    ->content(fn (callable $get): HtmlString => self::renderSummary($get))
-                    ->columnSpanFull(),
+                ToggleButtons::make('payment_method')
+                    ->label('Forma de pago')
+                    ->options(PaymentMethod::class)
+                    ->inline()
+                    ->required()
+                    ->live()
+                    ->helperText(fn (callable $get): string => self::isCash($get('payment_method'))
+                        ? 'Al confirmar, el dinero sale de la caja abierta de la sucursal.'
+                        : 'Solo "Efectivo" descuenta de la caja.'),
             ]);
     }
 
@@ -373,31 +456,13 @@ class PurchaseForm
         );
     }
 
-    private static function renderSummary(callable $get): HtmlString
-    {
-        try {
-            $amounts = self::amountsFromState($get);
-        } catch (MontosDocumentoInvalidosException) {
-            // Mientras el operador todavía está tipeando (todo en 0, etc.)
-            // el error ya se muestra en el campo; aquí solo no hay total que mostrar.
-            $amounts = null;
-        }
-
-        return new HtmlString(
-            view('filament.forms.purchase-summary', [
-                'amounts' => $amounts,
-                'isReciboInterno' => SupplierDocumentType::isReciboInterno($get('document_type')),
-            ])->render()
-        );
-    }
-
-    // ─── 4. Notas ───────────────────────────────────────────────────────────
+    // ─── Notas ──────────────────────────────────────────────────────────────
 
     private static function notesSection(): Section
     {
         return Section::make('Notas')
-            ->icon('heroicon-o-chat-bubble-left-ellipsis')
             ->description('Observaciones internas (opcional).')
+            ->compact()
             ->collapsible()
             ->collapsed()
             ->schema([
@@ -409,6 +474,52 @@ class PurchaseForm
             ]);
     }
 
+    // ─── Resumen (columna derecha) ──────────────────────────────────────────
+
+    private static function summarySection(): Section
+    {
+        return Section::make('Resumen')
+            ->icon('heroicon-o-calculator')
+            ->compact()
+            ->schema([
+                Placeholder::make('document_summary')
+                    ->hiddenLabel()
+                    ->content(fn (callable $get, ?Purchase $record): HtmlString => self::renderSummary($get, $record)),
+            ]);
+    }
+
+    /**
+     * El total NO es un campo editable: se deriva en PurchaseDocumentAmounts,
+     * así que el invariante no se puede romper. El resumen lo muestra junto a
+     * lo que pasará al confirmar, para que el operador lo compare contra el
+     * documento antes de guardar.
+     */
+    private static function renderSummary(callable $get, ?Purchase $record): HtmlString
+    {
+        try {
+            $amounts = self::amountsFromState($get);
+        } catch (MontosDocumentoInvalidosException) {
+            // Mientras el operador todavía está tipeando (todo en 0, etc.)
+            // el error ya se muestra en el campo; aquí solo no hay total.
+            $amounts = null;
+        }
+
+        $supplierId = $get('supplier_id');
+
+        return new HtmlString(
+            view('filament.forms.purchase-summary', [
+                'amounts' => $amounts,
+                'kind' => PurchaseKind::fromState($get('kind')),
+                'isReciboInterno' => SupplierDocumentType::isReciboInterno($get('document_type')),
+                'paymentMethod' => self::paymentMethodFromState($get('payment_method')),
+                'supplierName' => filled($supplierId)
+                    ? Supplier::query()->whereKey($supplierId)->value('name')
+                    : null,
+                'purchaseNumber' => $record?->purchase_number,
+            ])->render()
+        );
+    }
+
     private static function isExpense(mixed $kind): bool
     {
         return PurchaseKind::fromState($kind) === PurchaseKind::Gasto;
@@ -416,9 +527,15 @@ class PurchaseForm
 
     private static function isCash(mixed $method): bool
     {
-        $method = $method instanceof PaymentMethod ? $method : PaymentMethod::tryFrom((string) $method);
+        return self::paymentMethodFromState($method) === PaymentMethod::Efectivo;
+    }
 
-        return $method === PaymentMethod::Efectivo;
+    /**
+     * El state llega como string al capturar y como enum al editar (cast del modelo).
+     */
+    private static function paymentMethodFromState(mixed $state): ?PaymentMethod
+    {
+        return $state instanceof PaymentMethod ? $state : PaymentMethod::tryFrom((string) $state);
     }
 
     // ─── Auto-fill desde el último documento del proveedor ─────────────────

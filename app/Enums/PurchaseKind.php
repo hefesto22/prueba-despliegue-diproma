@@ -54,6 +54,34 @@ enum PurchaseKind: string implements HasColor, HasIcon, HasLabel
     }
 
     /**
+     * Documento que suele respaldar este tipo de compra. El formulario lo
+     * preselecciona para ahorrar clics; el operador puede cambiarlo.
+     *
+     * Los gastos del día (taxi, mercado, mensajería) casi nunca traen CAI;
+     * la mercadería se compra a distribuidores formales con factura.
+     */
+    public function suggestedDocumentType(): SupplierDocumentType
+    {
+        return match ($this) {
+            self::Mercaderia => SupplierDocumentType::Factura,
+            self::Gasto => SupplierDocumentType::ReciboInterno,
+        };
+    }
+
+    /**
+     * Forma de pago habitual, o null si no hay una que predomine. Un gasto
+     * del día se paga del cajón; la mercadería varía (transferencia, cheque…)
+     * y es mejor que el operador la elija.
+     */
+    public function suggestedPaymentMethod(): ?PaymentMethod
+    {
+        return match ($this) {
+            self::Mercaderia => null,
+            self::Gasto => PaymentMethod::Efectivo,
+        };
+    }
+
+    /**
      * Normaliza el state de un campo de formulario (string o enum) a enum.
      */
     public static function fromState(mixed $state): ?self
