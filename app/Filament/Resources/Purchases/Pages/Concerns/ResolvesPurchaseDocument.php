@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Purchases\Pages\Concerns;
 
+use App\Enums\PurchaseKind;
 use App\Enums\SupplierDocumentType;
 use App\Models\Supplier;
 use App\Services\Purchases\Exceptions\MontosDocumentoInvalidosException;
@@ -50,7 +51,25 @@ trait ResolvesPurchaseDocument
             $data = $this->resolveReciboInternoFields($data, $generateInternalReceiptNumber);
         }
 
-        return [...$data, ...$this->resolveAmounts($data)];
+        return [...$data, ...$this->resolveKindFields($data), ...$this->resolveAmounts($data)];
+    }
+
+    /**
+     * Categoría y concepto solo existen en los gastos. Si el operador cambió
+     * una compra de Gasto a Mercadería, esos campos quedan ocultos en el
+     * formulario y no viajan en el payload: aquí se limpian explícitamente
+     * para que la compra no siga contando como gasto de alguna categoría.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{expense_category?: null, description?: null}
+     */
+    private function resolveKindFields(array $data): array
+    {
+        if (PurchaseKind::fromState($data['kind'] ?? null) === PurchaseKind::Gasto) {
+            return [];
+        }
+
+        return ['expense_category' => null, 'description' => null];
     }
 
     /**

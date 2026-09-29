@@ -6,33 +6,32 @@ namespace App\Services\Expenses;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
-use App\Models\Expense;
+use App\Models\Purchase;
+use App\Models\Sale;
 use Carbon\CarbonImmutable;
 
 /**
  * Línea única del Reporte Mensual de Gastos.
  *
- * Value object inmutable que normaliza un Expense a la forma que tanto la hoja
- * de detalle del Excel como la tabla de la Page consumen. Una vez construido
- * no muta — previene bugs por mutación accidental al mapear a celdas/filas.
+ * Value object inmutable que normaliza cada gasto a la forma que consumen la
+ * hoja de detalle del Excel y la tabla de la Page.
  *
- * Diferencia con `PurchaseBookEntry`:
- *   - PurchaseBook es libro fiscal SAR (formato regulado): documento del
- *     proveedor con tipo 01/03/04, RTN obligatorio, anulación afecta totales.
- *   - ExpensesReport es reporte de gestión interno (no es libro SAR): los
- *     datos fiscales son OPCIONALES (gastos sin factura: taxi, propinas) y
- *     solo importan cuando is_isv_deductible = true.
+ * Desde "todo en Compras" (2026-09-28) los gastos vienen de dos fuentes:
+ *   - Compras tipo Gasto confirmadas (fromPurchase): con Factura (ISV como
+ *     crédito fiscal) o con Recibo Interno (sin CAI, sin ISV).
+ *   - Comisiones de tarjeta guardadas en las ventas (fromCardFee).
  *
- * El concepto crítico para el contador: si un gasto está marcado deducible
- * pero le faltan datos fiscales (RTN, # factura o CAI del proveedor), SAR
- * rechaza el crédito fiscal en una eventual auditoría. Por eso exponemos
- * `deducibleIncompleto` como bandera explícita — la Page la usa para
- * resaltar la fila y el Resumen la cuenta como alerta.
+ * Diferencia con `PurchaseBookEntry`: el Libro de Compras es el libro fiscal
+ * SAR (solo facturas); este es un reporte de gestión de todos los gastos.
+ *
+ * `deducibleIncompleto` marca facturas a las que les falta RTN del
+ * proveedor, número o CAI: SAR rechazaría ese crédito fiscal en una
+ * auditoría. La Page resalta la fila y el Resumen la cuenta como alerta.
  */
 final class ExpensesMonthlyReportEntry
 {
     public function __construct(
-        public readonly int $expenseId,
+        public readonly string $reference,       // # de compra o de venta (comisión)
         public readonly CarbonImmutable $expenseDate,
         public readonly string $categoryLabel,
         public readonly string $categoryValue,
@@ -55,59 +54,87 @@ final class ExpensesMonthlyReportEntry
     ) {}
 
     /**
-     * Construye una entrada a partir de un Expense.
+     * Entrada a partir de una compra tipo Gasto.
      *
-     * El Expense debe venir con relaciones `establishment:id,name` y
-     * `user:id,name` cargadas — el caller (Service) se encarga del eager load
-     * para evitar N+1.
+     * La compra debe venir con `establishment`, `supplier` y `createdBy`
+     * cargados — el Service hace el eager load para evitar N+1.
      */
-    public static function fromExpense(Expense $expense): self
+    public static function fromPurchase(Purchase $purchase): self
     {
-        $isv          = (float) ($expense->isv_amount ?? 0);
-        $total        = (float) $expense->amount_total;
-        $isDeductible = (bool) $expense->is_isv_deductible;
+        $isInvoice = $purchase->document_type?->separatesIsv() ?? false;
 
-        // Bandera de alerta: deducible sin alguno de los 3 datos que SAR exige
-        // como soporte del crédito fiscal. La validación del form ya lo
-        // bloquea para gastos NUEVOS, pero un gasto editado o creado antes de
-        // la validación puede aparecer así — el reporte tiene que detectarlo.
-        $incompleto = $isDeductible && (
-            blank($expense->provider_rtn)
-            || blank($expense->provider_invoice_number)
-            || blank($expense->provider_invoice_cai)
+        $incompleto = $isInvoice && (
+            blank($purchase->supplier?->rtn)
+            || blank($purchase->supplier_invoice_number)
+            || blank($purchase->supplier_cai)
         );
 
-        $category = $expense->category instanceof ExpenseCategory
-            ? $expense->category
-            : ExpenseCategory::from((string) $expense->category);
-
-        $payment = $expense->payment_method instanceof PaymentMethod
-            ? $expense->payment_method
-            : PaymentMethod::from((string) $expense->payment_method);
+        $category = $purchase->expense_category ?? ExpenseCategory::Otros;
+        $payment = $purchase->payment_method;
+        $date = CarbonImmutable::instance($purchase->date);
 
         return new self(
-            expenseId: $expense->id,
-            expenseDate: CarbonImmutable::instance($expense->expense_date),
+            reference: $purchase->purchase_number,
+            expenseDate: $date,
             categoryLabel: $category->getLabel(),
             categoryValue: $category->value,
-            description: $expense->description,
-            providerName: $expense->provider_name,
-            providerRtn: $expense->provider_rtn,
-            providerInvoiceNumber: $expense->provider_invoice_number,
-            providerInvoiceCai: $expense->provider_invoice_cai,
-            providerInvoiceDate: $expense->provider_invoice_date !== null
-                ? CarbonImmutable::instance($expense->provider_invoice_date)
-                : null,
-            amountBase: round($total - $isv, 2),
-            isvAmount: $isv,
-            amountTotal: $total,
-            isIsvDeductible: $isDeductible,
+            description: $purchase->description ?? $purchase->notes ?? '—',
+            providerName: $purchase->supplier?->name,
+            providerRtn: $purchase->supplier?->rtn,
+            providerInvoiceNumber: $purchase->supplier_invoice_number,
+            providerInvoiceCai: $purchase->supplier_cai,
+            providerInvoiceDate: $isInvoice ? $date : null,
+            amountBase: (float) $purchase->subtotal,
+            isvAmount: (float) $purchase->isv,
+            amountTotal: (float) $purchase->total,
+            isIsvDeductible: $isInvoice,
             deducibleIncompleto: $incompleto,
-            paymentMethodLabel: $payment->getLabel(),
-            paymentMethodValue: $payment->value,
-            affectsCash: $payment->affectsCashBalance(),
-            establishmentName: $expense->establishment?->name ?? '—',
-            userName: $expense->user?->name ?? '—',
+            paymentMethodLabel: $payment?->getLabel() ?? 'No registrado',
+            paymentMethodValue: $payment?->value ?? 'no_registrado',
+            affectsCash: $payment?->affectsCashBalance() ?? false,
+            establishmentName: $purchase->establishment?->name ?? '—',
+            userName: $purchase->createdBy?->name ?? '—',
+        );
+    }
+
+    /**
+     * Entrada a partir de la comisión de tarjeta de una venta. No es
+     * deducible ni sale de caja (la retiene el banco del depósito).
+     *
+     * La venta debe venir con `establishment` y `createdBy` cargados.
+     */
+    public static function fromCardFee(Sale $sale): self
+    {
+        $payment = $sale->payment_method instanceof PaymentMethod
+            ? $sale->payment_method
+            : PaymentMethod::tryFrom((string) $sale->payment_method);
+        $fee = (float) $sale->card_fee_amount;
+
+        return new self(
+            reference: $sale->sale_number ?? "#{$sale->id}",
+            expenseDate: CarbonImmutable::instance($sale->date),
+            categoryLabel: ExpenseCategory::ComisionesBancarias->getLabel(),
+            categoryValue: ExpenseCategory::ComisionesBancarias->value,
+            description: sprintf(
+                'Comisión por pago con %s en venta %s',
+                $payment?->getLabel() ?? 'tarjeta',
+                $sale->sale_number ?? "#{$sale->id}",
+            ),
+            providerName: null,
+            providerRtn: null,
+            providerInvoiceNumber: null,
+            providerInvoiceCai: null,
+            providerInvoiceDate: null,
+            amountBase: $fee,
+            isvAmount: 0.0,
+            amountTotal: $fee,
+            isIsvDeductible: false,
+            deducibleIncompleto: false,
+            paymentMethodLabel: $payment?->getLabel() ?? 'Tarjeta',
+            paymentMethodValue: $payment?->value ?? 'tarjeta',
+            affectsCash: false,
+            establishmentName: $sale->establishment?->name ?? '—',
+            userName: $sale->createdBy?->name ?? '—',
         );
     }
 
@@ -119,9 +146,9 @@ final class ExpensesMonthlyReportEntry
 
     /**
      * Etiqueta humana del estado fiscal — tres valores posibles:
-     *   - "No deducible"            → no genera crédito fiscal
-     *   - "Completo"                → deducible y datos en orden
-     *   - "Deducible incompleto"    → deducible pero le faltan RTN/factura/CAI
+     *   - "No deducible"            → Recibo Interno o comisión: sin crédito fiscal
+     *   - "Completo"                → factura con sus datos en orden
+     *   - "Deducible incompleto"    → factura a la que le falta RTN/número/CAI
      */
     public function fiscalStatusLabel(): string
     {

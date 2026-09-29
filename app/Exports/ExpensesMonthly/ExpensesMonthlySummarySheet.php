@@ -21,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
  *
  * KPIs y desgloses que el contador necesita ver al abrir el archivo:
  *   - Totales del período (count + monto)
- *   - Deducibles de ISV (`creditoFiscalDeducible` que va al Formulario 201)
+ *   - Deducibles de ISV (`creditoFiscalDeducible`, informativo: ya está en el Libro de Compras)
  *   - Alerta de deducibles incompletos (filas que SAR podría rechazar)
  *   - Impacto en caja (afecta vs no afecta saldo físico)
  *   - Desglose por categoría / método de pago / sucursal
@@ -41,16 +41,22 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
  *     hay alertas reales — se omite cuando count = 0 para no introducir
  *     ruido visual cuando todo está limpio.
  */
-class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEvents, WithColumnWidths, ShouldAutoSize
+class ExpensesMonthlySummarySheet implements FromCollection, ShouldAutoSize, WithColumnWidths, WithEvents, WithTitle
 {
     // Tipos de fila — gobiernan rendering Y estilo.
-    private const ROW_TITLE          = 'title';          // título principal, fondo oscuro, merge
+    private const ROW_TITLE = 'title';          // título principal, fondo oscuro, merge
+
     private const ROW_SECTION_HEADER = 'section_header'; // encabezado de sección, fondo medio, merge
-    private const ROW_KEY_VALUE      = 'key_value';      // concepto | valor (entero/string)
-    private const ROW_MONEY          = 'money';          // concepto | valor monetario (#,##0.00)
-    private const ROW_HIGHLIGHT      = 'highlight';      // fila destacada (crédito fiscal deducible)
-    private const ROW_ALERT          = 'alert';          // fila de alerta (deducibles incompletos)
-    private const ROW_SPACER         = 'spacer';         // fila vacía
+
+    private const ROW_KEY_VALUE = 'key_value';      // concepto | valor (entero/string)
+
+    private const ROW_MONEY = 'money';          // concepto | valor monetario (#,##0.00)
+
+    private const ROW_HIGHLIGHT = 'highlight';      // fila destacada (crédito fiscal deducible)
+
+    private const ROW_ALERT = 'alert';          // fila de alerta (deducibles incompletos)
+
+    private const ROW_SPACER = 'spacer';         // fila vacía
 
     /**
      * Layout declarativo. Única fuente de verdad para rendering + estilos.
@@ -80,8 +86,10 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
             ['type' => self::ROW_MONEY,          'label' => 'Monto total',         'value' => $s->gastosTotal],
             ['type' => self::ROW_SPACER,         'label' => '',                    'value' => ''],
 
-            // ── Deducibles de ISV (lo que importa para el F201) ──
-            ['type' => self::ROW_SECTION_HEADER, 'label' => 'DEDUCIBLES DE ISV (Formulario 201)', 'value' => ''],
+            // ── Deducibles de ISV ──
+            // Informativo: estas facturas ya están en el Libro de Compras (y de
+            // ahí en la Declaración ISV). No se suman otra vez al F201.
+            ['type' => self::ROW_SECTION_HEADER, 'label' => 'DEDUCIBLES DE ISV (ya incluidos en el Libro de Compras)', 'value' => ''],
             ['type' => self::ROW_KEY_VALUE,      'label' => 'Cantidad deducibles',          'value' => $s->deduciblesCount],
             ['type' => self::ROW_MONEY,          'label' => 'Total gastos deducibles',      'value' => $s->deduciblesTotal],
             ['type' => self::ROW_HIGHLIGHT,      'label' => 'Crédito fiscal deducible',     'value' => $s->creditoFiscalDeducible],
@@ -114,7 +122,7 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
             $this->layout[] = ['type' => self::ROW_SECTION_HEADER, 'label' => 'DESGLOSE POR CATEGORÍA', 'value' => ''];
             foreach ($s->byCategory as $bucket) {
                 $this->layout[] = [
-                    'type'  => self::ROW_MONEY,
+                    'type' => self::ROW_MONEY,
                     'label' => "{$bucket['label']} ({$bucket['count']})",
                     'value' => $bucket['total'],
                 ];
@@ -127,7 +135,7 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
             $this->layout[] = ['type' => self::ROW_SECTION_HEADER, 'label' => 'DESGLOSE POR MÉTODO DE PAGO', 'value' => ''];
             foreach ($s->byPaymentMethod as $bucket) {
                 $this->layout[] = [
-                    'type'  => self::ROW_MONEY,
+                    'type' => self::ROW_MONEY,
                     'label' => "{$bucket['label']} ({$bucket['count']})",
                     'value' => $bucket['total'],
                 ];
@@ -142,7 +150,7 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
             $this->layout[] = ['type' => self::ROW_SECTION_HEADER, 'label' => 'DESGLOSE POR SUCURSAL', 'value' => ''];
             foreach ($s->byEstablishment as $bucket) {
                 $this->layout[] = [
-                    'type'  => self::ROW_MONEY,
+                    'type' => self::ROW_MONEY,
                     'label' => "{$bucket['name']} ({$bucket['count']})",
                     'value' => $bucket['total'],
                 ];
@@ -157,7 +165,7 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
 
     public function title(): string
     {
-        return 'Resumen ' . $this->report->summary->periodSlug();
+        return 'Resumen '.$this->report->summary->periodSlug();
     }
 
     public function columnWidths(): array
@@ -178,13 +186,13 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
                     $excelRow = $index + 1; // Excel es 1-indexed
 
                     match ($row['type']) {
-                        self::ROW_TITLE          => $this->styleTitle($sheet, $excelRow),
+                        self::ROW_TITLE => $this->styleTitle($sheet, $excelRow),
                         self::ROW_SECTION_HEADER => $this->styleSectionHeader($sheet, $excelRow),
-                        self::ROW_MONEY          => $this->styleMoney($sheet, $excelRow),
-                        self::ROW_HIGHLIGHT      => $this->styleHighlight($sheet, $excelRow),
-                        self::ROW_ALERT          => $this->styleAlert($sheet, $excelRow),
+                        self::ROW_MONEY => $this->styleMoney($sheet, $excelRow),
+                        self::ROW_HIGHLIGHT => $this->styleHighlight($sheet, $excelRow),
+                        self::ROW_ALERT => $this->styleAlert($sheet, $excelRow),
                         self::ROW_KEY_VALUE,
-                        self::ROW_SPACER         => null,
+                        self::ROW_SPACER => null,
                     };
                 }
 
@@ -216,17 +224,17 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
         $sheet->mergeCells("A{$row}:B{$row}");
         $sheet->getStyle("A{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
-                'size'  => 14,
+                'bold' => true,
+                'size' => 14,
                 'color' => ['rgb' => 'FFFFFFFF'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FF1A1A1A'],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical'   => Alignment::VERTICAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
             ],
         ]);
         $sheet->getRowDimension($row)->setRowHeight(28);
@@ -237,17 +245,17 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
         $sheet->mergeCells("A{$row}:B{$row}");
         $sheet->getStyle("A{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
+                'bold' => true,
                 'color' => ['rgb' => 'FFFFFFFF'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FF424242'],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_LEFT,
-                'vertical'   => Alignment::VERTICAL_CENTER,
-                'indent'     => 1,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'indent' => 1,
             ],
         ]);
     }
@@ -268,11 +276,11 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
 
         $sheet->getStyle("A{$row}:B{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
+                'bold' => true,
                 'color' => ['rgb' => 'FF1B5E20'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FFE8F5E9'],
             ],
         ]);
@@ -285,11 +293,11 @@ class ExpensesMonthlySummarySheet implements FromCollection, WithTitle, WithEven
         // usa para "Deducible incompleto".
         $sheet->getStyle("A{$row}:B{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
+                'bold' => true,
                 'color' => ['rgb' => 'FFB71C1C'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FFFFF8E1'],
             ],
         ]);

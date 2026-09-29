@@ -6,42 +6,40 @@ namespace Database\Seeders\Demo;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Enums\PurchaseKind;
+use App\Enums\PurchaseStatus;
+use App\Enums\SupplierDocumentType;
 use App\Models\Establishment;
-use App\Models\Expense;
+use App\Models\Purchase;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Services\Purchases\InternalReceiptNumberGenerator;
+use App\Services\Purchases\PurchaseDocumentAmounts;
+use App\Services\Purchases\PurchaseService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Genera gastos contables NO-efectivo para el período histórico.
+ * Genera gastos NO-efectivo del período histórico como compras tipo Gasto.
  *
- * Los gastos en EFECTIVO se generan dentro de HistoricalOperationsSeeder
- * porque requieren caja abierta (ver ExpenseService::register). Este seeder
- * cubre los gastos que NO pasan por el cajón:
+ * Desde "todo en Compras" (2026-09-28) los gastos son compras con
+ * kind = gasto. Los gastos en EFECTIVO se generan en HistoricalOperationsSeeder
+ * (necesitan caja abierta); este seeder cubre los que no pasan por el cajón:
  *
- *   - Alquiler mensual del local — pago por transferencia, factura del
- *     propietario con CAI. Marzo y abril 2026.
- *   - Servicios básicos mensuales (luz, agua, internet) — pago por
- *     transferencia, factura del proveedor.
- *   - Mantenimiento extraordinario — ocasional, transferencia/cheque.
+ *   - Alquiler mensual del local — transferencia, factura con CAI.
+ *   - Servicios básicos (luz, agua, internet) — transferencia.
+ *   - Mantenimiento extraordinario — transferencia/cheque.
  *
- * Por qué NO usar ExpenseService:
- *   - ExpenseService requiere caja abierta SI payment_method = Efectivo.
- *     Los gastos de este seeder son siempre no-efectivo, así que el flow
- *     correcto es crear el Expense directamente — sin CashMovement asociado.
- *   - ExpenseService respeta esta misma regla: si el método no es efectivo,
- *     solo crea el Expense. La diferencia es que aquí salteamos el wrapper
- *     transaccional porque cada gasto es independiente.
+ * Documento: si el gasto trae factura con CAI y número SAR → Factura (entra al
+ * Libro de Compras con su ISV). Si no (p. ej. ENEE sin CAI, gastos sin
+ * factura) → Recibo Interno.
  *
- * Atribución: created_by = Carlos (admin) para alquiler/servicios; estos
- * los gestiona él, no Sofía.
+ * Atribución: created_by = Carlos (admin).
  *
- * Fechas:
- *   - Alquiler: 1 de cada mes (marzo y abril).
- *   - Servicios: alrededor del 5 (vencimiento típico de facturas de servicios HN).
- *   - Mantenimiento: ocurrencia esporádica.
- *
- * Idempotencia: usa firstOrCreate por (provider_invoice_number, expense_date).
+ * Idempotencia: omite un gasto si ya existe una compra tipo Gasto con la misma
+ * fecha y concepto.
  *
  * Pre-requisitos:
  *   - OperationalUsersSeeder (Carlos)
@@ -67,7 +65,7 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Inmobiliaria Reyes y Cía.',
                 'provider_rtn' => '08019988899900',
                 'provider_invoice_number' => '001-001-01-00033421',
-                'provider_invoice_cai' => 'CC1122-DD3344-EE5566-FF7788-AA9900-BB1122-001234',
+                'provider_invoice_cai' => 'CC1122-DD3344-EE5566-FF7788-AA9900-B1',
                 'provider_invoice_date' => '2026-03-01',
             ],
             [
@@ -81,7 +79,7 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Inmobiliaria Reyes y Cía.',
                 'provider_rtn' => '08019988899900',
                 'provider_invoice_number' => '001-001-01-00033587',
-                'provider_invoice_cai' => 'CC1122-DD3344-EE5566-FF7788-AA9900-BB1122-001234',
+                'provider_invoice_cai' => 'CC1122-DD3344-EE5566-FF7788-AA9900-B1',
                 'provider_invoice_date' => '2026-04-01',
             ],
 
@@ -157,7 +155,7 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Tigo Business Honduras',
                 'provider_rtn' => '08019966554400',
                 'provider_invoice_number' => '001-001-01-00876543',
-                'provider_invoice_cai' => 'AA9988-BB7766-CC5544-DD3322-EE1100-FF0011-002201',
+                'provider_invoice_cai' => 'AA9988-BB7766-CC5544-DD3322-EE1100-F1',
                 'provider_invoice_date' => '2026-03-15',
             ],
             [
@@ -171,7 +169,7 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Tigo Business Honduras',
                 'provider_rtn' => '08019966554400',
                 'provider_invoice_number' => '001-001-01-00879221',
-                'provider_invoice_cai' => 'AA9988-BB7766-CC5544-DD3322-EE1100-FF0011-002201',
+                'provider_invoice_cai' => 'AA9988-BB7766-CC5544-DD3322-EE1100-F1',
                 'provider_invoice_date' => '2026-04-15',
             ],
 
@@ -187,7 +185,7 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Climatec Servicios',
                 'provider_rtn' => '08019977711200',
                 'provider_invoice_number' => '001-001-01-00012876',
-                'provider_invoice_cai' => 'BB2233-CC4455-DD6677-EE8899-FF0011-AA1122-003344',
+                'provider_invoice_cai' => 'BB2233-CC4455-DD6677-EE8899-FF0011-A1',
                 'provider_invoice_date' => '2026-03-20',
             ],
             [
@@ -201,34 +199,89 @@ class HistoricalExpensesSeeder extends Seeder
                 'provider_name' => 'Cerrajería Don Jorge',
                 'provider_rtn' => '08019944422100',
                 'provider_invoice_number' => '001-001-01-00003121',
-                'provider_invoice_cai' => 'DD4455-EE6677-FF8899-AA0011-BB2233-CC4455-005566',
+                'provider_invoice_cai' => 'DD4455-EE6677-FF8899-AA0011-BB2233-C1',
                 'provider_invoice_date' => '2026-04-10',
             ],
         ];
 
+        Auth::login($carlos);
+
         $created = 0;
         foreach ($gastos as $data) {
-            $expense = Expense::firstOrCreate(
-                [
-                    'provider_invoice_number' => $data['provider_invoice_number'],
-                    'expense_date' => $data['expense_date'],
-                ],
-                array_merge($data, [
-                    'establishment_id' => $matriz->id,
-                    'user_id' => $carlos->id,
-                    'created_by' => $carlos->id,
-                ])
-            );
+            $exists = Purchase::query()
+                ->gastos()
+                ->whereDate('date', $data['expense_date'])
+                ->where('description', $data['description'])
+                ->exists();
 
-            if ($expense->wasRecentlyCreated) {
-                $created++;
+            if ($exists) {
+                continue;
             }
+
+            DB::transaction(function () use ($data, $matriz, $carlos) {
+                $purchase = Purchase::create([
+                    ...$this->documentFields($data),
+                    'establishment_id' => $matriz->id,
+                    'kind' => PurchaseKind::Gasto,
+                    'expense_category' => $data['category'],
+                    'description' => $data['description'],
+                    'payment_method' => $data['payment_method'],
+                    'date' => $data['provider_invoice_date'] ?? $data['expense_date'],
+                    'credit_days' => 0,
+                    'status' => PurchaseStatus::Borrador,
+                    'created_by' => $carlos->id,
+                ]);
+
+                app(PurchaseService::class)->confirm($purchase);
+            });
+
+            $created++;
         }
 
         $this->command?->info(sprintf(
-            'Gastos no-efectivo creados: %d nuevos (de %d totales)',
+            'Gastos no-efectivo creados en Compras: %d nuevos (de %d totales)',
             $created,
             count($gastos),
         ));
+    }
+
+    /**
+     * Documento y montos: Factura si trae CAI y número SAR, si no Recibo
+     * Interno. En la factura el gravado es lo que queda del total tras el ISV.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function documentFields(array $data): array
+    {
+        $total = (float) $data['amount_total'];
+        $isv = (float) ($data['isv_amount'] ?? 0);
+
+        $isInvoice = filled($data['provider_invoice_cai'] ?? null)
+            && preg_match('/^\d{3}-\d{3}-\d{2}-\d{8}$/', (string) ($data['provider_invoice_number'] ?? '')) === 1;
+
+        if ($isInvoice) {
+            $supplier = Supplier::firstOrCreate(
+                ['rtn' => $data['provider_rtn']],
+                ['name' => $data['provider_name'], 'is_active' => true, 'credit_days' => 0],
+            );
+
+            return [
+                'supplier_id' => $supplier->id,
+                'document_type' => SupplierDocumentType::Factura,
+                'supplier_invoice_number' => $data['provider_invoice_number'],
+                'supplier_cai' => $data['provider_invoice_cai'],
+                ...PurchaseDocumentAmounts::forDocument(SupplierDocumentType::Factura, $total - $isv, 0, $isv)->toAttributes(),
+            ];
+        }
+
+        return [
+            'supplier_id' => Supplier::forInternalReceipts()->id,
+            'document_type' => SupplierDocumentType::ReciboInterno,
+            'supplier_invoice_number' => app(InternalReceiptNumberGenerator::class)->next(Carbon::parse($data['expense_date'])),
+            'supplier_cai' => null,
+            'notes' => filled($data['provider_name'] ?? null) ? "Proveedor: {$data['provider_name']}" : null,
+            ...PurchaseDocumentAmounts::forDocument(SupplierDocumentType::ReciboInterno, 0, $total, 0)->toAttributes(),
+        ];
     }
 }

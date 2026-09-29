@@ -26,7 +26,8 @@ use Illuminate\Database\Eloquent\Builder;
  *   - CashSessionService::close()     → ClosingBalance
  *   - SaleService::process()          → SaleIncome
  *   - SaleService::cancel()           → SaleCancellation
- *   - RecordExpenseAction             → Expense
+ *   - PurchaseService::confirm()      → Expense / SupplierPayment (compra en efectivo)
+ *   - PurchaseService::cancel()       → PurchaseCancellation (devuelve ese efectivo)
  *
  * NO se exponen create/edit/delete actions ni en el header ni por row. Esto
  * es consistente con CashMovementPolicy que documenta que los permisos
@@ -109,14 +110,14 @@ class CashMovementsRelationManager extends RelationManager
                     })
                     ->formatStateUsing(function (CashMovement $record, $state): string {
                         $prefix = match (true) {
-                            $record->type->isOutflow()                     => '− ',
+                            $record->type->isOutflow() => '− ',
                             $record->type->isInflow()
                                 && $record->type !== CashMovementType::OpeningBalance
                                 && $record->type !== CashMovementType::ClosingBalance => '+ ',
-                            default                                        => '',
+                            default => '',
                         };
 
-                        return $prefix . 'L. ' . number_format((float) $state, 2);
+                        return $prefix.'L. '.number_format((float) $state, 2);
                     }),
 
                 TextColumn::make('user.name')

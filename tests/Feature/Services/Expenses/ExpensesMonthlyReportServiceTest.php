@@ -6,23 +6,30 @@ namespace Tests\Feature\Services\Expenses;
 
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Enums\PurchaseKind;
+use App\Enums\PurchaseStatus;
+use App\Enums\SupplierDocumentType;
 use App\Models\CompanySetting;
 use App\Models\Establishment;
-use App\Models\Expense;
-use App\Models\User;
+use App\Models\Purchase;
+use App\Models\Sale;
+use App\Models\Supplier;
 use App\Services\Expenses\ExpensesMonthlyReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
- * Cubre la construcción del DTO `ExpensesMonthlyReport`:
+ * Cubre la construcción del DTO `ExpensesMonthlyReport` desde "todo en
+ * Compras" (2026-09-28): los gastos son compras tipo Gasto confirmadas y las
+ * comisiones de tarjeta viven en las ventas.
  *
  *   - Período correcto: solo gastos del year+month solicitado.
- *   - Filtro por sucursal: aislamiento entre matrices.
- *   - Sumas globales: count + total bien acumulados.
- *   - Crédito fiscal: solo deducibles, suma de isv_amount.
- *   - Deducibles incompletos: deducible sin RTN/factura/CAI cuenta como alerta.
+ *   - Solo compras tipo Gasto CONFIRMADAS (no mercadería, borradores ni anuladas).
+ *   - Filtro por sucursal: aislamiento entre sucursales.
+ *   - Crédito fiscal: solo facturas, suma de su ISV. Recibo Interno no deduce.
+ *   - Facturas incompletas: sin RTN del proveedor o sin CAI cuentan como alerta.
+ *   - Comisiones de tarjeta: entran como Comisiones bancarias, sin caja ni ISV.
  *   - Buckets: byCategory / byPaymentMethod / byEstablishment ordenados por total desc.
  *   - Impacto en caja: cashCount/cashTotal solo para Efectivo.
  */
@@ -35,8 +42,6 @@ class ExpensesMonthlyReportServiceTest extends TestCase
     private CompanySetting $company;
 
     private Establishment $matriz;
-
-    private User $user;
 
     protected function setUp(): void
     {
@@ -53,43 +58,87 @@ class ExpensesMonthlyReportServiceTest extends TestCase
             ->main()
             ->create(['name' => 'Matriz Tegucigalpa']);
 
-        $this->user = User::factory()->create();
         $this->service = app(ExpensesMonthlyReportService::class);
     }
 
-    private function makeExpense(array $overrides = []): Expense
+    /**
+     * Gasto con Recibo Interno (sin ISV) — el caso más común de caja chica.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeGasto(float $total = 100.00, array $overrides = []): Purchase
     {
-        return Expense::factory()
-            ->for($this->matriz, 'establishment')
-            ->for($this->user, 'user')
+        return Purchase::factory()
+            ->forEstablishment($this->matriz)
             ->create(array_merge([
-                'expense_date'      => '2026-04-15',
-                'category'          => ExpenseCategory::Otros->value,
-                'payment_method'    => PaymentMethod::Efectivo->value,
-                'amount_total'      => 100.00,
-                'isv_amount'        => null,
-                'is_isv_deductible' => false,
-                'description'       => 'Test',
+                'kind' => PurchaseKind::Gasto,
+                'status' => PurchaseStatus::Confirmada,
+                'expense_category' => ExpenseCategory::Otros,
+                'description' => 'Test',
+                'payment_method' => PaymentMethod::Efectivo,
+                'date' => '2026-04-15',
+                'document_type' => SupplierDocumentType::ReciboInterno,
+                'supplier_cai' => null,
+                'subtotal' => $total,
+                'taxable_total' => 0,
+                'exempt_total' => $total,
+                'isv' => 0,
+                'total' => $total,
             ], $overrides));
     }
 
-    // ─── Período: solo gastos del mes solicitado ──────────────
+    /**
+     * Gasto con Factura: el ISV cuenta como crédito fiscal.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeGastoConFactura(float $taxable, array $overrides = []): Purchase
+    {
+        return Purchase::factory()
+            ->forEstablishment($this->matriz)
+            ->withTotals($taxable)
+            ->create(array_merge([
+                'kind' => PurchaseKind::Gasto,
+                'status' => PurchaseStatus::Confirmada,
+                'expense_category' => ExpenseCategory::Servicios,
+                'description' => 'Factura test',
+                'payment_method' => PaymentMethod::Transferencia,
+                'date' => '2026-04-15',
+                'document_type' => SupplierDocumentType::Factura,
+            ], $overrides));
+    }
+
+    // ─── Período y fuentes ────────────────────────────────────
 
     public function test_build_solo_incluye_gastos_del_periodo_solicitado(): void
     {
         // Abril 2026 — debe incluirse.
-        $this->makeExpense(['expense_date' => '2026-04-10', 'amount_total' => 200.00]);
-        $this->makeExpense(['expense_date' => '2026-04-30', 'amount_total' => 300.00]);
+        $this->makeGasto(200.00, ['date' => '2026-04-01']);
+        $this->makeGasto(300.00, ['date' => '2026-04-30']);
 
         // Marzo 2026 y Mayo 2026 — deben excluirse.
-        $this->makeExpense(['expense_date' => '2026-03-31', 'amount_total' => 999.00]);
-        $this->makeExpense(['expense_date' => '2026-05-01', 'amount_total' => 999.00]);
+        $this->makeGasto(999.00, ['date' => '2026-03-31']);
+        $this->makeGasto(999.00, ['date' => '2026-05-01']);
 
         $report = $this->service->build(year: 2026, month: 4);
 
         $this->assertSame(2, $report->summary->gastosCount);
         $this->assertSame(500.00, $report->summary->gastosTotal);
         $this->assertCount(2, $report->entries);
+    }
+
+    public function test_build_ignora_mercaderia_borradores_y_anuladas(): void
+    {
+        $this->makeGasto(100.00);
+
+        $this->makeGasto(999.00, ['kind' => PurchaseKind::Mercaderia, 'expense_category' => null]);
+        $this->makeGasto(999.00, ['status' => PurchaseStatus::Borrador]);
+        $this->makeGasto(999.00, ['status' => PurchaseStatus::Anulada]);
+
+        $report = $this->service->build(year: 2026, month: 4);
+
+        $this->assertSame(1, $report->summary->gastosCount);
+        $this->assertSame(100.00, $report->summary->gastosTotal);
     }
 
     // ─── Filtro por sucursal ──────────────────────────────────
@@ -100,23 +149,9 @@ class ExpensesMonthlyReportServiceTest extends TestCase
             ->for($this->company, 'companySetting')
             ->create(['is_main' => false, 'name' => 'Sucursal Catacamas']);
 
-        // Matriz: 2 gastos.
-        $this->makeExpense(['amount_total' => 100.00]);
-        $this->makeExpense(['amount_total' => 200.00]);
-
-        // Sucursal B: 1 gasto.
-        Expense::factory()
-            ->for($sucursalB, 'establishment')
-            ->for($this->user, 'user')
-            ->create([
-                'expense_date'      => '2026-04-15',
-                'category'          => ExpenseCategory::Otros->value,
-                'payment_method'    => PaymentMethod::Efectivo->value,
-                'amount_total'      => 999.00,
-                'isv_amount'        => null,
-                'is_isv_deductible' => false,
-                'description'       => 'Sucursal B',
-            ]);
+        $this->makeGasto(100.00);
+        $this->makeGasto(200.00);
+        $this->makeGasto(999.00, ['establishment_id' => $sucursalB->id]);
 
         $reportMatriz = $this->service->build(year: 2026, month: 4, establishmentId: $this->matriz->id);
 
@@ -128,36 +163,16 @@ class ExpensesMonthlyReportServiceTest extends TestCase
         $this->assertSame(1299.00, $reportTodas->summary->gastosTotal);
     }
 
-    // ─── Crédito fiscal: solo deducibles ──────────────────────
+    // ─── Crédito fiscal: solo facturas ────────────────────────
 
-    public function test_credito_fiscal_solo_suma_isv_de_gastos_deducibles(): void
+    public function test_credito_fiscal_solo_suma_isv_de_facturas(): void
     {
-        // Deducible con ISV 15.00
-        $this->makeExpense([
-            'amount_total'      => 115.00,
-            'isv_amount'        => 15.00,
-            'is_isv_deductible' => true,
-            'provider_rtn'      => '08019999999999',
-            'provider_invoice_number' => '000-001-01-00000001',
-            'provider_invoice_cai'    => 'AAAAAA-AAAAAA-AAAAAA-AAAAAA-AAAAAA-99',
-        ]);
-
-        // Deducible con ISV 30.00
-        $this->makeExpense([
-            'amount_total'      => 230.00,
-            'isv_amount'        => 30.00,
-            'is_isv_deductible' => true,
-            'provider_rtn'      => '08019999999998',
-            'provider_invoice_number' => '000-001-01-00000002',
-            'provider_invoice_cai'    => 'BBBBBB-BBBBBB-BBBBBB-BBBBBB-BBBBBB-99',
-        ]);
-
-        // No deducible con ISV (no debe sumar al crédito fiscal).
-        $this->makeExpense([
-            'amount_total'      => 115.00,
-            'isv_amount'        => 15.00,
-            'is_isv_deductible' => false,
-        ]);
+        // Factura gravada 100 → ISV 15, total 115.
+        $this->makeGastoConFactura(100.00);
+        // Factura gravada 200 → ISV 30, total 230.
+        $this->makeGastoConFactura(200.00);
+        // Recibo Interno: no deduce aunque el monto sea igual.
+        $this->makeGasto(115.00);
 
         $report = $this->service->build(year: 2026, month: 4);
 
@@ -168,39 +183,17 @@ class ExpensesMonthlyReportServiceTest extends TestCase
         $this->assertSame(115.00, $report->summary->noDeduciblesTotal);
     }
 
-    // ─── Deducibles incompletos: alerta ───────────────────────
-
-    public function test_deducibles_sin_rtn_factura_o_cai_se_cuentan_como_incompletos(): void
+    public function test_facturas_sin_rtn_o_cai_se_cuentan_como_incompletas(): void
     {
-        // Deducible completo (3 datos presentes).
-        $this->makeExpense([
-            'amount_total'      => 100.00,
-            'isv_amount'        => 13.04,
-            'is_isv_deductible' => true,
-            'provider_rtn'      => '08010000000001',
-            'provider_invoice_number' => '000-001-01-11111111',
-            'provider_invoice_cai'    => 'CCCCCC-CCCCCC-CCCCCC-CCCCCC-CCCCCC-99',
-        ]);
+        // Completa.
+        $this->makeGastoConFactura(100.00);
 
-        // Deducible sin RTN.
-        $this->makeExpense([
-            'amount_total'      => 100.00,
-            'isv_amount'        => 13.04,
-            'is_isv_deductible' => true,
-            'provider_rtn'      => null,
-            'provider_invoice_number' => '000-001-01-22222222',
-            'provider_invoice_cai'    => 'DDDDDD-DDDDDD-DDDDDD-DDDDDD-DDDDDD-99',
-        ]);
+        // Proveedor sin RTN.
+        $sinRtn = Supplier::factory()->create(['rtn' => null]);
+        $this->makeGastoConFactura(100.00, ['supplier_id' => $sinRtn->id]);
 
-        // Deducible sin invoice_number.
-        $this->makeExpense([
-            'amount_total'      => 100.00,
-            'isv_amount'        => 13.04,
-            'is_isv_deductible' => true,
-            'provider_rtn'      => '08010000000003',
-            'provider_invoice_number' => null,
-            'provider_invoice_cai'    => 'EEEEEE-EEEEEE-EEEEEE-EEEEEE-EEEEEE-99',
-        ]);
+        // Sin CAI.
+        $this->makeGastoConFactura(100.00, ['supplier_cai' => null]);
 
         $report = $this->service->build(year: 2026, month: 4);
 
@@ -209,19 +202,49 @@ class ExpensesMonthlyReportServiceTest extends TestCase
         $this->assertTrue($report->summary->hasIncompleteWarnings());
     }
 
+    // ─── Comisiones de tarjeta ────────────────────────────────
+
+    public function test_comisiones_de_tarjeta_de_las_ventas_entran_como_gasto_bancario(): void
+    {
+        $sale = Sale::factory()->forEstablishment($this->matriz)->completada()->create([
+            'date' => '2026-04-20',
+            'payment_method' => PaymentMethod::TarjetaCredito,
+            'total' => 1000.00,
+            'card_fee_amount' => 34.00,
+        ]);
+
+        // Venta sin comisión y comisión de otro mes: no entran.
+        Sale::factory()->forEstablishment($this->matriz)->completada()->create(['date' => '2026-04-20']);
+        Sale::factory()->forEstablishment($this->matriz)->completada()->create([
+            'date' => '2026-05-02',
+            'card_fee_amount' => 50.00,
+        ]);
+
+        $report = $this->service->build(year: 2026, month: 4);
+
+        $this->assertSame(1, $report->summary->gastosCount);
+        $this->assertSame(34.00, $report->summary->gastosTotal);
+        $this->assertSame(0.0, $report->summary->creditoFiscalDeducible);
+        $this->assertSame(0, $report->summary->cashCount);
+
+        $entry = $report->entries->first();
+        $this->assertSame(ExpenseCategory::ComisionesBancarias->value, $entry->categoryValue);
+        $this->assertSame($sale->sale_number, $entry->reference);
+        $this->assertFalse($entry->isIsvDeductible);
+    }
+
     // ─── Buckets ──────────────────────────────────────────────
 
     public function test_buckets_agrupan_por_categoria_metodo_pago_y_sucursal(): void
     {
-        // Combustible × 2: 100 + 200 = 300
-        $this->makeExpense(['amount_total' => 100.00, 'category' => ExpenseCategory::Combustible->value]);
-        $this->makeExpense(['amount_total' => 200.00, 'category' => ExpenseCategory::Combustible->value]);
+        // Combustible × 2: 100 + 200 = 300 (efectivo)
+        $this->makeGasto(100.00, ['expense_category' => ExpenseCategory::Combustible]);
+        $this->makeGasto(200.00, ['expense_category' => ExpenseCategory::Combustible]);
 
-        // Servicios × 1: 1000
-        $this->makeExpense([
-            'amount_total'   => 1000.00,
-            'category'       => ExpenseCategory::Servicios->value,
-            'payment_method' => PaymentMethod::Transferencia->value,
+        // Servicios × 1: 1000 (transferencia)
+        $this->makeGasto(1000.00, [
+            'expense_category' => ExpenseCategory::Servicios,
+            'payment_method' => PaymentMethod::Transferencia,
         ]);
 
         $report = $this->service->build(year: 2026, month: 4);
@@ -234,11 +257,9 @@ class ExpensesMonthlyReportServiceTest extends TestCase
         $this->assertSame(300.00, $report->summary->byCategory[ExpenseCategory::Combustible->value]['total']);
         $this->assertSame(2, $report->summary->byCategory[ExpenseCategory::Combustible->value]['count']);
 
-        // byPaymentMethod: efectivo (300) y transferencia (1000).
         $this->assertSame(1000.00, $report->summary->byPaymentMethod[PaymentMethod::Transferencia->value]['total']);
         $this->assertSame(300.00, $report->summary->byPaymentMethod[PaymentMethod::Efectivo->value]['total']);
 
-        // byEstablishment: una sola sucursal.
         $this->assertCount(1, $report->summary->byEstablishment);
         $this->assertSame(1300.00, $report->summary->byEstablishment['Matriz Tegucigalpa']['total']);
     }
@@ -247,14 +268,13 @@ class ExpensesMonthlyReportServiceTest extends TestCase
 
     public function test_cashtotal_solo_acumula_gastos_en_efectivo(): void
     {
-        // Efectivo × 2: 100 + 50 = 150
-        $this->makeExpense(['amount_total' => 100.00, 'payment_method' => PaymentMethod::Efectivo->value]);
-        $this->makeExpense(['amount_total' => 50.00, 'payment_method' => PaymentMethod::Efectivo->value]);
+        $this->makeGasto(100.00, ['payment_method' => PaymentMethod::Efectivo]);
+        $this->makeGasto(50.00, ['payment_method' => PaymentMethod::Efectivo]);
 
         // Tarjeta + transferencia + cheque (NO afectan caja)
-        $this->makeExpense(['amount_total' => 200.00, 'payment_method' => PaymentMethod::TarjetaCredito->value]);
-        $this->makeExpense(['amount_total' => 300.00, 'payment_method' => PaymentMethod::Transferencia->value]);
-        $this->makeExpense(['amount_total' => 400.00, 'payment_method' => PaymentMethod::Cheque->value]);
+        $this->makeGasto(200.00, ['payment_method' => PaymentMethod::TarjetaCredito]);
+        $this->makeGasto(300.00, ['payment_method' => PaymentMethod::Transferencia]);
+        $this->makeGasto(400.00, ['payment_method' => PaymentMethod::Cheque]);
 
         $report = $this->service->build(year: 2026, month: 4);
 

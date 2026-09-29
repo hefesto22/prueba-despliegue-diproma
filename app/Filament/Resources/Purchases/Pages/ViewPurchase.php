@@ -14,6 +14,8 @@ use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 
 class ViewPurchase extends ViewRecord
@@ -38,9 +40,8 @@ class ViewPurchase extends ViewRecord
                     ? 'Sí, descartar borrador'
                     : 'Sí, anular compra')
                 ->modalCancelActionLabel('Volver')
-                // Una compra generada desde un gasto se anula desmarcando la
-                // factura en el gasto (ExpenseFiscalDocumentSync), no aquí.
-                ->visible(fn (Purchase $record) => $record->status->canCancel() && ! $record->isFromExpense())
+                ->visible(fn (Purchase $record) => $record->status->canCancel())
+                ->authorize(fn (Purchase $record): Response => Gate::inspect(self::cancelAbility($record), $record))
                 ->action(function (Purchase $record, PurchaseService $purchases) {
                     // Se evalúa ANTES de anular: después el estado ya es Anulada.
                     $revertsStock = $record->status === PurchaseStatus::Confirmada
@@ -81,6 +82,18 @@ class ViewPurchase extends ViewRecord
     }
 
     /**
+     * Permiso que exige "Anular" según el estado de la compra:
+     *   - Borrador: descartarlo equivale a corregirlo → Update (el cajero
+     *     puede descartar el gasto que capturó mal).
+     *   - Confirmada: sale del Libro de Compras y puede devolver efectivo a la
+     *     caja → Delete (admin), igual que eliminar.
+     */
+    private static function cancelAbility(Purchase $record): string
+    {
+        return $record->status === PurchaseStatus::Borrador ? 'update' : 'delete';
+    }
+
+    /**
      * Texto del modal de anulación según el estado y el tipo de compra:
      *   - Borrador: descartarlo no tiene consecuencias.
      *   - Confirmada: sale del Libro de Compras.
@@ -105,7 +118,9 @@ class ViewPurchase extends ViewRecord
             .'<p>Anular una compra confirmada es para casos excepcionales (documento registrado por error o duplicado):</p>'
             .'<ul class="list-disc list-inside space-y-1">'
             .'<li>La compra <strong>sale del Libro de Compras</strong> y su ISV deja de contar como crédito fiscal.</li>'
-            .'<li>Si era de contado sigue marcada <strong>Pagada</strong>: el dinero ya se entregó.</li>'
+            .($record->isPaidFromCash()
+                ? '<li>Se pagó en <strong>efectivo</strong>: los <strong>L '.number_format((float) $record->total, 2).'</strong> vuelven a la caja abierta de la sucursal (hace falta una caja abierta para anular).</li>'
+                : '<li>Si era de contado sigue marcada <strong>Pagada</strong>: el dinero ya se entregó.</li>')
             .$legacyStock
             .'</ul>'
             .'<p class="text-xs italic text-gray-500 dark:text-gray-400">Si el período fiscal ya fue declarado, el sistema no permitirá anularla sin reabrirlo.</p>'

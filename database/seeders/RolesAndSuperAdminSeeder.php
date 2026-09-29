@@ -57,9 +57,13 @@ class RolesAndSuperAdminSeeder extends Seeder
      * estos roles debe leer de aquí, no hardcodear strings.
      */
     public const ROLE_SUPER_ADMIN = 'super_admin';
+
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_CONTADOR = 'contador';
+
     public const ROLE_CAJERO = 'cajero';
+
     public const ROLE_TECNICO = 'tecnico';
 
     /**
@@ -80,7 +84,9 @@ class RolesAndSuperAdminSeeder extends Seeder
      * del sistema en el futuro.
      */
     public const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
+
     private const SUPER_ADMIN_NAME = 'Administrador Diproma';
+
     private const SUPER_ADMIN_DEFAULT_PASSWORD = '12345678';
 
     /**
@@ -88,9 +94,13 @@ class RolesAndSuperAdminSeeder extends Seeder
      * Centralizadas para que un cambio de naming sea una sola edición.
      */
     private const ACTION_VIEW = 'View';
+
     private const ACTION_VIEW_ANY = 'ViewAny';
+
     private const ACTION_CREATE = 'Create';
+
     private const ACTION_UPDATE = 'Update';
+
     private const ACTION_DELETE = 'Delete';
 
     /**
@@ -99,6 +109,7 @@ class RolesAndSuperAdminSeeder extends Seeder
      * las acciones sobre el resource Role del propio Shield).
      */
     private const SUFFIX_ROLE = ':Role';
+
     private const SUFFIX_PERMISSION = ':Permission';
 
     public function run(): void
@@ -329,15 +340,6 @@ class RolesAndSuperAdminSeeder extends Seeder
             ]),
         );
 
-        // Gastos: revisar deducibilidad antes de cerrar período.
-        $deseados = array_merge(
-            $deseados,
-            $this->buildResourcePermissions('Expense', [
-                self::ACTION_VIEW_ANY,
-                self::ACTION_VIEW,
-            ]),
-        );
-
         // CAIs: validar vigencia y rangos disponibles.
         $deseados = array_merge(
             $deseados,
@@ -523,13 +525,17 @@ class RolesAndSuperAdminSeeder extends Seeder
             ]),
         );
 
-        // Gastos pequeños del día.
+        // Compras: desde "todo en Compras" (2026-09-28) los gastos del día
+        // (taxi, gasolina, papelería) se registran aquí como compra tipo
+        // Gasto pagada en efectivo. Update para corregir su borrador antes de
+        // confirmarlo; sin Delete (anular es la vía, con su rastro en caja).
         $deseados = array_merge(
             $deseados,
-            $this->buildResourcePermissions('Expense', [
+            $this->buildResourcePermissions('Purchase', [
                 self::ACTION_VIEW_ANY,
                 self::ACTION_VIEW,
                 self::ACTION_CREATE,
+                self::ACTION_UPDATE,
             ]),
         );
 

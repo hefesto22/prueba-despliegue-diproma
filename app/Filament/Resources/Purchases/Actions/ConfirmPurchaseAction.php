@@ -22,6 +22,10 @@ use Illuminate\Support\HtmlString;
  *
  * `$record` lo inyecta Filament: en páginas de registro las acciones de
  * encabezado reciben el registro de la página (InteractsWithRecord).
+ *
+ * Autorización: requiere Update:Purchase. El cajero lo tiene porque confirma
+ * sus gastos del día (es lo que saca el efectivo del cajón); el contador, que
+ * solo audita, no. Sin permiso la acción se oculta.
  */
 final class ConfirmPurchaseAction
 {
@@ -37,6 +41,7 @@ final class ConfirmPurchaseAction
             ->modalSubmitActionLabel('Sí, confirmar compra')
             ->modalCancelActionLabel('Volver al borrador')
             ->visible(fn (Purchase $record): bool => $record->status->canConfirm())
+            ->authorize('update')
             ->action(function (Purchase $record, PurchaseService $purchases, Action $action): void {
                 try {
                     $purchases->confirm($record);
@@ -66,10 +71,15 @@ final class ConfirmPurchaseAction
             ? '<li>Es un <strong>Recibo Interno</strong>: queda como control interno y <strong>no entra al Libro de Compras SAR</strong>.</li>'
             : '<li>El documento <strong>entra al Libro de Compras SAR</strong> del mes y su ISV cuenta como crédito fiscal.</li>';
 
+        $cashLine = $record->isPaidFromCash()
+            ? '<li>Se paga en <strong>efectivo</strong>: salen <strong>L '.number_format((float) $record->total, 2).'</strong> de la caja abierta de la sucursal (si no hay caja abierta, no se puede confirmar).</li>'
+            : '';
+
         return '<div class="space-y-3 text-sm">'
             .'<p>Al confirmar, esta compra deja de ser un borrador editable:</p>'
             .'<ul class="list-disc list-inside space-y-1">'
             .$bookLine
+            .$cashLine
             .'<li>Si es de contado, queda <strong>marcada como Pagada</strong>.</li>'
             .'<li>El inventario <strong>no cambia</strong>: los equipos se ingresan desde Productos.</li>'
             .'</ul>'

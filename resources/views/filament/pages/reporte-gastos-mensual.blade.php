@@ -10,12 +10,12 @@
 
             <div class="prose dark:prose-invert max-w-none text-sm leading-relaxed">
                 <p>
-                    Este reporte muestra los gastos del período y los KPIs que el contador necesita
-                    para el pago mensual de ISV (Formulario 201, día 10 de cada mes).
+                    Este reporte reúne los gastos del período: las compras registradas como
+                    <strong>Gasto operativo</strong> y las comisiones de tarjeta de las ventas.
                 </p>
                 <ul class="list-disc pl-6 space-y-1">
-                    <li><strong>Crédito fiscal deducible:</strong> el monto que el contador suma al F201 como ISV pagado en compras y gastos.</li>
-                    <li><strong>Deducibles incompletos:</strong> gastos marcados deducibles que no tienen RTN, # factura o CAI completos. SAR puede rechazar el crédito fiscal de estas filas en una auditoría.</li>
+                    <li><strong>Crédito fiscal deducible:</strong> ISV de los gastos con factura. <strong>Ya está incluido en el Libro de Compras</strong> (y en la Declaración ISV): es informativo, no se suma otra vez al F201.</li>
+                    <li><strong>Deducibles incompletos:</strong> facturas de gasto sin RTN del proveedor, # factura o CAI completos. SAR puede rechazar el crédito fiscal de estas filas en una auditoría.</li>
                     <li><strong>Impacto en caja:</strong> separa gastos pagados en efectivo (afectan saldo físico de cajas) de los pagados con tarjeta / transferencia / cheque.</li>
                     <li><strong>Sucursal opcional:</strong> vacío = company-wide. Útil filtrar para conciliar gastos por punto de venta.</li>
                 </ul>
@@ -44,7 +44,7 @@
                             {{ $s->deduciblesIncompletosCount }} {{ $s->deduciblesIncompletosCount === 1 ? 'gasto deducible incompleto' : 'gastos deducibles incompletos' }}
                         </p>
                         <p class="text-amber-800 dark:text-amber-200 mt-1">
-                            Hay gastos marcados deducibles sin RTN, # de factura o CAI completos. Antes de declarar al SAR, edite cada uno y complete los datos del proveedor — de lo contrario, el crédito fiscal de esas filas puede ser rechazado en auditoría.
+                            Hay facturas de gasto sin RTN del proveedor, # de factura o CAI completos. Antes de declarar al SAR, complete el RTN en Proveedores o corrija la compra — de lo contrario, el crédito fiscal de esas filas puede ser rechazado en auditoría.
                         </p>
                         <p class="text-amber-700 dark:text-amber-300 text-xs mt-2">
                             Las filas afectadas aparecen resaltadas en la hoja "Detalle" del Excel.
@@ -73,7 +73,7 @@
                         L. {{ number_format($s->creditoFiscalDeducible, 2) }}
                     </p>
                     <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-                        Va al F201 como ISV de compras
+                        Ya incluido en el Libro de Compras
                     </p>
                 </div>
 

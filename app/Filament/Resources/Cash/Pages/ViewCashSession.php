@@ -5,12 +5,10 @@ namespace App\Filament\Resources\Cash\Pages;
 use App\Filament\Resources\Cash\Actions\CloseCashSessionAction;
 use App\Filament\Resources\Cash\Actions\PrintCashSessionAction;
 use App\Filament\Resources\Cash\Actions\ReconcileCashSessionAction;
-use App\Filament\Resources\Cash\Actions\RecordExpenseAction;
 use App\Filament\Resources\Cash\CashSessionResource;
 use App\Models\CashSession;
 use App\Services\Cash\CashBalanceCalculator;
 use App\Services\Cash\CashSessionService;
-use App\Services\Expenses\ExpenseService;
 use Filament\Resources\Pages\ViewRecord;
 
 /**
@@ -36,16 +34,12 @@ class ViewCashSession extends ViewRecord
 
     protected CashSessionService $cashSessions;
 
-    protected ExpenseService $expenses;
-
     public function boot(
         CashBalanceCalculator $balanceCalculator,
         CashSessionService $cashSessions,
-        ExpenseService $expenses,
     ): void {
         $this->balanceCalculator = $balanceCalculator;
         $this->cashSessions = $cashSessions;
-        $this->expenses = $expenses;
     }
 
     /**
@@ -101,7 +95,6 @@ class ViewCashSession extends ViewRecord
             PrintCashSessionAction::make(),
             CloseCashSessionAction::make($openSessionResolver, $this->balanceCalculator, $this->cashSessions),
             ReconcileCashSessionAction::make($reconcileResolver, $this->cashSessions),
-            RecordExpenseAction::make($openSessionResolver, $this->expenses),
         ];
     }
 }

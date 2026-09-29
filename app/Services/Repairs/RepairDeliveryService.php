@@ -84,9 +84,9 @@ class RepairDeliveryService
      *      delivered_at, customer_rtn (si se editó).
      *   6. Registra evento `StatusChange` en repair_status_logs.
      *
-     * @throws RepairTransitionException                 Si el estado no permite entrega.
-     * @throws RepairDeliveryException                   Si el repair no tiene items.
-     * @throws InsufficientStockOnDeliveryException      Si una pieza interna ya no tiene stock.
+     * @throws RepairTransitionException Si el estado no permite entrega.
+     * @throws RepairDeliveryException Si el repair no tiene items.
+     * @throws InsufficientStockOnDeliveryException Si una pieza interna ya no tiene stock.
      * @throws \App\Exceptions\Cash\NoHayCajaAbiertaException Si requiere caja y no hay.
      */
     public function deliver(
@@ -268,8 +268,8 @@ class RepairDeliveryService
                 );
             }
 
-            // 7. Si el saldo se cobró con tarjeta, registrar Expense
-            //    automático por la comisión bancaria del procesador.
+            // 7. Si el saldo se cobró con tarjeta, guardar en la venta la
+            //    comisión bancaria del procesador.
             //    Importante: la comisión se calcula sobre el `outstanding`
             //    (lo que efectivamente pasó por el POS bancario), NO sobre
             //    el total de la venta. El anticipo se cobró en efectivo

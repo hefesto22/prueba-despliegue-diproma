@@ -17,7 +17,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Sale extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'sale_number',
@@ -34,6 +34,7 @@ class Sale extends Model
         'subtotal',
         'isv',
         'total',
+        'card_fee_amount',
         'notes',
         'created_by',
         'updated_by',
@@ -52,6 +53,7 @@ class Sale extends Model
             'subtotal' => 'decimal:2',
             'isv' => 'decimal:2',
             'total' => 'decimal:2',
+            'card_fee_amount' => 'decimal:2',
         ];
     }
 
@@ -89,7 +91,7 @@ class Sale extends Model
             $sequence = 1;
         }
 
-        return $prefix . str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
     }
 
     // ─── Activity Log ────────────────────────────────────────

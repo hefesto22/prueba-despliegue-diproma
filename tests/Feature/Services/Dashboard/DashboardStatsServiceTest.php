@@ -2,13 +2,17 @@
 
 namespace Tests\Feature\Services\Dashboard;
 
+use App\Enums\ExpenseCategory;
 use App\Enums\MovementType;
+use App\Enums\PurchaseKind;
+use App\Enums\PurchaseStatus;
 use App\Enums\SaleStatus;
+use App\Enums\SupplierDocumentType;
 use App\Enums\TaxType;
 use App\Models\Category;
-use App\Models\Expense;
 use App\Models\InventoryMovement;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Services\Dashboard\DashboardStatsService;
@@ -88,12 +92,7 @@ class DashboardStatsServiceTest extends TestCase
         // Ganancia bruta: 1000 base − 600 costo = 400
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
-        // Gasto del mes: L 100
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => Carbon::now()->toDateString(),
-            'amount_total' => 100.00,
-        ]);
+        $this->createGastoThisMonth(total: 100.00);
 
         $result = $this->service->netProfitThisMonth();
 
@@ -111,11 +110,7 @@ class DashboardStatsServiceTest extends TestCase
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
         // Gastos del mes: L 700 (mayor que la ganancia bruta de 400)
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => Carbon::now()->toDateString(),
-            'amount_total' => 700.00,
-        ]);
+        $this->createGastoThisMonth(total: 700.00);
 
         $result = $this->service->netProfitThisMonth();
 
@@ -130,19 +125,12 @@ class DashboardStatsServiceTest extends TestCase
         // Ganancia bruta del mes actual: 400
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
-        // Gasto registrado el mes pasado — NO debe restar a este mes.
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => Carbon::now()->subMonthNoOverflow()->toDateString(),
-            'amount_total' => 999.00,
+        // Gasto con fecha del mes pasado — NO debe restar a este mes.
+        $this->createGastoThisMonth(total: 999.00, overrides: [
+            'date' => Carbon::now()->subMonthNoOverflow()->toDateString(),
         ]);
 
-        // Gasto del mes actual: L 50
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => Carbon::now()->toDateString(),
-            'amount_total' => 50.00,
-        ]);
+        $this->createGastoThisMonth(total: 50.00);
 
         $result = $this->service->netProfitThisMonth();
 
@@ -156,15 +144,8 @@ class DashboardStatsServiceTest extends TestCase
     {
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
-        // 3 gastos en distintos días del mes actual
-        $today = Carbon::now();
-        $amounts = [120.00, 75.50, 45.25];
-        foreach ($amounts as $amount) {
-            Expense::factory()->create([
-                'establishment_id' => $this->matriz->id,
-                'expense_date' => $today->toDateString(),
-                'amount_total' => $amount,
-            ]);
+        foreach ([120.00, 75.50, 45.25] as $amount) {
+            $this->createGastoThisMonth(total: $amount);
         }
 
         $result = $this->service->netProfitThisMonth();
@@ -175,66 +156,62 @@ class DashboardStatsServiceTest extends TestCase
             'Utilidad neta = 400 ganancia − 240.75 gastos = 159.25.');
     }
 
-    public function test_gastos_no_deducibles_tambien_restan_utilidad(): void
-    {
-        // Deducibles y no deducibles restan utilidad. Aquí el deducible no
-        // desglosa ISV (isv_amount null), así que resta completo; el caso con
-        // ISV recuperable está en el test siguiente.
-        $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
-
-        $today = Carbon::now()->toDateString();
-
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => $today,
-            'amount_total' => 100.00,
-            'is_isv_deductible' => true, // con factura, deducible
-        ]);
-
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => $today,
-            'amount_total' => 80.00,
-            'is_isv_deductible' => false, // sin factura, no deducible (ej. taxi)
-        ]);
-
-        $result = $this->service->netProfitThisMonth();
-
-        $this->assertEquals(180.00, $result['expenses'],
-            'Ambos gastos suman: 100 deducible + 80 no deducible = 180.');
-        $this->assertEquals(220.00, $result['net_profit'],
-            'Utilidad neta = 400 − 180 = 220.');
-    }
-
-    public function test_el_isv_recuperable_de_un_gasto_deducible_no_resta_utilidad(): void
+    public function test_el_isv_de_un_gasto_con_factura_no_resta_utilidad(): void
     {
         // Las ventas entran a la utilidad sin ISV; el ISV de un gasto con
-        // factura se recupera como crédito fiscal, así que tampoco es gasto.
+        // factura se recupera como crédito fiscal (Libro de Compras), así que
+        // tampoco es gasto. Un Recibo Interno no separa ISV: resta completo.
         $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
 
-        $today = Carbon::now()->toDateString();
-
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => $today,
-            'amount_total' => 115.00,
-            'isv_amount' => 15.00,
-            'is_isv_deductible' => true,
+        // Factura: gravado 100 + ISV 15 = 115 → resta 100.
+        $this->createGastoThisMonth(total: 115.00, overrides: [
+            'document_type' => SupplierDocumentType::Factura,
+            'subtotal' => 100.00,
+            'taxable_total' => 100.00,
+            'exempt_total' => 0,
+            'isv' => 15.00,
         ]);
 
-        // No deducible con ISV desglosado: ese ISV sí es costo.
-        Expense::factory()->create([
-            'establishment_id' => $this->matriz->id,
-            'expense_date' => $today,
-            'amount_total' => 57.50,
-            'isv_amount' => 7.50,
-            'is_isv_deductible' => false,
-        ]);
+        // Recibo Interno de 57.50 → resta 57.50.
+        $this->createGastoThisMonth(total: 57.50);
 
         $result = $this->service->netProfitThisMonth();
 
         $this->assertEquals(157.50, $result['expenses'], '100 (115 − 15 recuperable) + 57.50 completo.');
         $this->assertEquals(242.50, $result['net_profit'], '400 − 157.50.');
+    }
+
+    public function test_compras_de_mercaderia_borradores_y_anuladas_no_son_gasto(): void
+    {
+        $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
+
+        // La mercadería entra al costo vía Kardex (COGS), no como gasto.
+        $this->createGastoThisMonth(total: 500.00, overrides: [
+            'kind' => PurchaseKind::Mercaderia,
+            'expense_category' => null,
+        ]);
+        $this->createGastoThisMonth(total: 500.00, overrides: ['status' => PurchaseStatus::Borrador]);
+        $this->createGastoThisMonth(total: 500.00, overrides: ['status' => PurchaseStatus::Anulada]);
+
+        $this->createGastoThisMonth(total: 40.00);
+
+        $result = $this->service->netProfitThisMonth();
+
+        $this->assertEquals(40.00, $result['expenses']);
+        $this->assertEquals(360.00, $result['net_profit']);
+    }
+
+    public function test_comisiones_de_tarjeta_restan_utilidad(): void
+    {
+        $sale = $this->createCompletedSaleThisMonth(unitPriceWithIsv: 1150, costPrice: 600);
+        $sale->update(['card_fee_amount' => 39.10]);
+
+        $this->createGastoThisMonth(total: 60.90);
+
+        $result = $this->service->netProfitThisMonth();
+
+        $this->assertEquals(100.00, $result['expenses'], '60.90 de compras + 39.10 de comisión.');
+        $this->assertEquals(300.00, $result['net_profit']);
     }
 
     // ─── Líneas de reparación (sin producto del catálogo) ───────────────
@@ -368,6 +345,30 @@ class DashboardStatsServiceTest extends TestCase
     }
 
     // ─── Helpers ─────────────────────────────────────────────
+
+    /**
+     * Compra tipo Gasto confirmada con fecha de hoy. Por defecto Recibo
+     * Interno (sin ISV): subtotal = total.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function createGastoThisMonth(float $total, array $overrides = []): Purchase
+    {
+        return Purchase::factory()->forEstablishment($this->matriz)->create([
+            'kind' => PurchaseKind::Gasto,
+            'expense_category' => ExpenseCategory::Otros,
+            'status' => PurchaseStatus::Confirmada,
+            'document_type' => SupplierDocumentType::ReciboInterno,
+            'supplier_cai' => null,
+            'date' => Carbon::now()->toDateString(),
+            'subtotal' => $total,
+            'taxable_total' => 0,
+            'exempt_total' => $total,
+            'isv' => 0,
+            'total' => $total,
+            ...$overrides,
+        ]);
+    }
 
     /**
      * Crear venta completada del mes actual con su SaleItem y el movimiento

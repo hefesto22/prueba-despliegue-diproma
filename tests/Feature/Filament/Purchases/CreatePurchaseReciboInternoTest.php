@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Purchases;
 
+use App\Enums\PaymentMethod;
 use App\Enums\SupplierDocumentType;
 use App\Filament\Resources\Purchases\Pages\CreatePurchase;
 use App\Models\Purchase;
@@ -101,6 +102,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
         Livewire::test(CreatePurchase::class)
             ->fillForm([
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
+                'payment_method' => PaymentMethod::Transferencia->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
                 'exempt_total' => 200.00,
@@ -155,6 +157,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
         Livewire::test(CreatePurchase::class)
             ->fillForm([
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
+                'payment_method' => PaymentMethod::Transferencia->value,
                 'supplier_id' => $proveedorReal->id,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
@@ -197,6 +200,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
         Livewire::test(CreatePurchase::class)
             ->fillForm([
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
+                'payment_method' => PaymentMethod::Transferencia->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
                 'exempt_total' => 50.00,
@@ -208,6 +212,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
         Livewire::test(CreatePurchase::class)
             ->fillForm([
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
+                'payment_method' => PaymentMethod::Transferencia->value,
                 'establishment_id' => $this->matriz->id,
                 'date' => $hoy->toDateString(),
                 'exempt_total' => 75.00,
@@ -242,6 +247,7 @@ class CreatePurchaseReciboInternoTest extends TestCase
         Livewire::test(CreatePurchase::class)
             ->fillForm([
                 'document_type' => SupplierDocumentType::Factura->value,
+                'payment_method' => PaymentMethod::Transferencia->value,
                 'supplier_id' => $proveedor->id,
                 'establishment_id' => $this->matriz->id,
                 'supplier_invoice_number' => '001-001-01-00000001',

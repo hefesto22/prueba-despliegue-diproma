@@ -4,14 +4,12 @@ namespace App\Filament\Resources\Cash\Pages;
 
 use App\Exceptions\Cash\CajaYaAbiertaException;
 use App\Filament\Resources\Cash\Actions\CloseCashSessionAction;
-use App\Filament\Resources\Cash\Actions\RecordExpenseAction;
 use App\Filament\Resources\Cash\CashSessionResource;
 use App\Models\CashSession;
 use App\Services\Cash\CashBalanceCalculator;
 use App\Services\Cash\CashSessionService;
 use App\Services\Establishments\EstablishmentResolver;
 use App\Services\Establishments\Exceptions\NoActiveEstablishmentException;
-use App\Services\Expenses\ExpenseService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -48,18 +46,14 @@ class ListCashSessions extends ListRecords
 
     protected CashBalanceCalculator $balanceCalculator;
 
-    protected ExpenseService $expenses;
-
     public function boot(
         EstablishmentResolver $establishments,
         CashSessionService $cashSessions,
         CashBalanceCalculator $balanceCalculator,
-        ExpenseService $expenses,
     ): void {
         $this->establishments = $establishments;
         $this->cashSessions = $cashSessions;
         $this->balanceCalculator = $balanceCalculator;
-        $this->expenses = $expenses;
     }
 
     protected function getHeaderActions(): array
@@ -97,13 +91,9 @@ class ListCashSessions extends ListRecords
                 $this->cashSessions,
             ),
 
-            // Registrar gasto — visible solo con caja abierta (de ahí toma el
-            // establishment_id). El ExpenseService decide si crea CashMovement
-            // según el payment_method elegido en el form.
-            RecordExpenseAction::make(
-                fn (): ?CashSession => $this->currentOpenSession(),
-                $this->expenses,
-            ),
+            // Los gastos pagados con efectivo del cajón ya no se registran
+            // aquí: se registran en Compras (tipo Gasto, forma de pago
+            // Efectivo) y al confirmarse salen de la caja abierta.
         ];
     }
 
@@ -185,13 +175,13 @@ class ListCashSessions extends ListRecords
         try {
             $session = $this->cashSessions->open(
                 establishmentId: $establishment->id,
-                openedBy:        auth()->user(),
-                openingAmount:   $openingAmount,
+                openedBy: auth()->user(),
+                openingAmount: $openingAmount,
             );
 
             Notification::make()
                 ->title('Caja abierta')
-                ->body("Sesión #{$session->id} en {$establishment->name} con monto inicial L. " . number_format($openingAmount, 2))
+                ->body("Sesión #{$session->id} en {$establishment->name} con monto inicial L. ".number_format($openingAmount, 2))
                 ->success()
                 ->send();
         } catch (CajaYaAbiertaException $e) {

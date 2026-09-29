@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Services\Banking;
 
-use App\Enums\ExpenseCategory;
+use App\Enums\CashMovementType;
 use App\Enums\PaymentMethod;
-use App\Models\Category;
+use App\Models\CashMovement;
 use App\Models\CashSession;
+use App\Models\Category;
 use App\Models\CompanySetting;
-use App\Models\Expense;
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\User;
 use App\Services\Cash\CashSessionService;
 use App\Services\Sales\SaleService;
@@ -19,23 +20,24 @@ use Tests\TestCase;
 /**
  * Tests de integración del CardFeeRecorder en el flujo real de venta.
  *
- * Verifica:
- *   - Venta con tarjeta de crédito → se crea Expense con monto y categoría correctos
- *   - Venta con tarjeta de débito → se crea Expense
- *   - Venta en efectivo → NO se crea Expense
- *   - Venta con transferencia → NO se crea Expense
- *   - El Expense queda asociado a la venta vía sale_id
- *   - El Expense usa la fecha de la venta (no now())
- *   - El Expense NO afecta caja (no se crea CashMovement vinculado)
+ * Desde "todo en Compras" (2026-09-28) la comisión se guarda en la propia
+ * venta (`sales.card_fee_amount`). Verifica:
+ *   - Tarjeta de crédito / débito → la venta guarda la comisión correcta
+ *   - Efectivo, transferencia, cheque → comisión 0
+ *   - La comisión NO sale del cajón (no genera CashMovement de gasto)
+ *   - Si la venta hace rollback, no queda nada persistido
  */
 class CardFeeRecorderTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private SaleService $service;
+
     private Category $category;
+
     private User $cajero;
+
     private CashSession $cajaMatriz;
 
     protected function setUp(): void
@@ -87,7 +89,7 @@ class CardFeeRecorderTest extends TestCase
 
     // ─── Comportamiento con tarjeta ──────────────────────────
 
-    public function test_creates_expense_when_paid_with_credit_card(): void
+    public function test_stores_fee_on_sale_when_paid_with_credit_card(): void
     {
         $product = $this->makeProduct(salePrice: 1000);
 
@@ -96,21 +98,11 @@ class CardFeeRecorderTest extends TestCase
             paymentMethod: PaymentMethod::TarjetaCredito,
         );
 
-        $expense = Expense::where('sale_id', $sale->id)->first();
-
-        $this->assertNotNull($expense, 'Debió crearse un Expense por la comisión bancaria.');
-        $this->assertEquals(ExpenseCategory::ComisionesBancarias, $expense->category);
-        $this->assertEquals(PaymentMethod::TarjetaCredito, $expense->payment_method);
-
         // 1000 × 0.0340 = 34.00
-        $this->assertEqualsWithDelta(34.00, (float) $expense->amount_total, 0.01);
-
-        $this->assertSame($sale->id, $expense->sale_id);
-        $this->assertSame($this->matriz->id, $expense->establishment_id);
-        $this->assertSame($this->cajero->id, $expense->user_id);
+        $this->assertEqualsWithDelta(34.00, (float) $sale->fresh()->card_fee_amount, 0.001);
     }
 
-    public function test_creates_expense_when_paid_with_debit_card(): void
+    public function test_stores_fee_on_sale_when_paid_with_debit_card(): void
     {
         $product = $this->makeProduct(salePrice: 2000);
 
@@ -119,110 +111,54 @@ class CardFeeRecorderTest extends TestCase
             paymentMethod: PaymentMethod::TarjetaDebito,
         );
 
-        $expense = Expense::where('sale_id', $sale->id)->first();
-
-        $this->assertNotNull($expense);
-        $this->assertEquals(PaymentMethod::TarjetaDebito, $expense->payment_method);
-
         // 2000 × 0.0340 = 68.00
-        $this->assertEqualsWithDelta(68.00, (float) $expense->amount_total, 0.01);
+        $this->assertEqualsWithDelta(68.00, (float) $sale->fresh()->card_fee_amount, 0.001);
     }
 
-    public function test_does_not_create_expense_for_cash_payment(): void
+    /**
+     * @dataProvider nonCardMethods
+     */
+    public function test_no_fee_for_non_card_payment(PaymentMethod $method): void
     {
         $product = $this->makeProduct(salePrice: 1000);
 
         $sale = $this->service->processSale(
             cartItems: $this->cartItems($product),
-            paymentMethod: PaymentMethod::Efectivo,
+            paymentMethod: $method,
         );
 
-        $this->assertDatabaseMissing('expenses', ['sale_id' => $sale->id]);
+        $this->assertEqualsWithDelta(0.0, (float) $sale->fresh()->card_fee_amount, 0.001);
     }
 
-    public function test_does_not_create_expense_for_transferencia(): void
+    /**
+     * @return array<string, array{PaymentMethod}>
+     */
+    public static function nonCardMethods(): array
     {
-        $product = $this->makeProduct(salePrice: 1000);
-
-        $sale = $this->service->processSale(
-            cartItems: $this->cartItems($product),
-            paymentMethod: PaymentMethod::Transferencia,
-        );
-
-        $this->assertDatabaseMissing('expenses', ['sale_id' => $sale->id]);
+        return [
+            'efectivo' => [PaymentMethod::Efectivo],
+            'transferencia' => [PaymentMethod::Transferencia],
+            'cheque' => [PaymentMethod::Cheque],
+        ];
     }
 
-    public function test_does_not_create_expense_for_cheque(): void
-    {
-        $product = $this->makeProduct(salePrice: 1000);
+    // ─── Efectos colaterales ─────────────────────────────────
 
-        $sale = $this->service->processSale(
-            cartItems: $this->cartItems($product),
-            paymentMethod: PaymentMethod::Cheque,
-        );
-
-        $this->assertDatabaseMissing('expenses', ['sale_id' => $sale->id]);
-    }
-
-    // ─── Comportamiento del Expense ──────────────────────────
-
-    public function test_expense_uses_sale_date_not_now(): void
+    public function test_fee_does_not_touch_cash_drawer(): void
     {
         $product = $this->makeProduct();
 
-        $sale = $this->service->processSale(
+        $this->service->processSale(
             cartItems: $this->cartItems($product),
             paymentMethod: PaymentMethod::TarjetaCredito,
         );
 
-        $expense = Expense::where('sale_id', $sale->id)->first();
-
-        $this->assertEquals(
-            $sale->date->toDateString(),
-            $expense->expense_date->toDateString(),
-            'expense_date debería coincidir con la fecha de la venta para alinear período fiscal.'
-        );
+        // La comisión la retiene el banco del depósito, no sale del cajón.
+        $this->assertSame(0, CashMovement::where('type', CashMovementType::Expense->value)->count());
     }
 
-    public function test_expense_does_not_create_cash_movement(): void
+    public function test_fee_is_rolled_back_if_sale_fails(): void
     {
-        $product = $this->makeProduct();
-
-        $sale = $this->service->processSale(
-            cartItems: $this->cartItems($product),
-            paymentMethod: PaymentMethod::TarjetaCredito,
-        );
-
-        $expense = Expense::where('sale_id', $sale->id)->first();
-
-        // La comisión bancaria NO sale del cajón físico — el banco la retiene
-        // del depósito, no del efectivo. Por eso el Expense con payment_method
-        // = TarjetaCredito tiene affectsCashBalance() = false → NO se crea
-        // CashMovement asociado.
-        $this->assertNull($expense->cashMovement);
-    }
-
-    public function test_expense_description_includes_sale_number_and_rate(): void
-    {
-        $product = $this->makeProduct(salePrice: 5000);
-
-        $sale = $this->service->processSale(
-            cartItems: $this->cartItems($product),
-            paymentMethod: PaymentMethod::TarjetaCredito,
-        );
-
-        $expense = Expense::where('sale_id', $sale->id)->first();
-
-        $this->assertStringContainsString($sale->sale_number, $expense->description);
-        $this->assertStringContainsString('3.40%', $expense->description);
-        $this->assertStringContainsString('Tarjeta de crédito', $expense->description);
-    }
-
-    public function test_expense_is_rolled_back_if_sale_fails(): void
-    {
-        // Si la transacción de la venta hace rollback (ej. fallo en checkout),
-        // el Expense NO debe quedar en la BD. Garantizado por la
-        // DB::transaction() del SaleService que envuelve todo.
         $product = $this->makeProduct(salePrice: 1000);
         $product->update(['stock' => 1]); // forzar fallo de stock
 
@@ -232,12 +168,12 @@ class CardFeeRecorderTest extends TestCase
                 paymentMethod: PaymentMethod::TarjetaCredito,
             );
             $this->fail('Esperaba que la venta fallara por stock insuficiente.');
-        } catch (\RuntimeException $e) {
+        } catch (\RuntimeException) {
             // OK
         }
 
-        // Ningún Expense de comisión debe haberse persistido.
-        $this->assertSame(0, Expense::where('category', ExpenseCategory::ComisionesBancarias->value)->count());
+        // La venta (y con ella su comisión) no quedó persistida.
+        $this->assertSame(0, Sale::count());
     }
 
     // Nota: La verificación "tasa nueva en settings → cálculo correcto" está

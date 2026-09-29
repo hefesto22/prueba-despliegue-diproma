@@ -171,13 +171,11 @@ class SaleService
             // 6. Marcar como completada
             $sale->update(['status' => SaleStatus::Completada]);
 
-            // 7. Si fue pagada con tarjeta (crédito o débito), registrar el
-            //    Expense automático por la comisión bancaria que cobra el
-            //    procesador. El monto NO se descuenta de caja (la comisión
-            //    la retiene el banco del depósito, no del cajón) — solo
-            //    queda como gasto contable para reflejar la utilidad real
-            //    del negocio. Si el método no aplica, recordIfApplicable()
-            //    es no-op silencioso.
+            // 7. Si fue pagada con tarjeta (crédito o débito), guardar en la
+            //    venta la comisión bancaria que cobra el procesador. NO se
+            //    descuenta de caja (la retiene el banco del depósito); la
+            //    Utilidad Neta la resta. Si el método no aplica,
+            //    recordIfApplicable() es no-op silencioso.
             $this->cardFeeRecorder->recordIfApplicable($sale, $paymentMethod);
 
             return $sale->fresh(['items.product', 'customer']);
@@ -267,10 +265,10 @@ class SaleService
      *                              que lo resuelve el CashSessionService vía el lock).
      *
      * @throws \RuntimeException si no hay usuario autenticado ni `created_by`
-     *         en la venta. Esto nunca debería pasar en el flujo normal —
-     *         processSale corre siempre con usuario autenticado y cancel()
-     *         también. Fail-fast si alguna vez se invoca desde un Job sin
-     *         impersonation del usuario que originó la venta.
+     *                           en la venta. Esto nunca debería pasar en el flujo normal —
+     *                           processSale corre siempre con usuario autenticado y cancel()
+     *                           también. Fail-fast si alguna vez se invoca desde un Job sin
+     *                           impersonation del usuario que originó la venta.
      */
     private function buildSaleCashMovementAttributes(
         Sale $sale,

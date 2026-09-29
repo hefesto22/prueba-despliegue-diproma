@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources\Purchases\Tables;
 
+use App\Enums\ExpenseCategory;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use Filament\Actions\BulkActionGroup;
@@ -30,8 +33,9 @@ class PurchasesTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    // Compras copiadas desde un gasto con factura (Fase 1b).
-                    ->description(fn ($record) => $record->expense_id ? "Desde gasto #{$record->expense_id}" : null)
+                    // Concepto del gasto debajo del número: en la lista se distingue
+                    // "COMP-… Gasolina moto" de una compra de mercadería.
+                    ->description(fn ($record) => $record->description)
                     ->icon('heroicon-o-shopping-cart'),
                 TextColumn::make('supplier.name')
                     ->label('Proveedor')
@@ -42,8 +46,16 @@ class PurchasesTable
                     ->icon('heroicon-o-building-storefront')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('kind')
+                    ->label('Qué')
+                    ->badge(),
+                TextColumn::make('expense_category')
+                    ->label('Categoría')
+                    ->badge()
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('document_type')
-                    ->label('Tipo')
+                    ->label('Documento')
                     ->badge()
                     ->toggleable(),
                 TextColumn::make('supplier_invoice_number')
@@ -101,6 +113,18 @@ class PurchasesTable
             ])
             ->defaultSort('date', 'desc')
             ->filters([
+                SelectFilter::make('kind')
+                    ->label('¿Qué se compró?')
+                    ->options(PurchaseKind::class)
+                    ->placeholder('Todo'),
+                SelectFilter::make('expense_category')
+                    ->label('Categoría del gasto')
+                    ->options(ExpenseCategory::class)
+                    ->placeholder('Todas'),
+                SelectFilter::make('payment_method')
+                    ->label('Forma de pago')
+                    ->options(PaymentMethod::class)
+                    ->placeholder('Todas'),
                 SelectFilter::make('status')
                     ->label('Estado')
                     ->options(PurchaseStatus::class)

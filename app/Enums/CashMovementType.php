@@ -31,7 +31,7 @@ use Filament\Support\Contracts\HasLabel;
  *                             o anula y el cliente prefirió devolución sobre crédito.
  *   - repair_final_income:    saldo restante (total - anticipo) cobrado al entregar.
  */
-enum CashMovementType: string implements HasLabel, HasColor, HasIcon
+enum CashMovementType: string implements HasColor, HasIcon, HasLabel
 {
     case OpeningBalance = 'opening_balance';
     case SaleIncome = 'sale_income';
@@ -44,6 +44,7 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
     case RepairAdvancePayment = 'repair_advance_payment';
     case RepairAdvanceRefund = 'repair_advance_refund';
     case RepairFinalIncome = 'repair_final_income';
+    case PurchaseCancellation = 'purchase_cancellation';
 
     public function getLabel(): string
     {
@@ -59,6 +60,7 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::RepairAdvancePayment => 'Anticipo de reparación',
             self::RepairAdvanceRefund => 'Devolución de anticipo',
             self::RepairFinalIncome => 'Ingreso por reparación',
+            self::PurchaseCancellation => 'Anulación de compra',
         };
     }
 
@@ -76,6 +78,7 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::RepairAdvancePayment => 'info',
             self::RepairAdvanceRefund => 'danger',
             self::RepairFinalIncome => 'success',
+            self::PurchaseCancellation => 'info',
         };
     }
 
@@ -93,6 +96,7 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::RepairAdvancePayment => 'heroicon-o-banknotes',
             self::RepairAdvanceRefund => 'heroicon-o-arrow-uturn-left',
             self::RepairFinalIncome => 'heroicon-o-wrench-screwdriver',
+            self::PurchaseCancellation => 'heroicon-o-arrow-uturn-down',
         };
     }
 
@@ -108,7 +112,10 @@ enum CashMovementType: string implements HasLabel, HasColor, HasIcon
             self::OpeningBalance,
             self::SaleIncome,
             self::RepairAdvancePayment,
-            self::RepairFinalIncome => true,
+            self::RepairFinalIncome,
+            // Anular una compra pagada en efectivo devuelve ese dinero a la
+            // caja: es el espejo del Expense/SupplierPayment que registró.
+            self::PurchaseCancellation => true,
             default => false,
         };
     }

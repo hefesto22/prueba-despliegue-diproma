@@ -6,7 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Exports\ExpensesMonthly\ExpensesMonthlyExport;
 use App\Models\Establishment;
-use App\Models\Expense;
+use App\Models\Purchase;
 use App\Services\Expenses\ExpensesMonthlyReport;
 use App\Services\Expenses\ExpensesMonthlyReportService;
 use BackedEnum;
@@ -48,26 +48,25 @@ use Maatwebsite\Excel\Facades\Excel;
  *
  * POR QUÉ NO ES UN RESOURCE
  * ─────────────────────────
- * No hay CRUD aquí. El usuario ya gestiona gastos en `ExpenseResource`. Esta
- * Page es UN reporte (lectura+export), por lo que un Resource sería over-
- * engineering: heredaríamos botones de Edit/Delete que no aplican.
+ * No hay CRUD aquí. Desde "todo en Compras" (2026-09-28) los gastos se
+ * registran en Compras (tipo Gasto) y las comisiones de tarjeta quedan en las
+ * ventas; esta Page solo los reúne (lectura + export). Un Resource heredaría
+ * botones de Edit/Delete que no aplican.
  *
  * AUTORIZACIÓN
  * ────────────
  * `canAccess`: cualquier usuario autenticado con permiso `viewAny` sobre
- * `Expense` puede ver este reporte (el rol "contador" tiene viewAny pero no
+ * `Purchase` puede ver este reporte (el rol "contador" tiene viewAny pero no
  * create/update — perfecto para esta página, que es read-only por diseño).
  *
  * El permiso de la Page (`Page:ReporteGastosMensual`) se genera vía Shield
  * y se asigna a admin + contador. La auth de la Page es defense-in-depth
- * sobre el viewAny del Expense.
+ * sobre el viewAny de Purchase.
  */
 class ReporteGastosMensual extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    // Icono distinto al de ExpenseResource (`OutlinedClipboardDocumentList`)
-    // para que en el sidebar el reporte no se confunda con el CRUD de gastos.
     // `DocumentChartBar` = "documento con gráfico" → semántica de reporte.
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
 
@@ -77,9 +76,7 @@ class ReporteGastosMensual extends Page implements HasForms
 
     protected static ?string $slug = 'reporte-gastos-mensual';
 
-    // Después de "Gastos" (CRUD del módulo) — flujo natural: primero registrar,
-    // luego revisar. El sort exacto no importa mientras quede en el mismo
-    // grupo de Finanzas.
+    // Después de Compras — flujo natural: primero registrar, luego revisar.
     protected static ?int $navigationSort = 50;
 
     protected string $view = 'filament.pages.reporte-gastos-mensual';
@@ -102,7 +99,9 @@ class ReporteGastosMensual extends Page implements HasForms
     // DTOs) duplica código de serialización y aumenta superficie de bugs.
 
     public ?int $loadedYear = null;
+
     public ?int $loadedMonth = null;
+
     public ?int $loadedEstablishmentId = null;
 
     /**
@@ -134,12 +133,12 @@ class ReporteGastosMensual extends Page implements HasForms
     }
 
     /**
-     * Quien puede ver gastos accede al reporte. El rol "contador" cumple
-     * ambos: ve gastos y debe ver este reporte para sus pagos de ISV.
+     * Quien puede ver compras accede al reporte: los gastos son compras tipo
+     * Gasto. El rol "contador" ve compras y necesita este reporte.
      */
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('viewAny', Expense::class) === true;
+        return auth()->user()?->can('viewAny', Purchase::class) === true;
     }
 
     public function mount(): void
@@ -153,8 +152,8 @@ class ReporteGastosMensual extends Page implements HasForms
         $defaultPeriod = $now->day <= 10 ? $now->subMonthNoOverflow() : $now;
 
         $this->form->fill([
-            'period_year'      => $defaultPeriod->year,
-            'period_month'     => $defaultPeriod->month,
+            'period_year' => $defaultPeriod->year,
+            'period_month' => $defaultPeriod->month,
             'establishment_id' => null,
         ]);
     }
@@ -178,15 +177,15 @@ class ReporteGastosMensual extends Page implements HasForms
                             Select::make('period_month')
                                 ->label('Mes')
                                 ->options([
-                                    1  => 'Enero',
-                                    2  => 'Febrero',
-                                    3  => 'Marzo',
-                                    4  => 'Abril',
-                                    5  => 'Mayo',
-                                    6  => 'Junio',
-                                    7  => 'Julio',
-                                    8  => 'Agosto',
-                                    9  => 'Septiembre',
+                                    1 => 'Enero',
+                                    2 => 'Febrero',
+                                    3 => 'Marzo',
+                                    4 => 'Abril',
+                                    5 => 'Mayo',
+                                    6 => 'Junio',
+                                    7 => 'Julio',
+                                    8 => 'Agosto',
+                                    9 => 'Septiembre',
                                     10 => 'Octubre',
                                     11 => 'Noviembre',
                                     12 => 'Diciembre',
@@ -281,7 +280,7 @@ class ReporteGastosMensual extends Page implements HasForms
 
         $s = $report->summary;
 
-        $body = "Gastos: {$s->gastosCount}  ·  Total: " . number_format($s->gastosTotal, 2) . ' L';
+        $body = "Gastos: {$s->gastosCount}  ·  Total: ".number_format($s->gastosTotal, 2).' L';
         if ($s->hasIncompleteWarnings()) {
             $body .= "  ·  ⚠ {$s->deduciblesIncompletosCount} deducibles incompletos";
         }
@@ -304,7 +303,7 @@ class ReporteGastosMensual extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $year  = (int) ($data['period_year'] ?? 0);
+        $year = (int) ($data['period_year'] ?? 0);
         $month = (int) ($data['period_month'] ?? 0);
         $estId = isset($data['establishment_id']) && $data['establishment_id'] !== '' && $data['establishment_id'] !== null
             ? (int) $data['establishment_id']
@@ -321,7 +320,7 @@ class ReporteGastosMensual extends Page implements HasForms
         }
 
         $selected = CarbonImmutable::create($year, $month, 1);
-        $now      = CarbonImmutable::now()->startOfMonth();
+        $now = CarbonImmutable::now()->startOfMonth();
 
         if ($selected->greaterThan($now)) {
             Notification::make()

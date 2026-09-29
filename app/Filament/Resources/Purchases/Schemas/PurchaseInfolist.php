@@ -2,9 +2,9 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
-use App\Filament\Resources\Expenses\ExpenseResource;
 use App\Models\Purchase;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -19,20 +19,6 @@ class PurchaseInfolist
         return $schema
             ->columns(1)
             ->components([
-                // Compras generadas desde un gasto con factura (Fase 1b): el gasto
-                // es la fuente de verdad y aquí solo se consulta.
-                Section::make('Generada desde un gasto')
-                    ->icon('heroicon-o-banknotes')
-                    ->description('Esta compra es la copia en el Libro de Compras de un gasto con factura. Para corregirla o quitarla del libro, edite el gasto.')
-                    ->visible(fn (Purchase $record) => $record->isFromExpense())
-                    ->schema([
-                        TextEntry::make('expense_id')
-                            ->label('Gasto')
-                            ->formatStateUsing(fn (int $state) => "Gasto #{$state}")
-                            ->url(fn (Purchase $record) => ExpenseResource::getUrl('view', ['record' => $record->expense_id]))
-                            ->icon('heroicon-o-arrow-top-right-on-square'),
-                    ]),
-
                 Section::make('Compra')
                     ->aside()
                     ->schema([
@@ -51,6 +37,22 @@ class PurchaseInfolist
                                 ->label('Fecha')
                                 ->date('d/m/Y'),
                         ]),
+                        Grid::make(3)->schema([
+                            TextEntry::make('kind')
+                                ->label('¿Qué se compró?')
+                                ->badge(),
+                            TextEntry::make('expense_category')
+                                ->label('Categoría del gasto')
+                                ->badge()
+                                ->visible(fn (Purchase $record) => $record->kind === PurchaseKind::Gasto),
+                            TextEntry::make('payment_method')
+                                ->label('Forma de pago')
+                                ->badge()
+                                ->placeholder('No registrada'),
+                        ]),
+                        TextEntry::make('description')
+                            ->label('Concepto')
+                            ->visible(fn (Purchase $record) => filled($record->description)),
                         // Crédito y vencimiento: visibles solo cuando la compra realmente
                         // tiene crédito (credit_days > 0). Mientras el módulo de Cuentas por
                         // Pagar esté pendiente de implementación, todas las compras nuevas

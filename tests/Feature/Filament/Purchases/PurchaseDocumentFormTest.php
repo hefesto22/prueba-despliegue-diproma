@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Purchases;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Filament\Resources\Purchases\Pages\CreatePurchase;
@@ -70,6 +71,7 @@ class PurchaseDocumentFormTest extends TestCase
             'supplier_invoice_number' => '001-001-01-00004567',
             'supplier_cai' => 'ABCDEF-123456-789ABC-DEF012-345678-AB',
             'date' => '2026-09-20',
+            'payment_method' => PaymentMethod::Transferencia->value,
             ...$overrides,
         ];
     }

@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\Purchases\Schemas;
 
+use App\Enums\ExpenseCategory;
+use App\Enums\PaymentMethod;
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Models\Establishment;
@@ -16,6 +19,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -54,8 +58,32 @@ class PurchaseForm
     {
         return Section::make('Información de la compra')
             ->icon('heroicon-o-building-storefront')
-            ->description('Proveedor, sucursal, fecha y condiciones de pago.')
+            ->description('Qué se compró, a quién, dónde y cómo se pagó.')
             ->schema([
+                // "Todo en Compras" (2026-09-28): aquí se registran también los
+                // gastos operativos. El tipo decide si resta de la Utilidad Neta
+                // (gasto) o entra por el costo de lo vendido (mercadería).
+                Grid::make(3)->schema([
+                    ToggleButtons::make('kind')
+                        ->label('¿Qué se compró?')
+                        ->options(PurchaseKind::class)
+                        ->default(PurchaseKind::Mercaderia->value)
+                        ->inline()
+                        ->required()
+                        ->live(),
+                    Select::make('expense_category')
+                        ->label('Categoría del gasto')
+                        ->options(ExpenseCategory::class)
+                        ->native(false)
+                        ->visible(fn (callable $get) => self::isExpense($get('kind')))
+                        ->required(fn (callable $get) => self::isExpense($get('kind'))),
+                    TextInput::make('description')
+                        ->label('Concepto')
+                        ->placeholder('Ej. Gasolina moto mensajero')
+                        ->maxLength(500)
+                        ->visible(fn (callable $get) => self::isExpense($get('kind')))
+                        ->required(fn (callable $get) => self::isExpense($get('kind'))),
+                ]),
                 Grid::make(3)->schema([
                     Select::make('supplier_id')
                         ->label('Proveedor')
@@ -117,9 +145,15 @@ class PurchaseForm
                     ->default(0)
                     ->dehydrated(),
                 Grid::make(2)->schema([
-                    Placeholder::make('payment_terms_display')
-                        ->label('Condición de pago')
-                        ->content('Contado'),
+                    Select::make('payment_method')
+                        ->label('Forma de pago')
+                        ->options(PaymentMethod::class)
+                        ->required()
+                        ->native(false)
+                        ->live()
+                        ->helperText(fn (callable $get) => self::isCash($get('payment_method'))
+                            ? 'Al confirmar, el dinero sale de la caja abierta de la sucursal.'
+                            : 'Contado. Solo "Efectivo" descuenta de la caja.'),
                     TextInput::make('purchase_number')
                         ->label('# Compra')
                         ->disabled()
@@ -136,7 +170,7 @@ class PurchaseForm
     {
         return Section::make('Documento fiscal del proveedor')
             ->icon('heroicon-o-document-text')
-            ->description('Datos SAR para el Libro de Compras. Los gastos con factura (papelería, internet, energía) no se registran aquí: se registran en Gastos con "Factura con CAI" y pasan solos a este libro.')
+            ->description('Factura: entra al Libro de Compras con su ISV. Recibo Interno: compras sin CAI (taxi, mercado, particulares).')
             ->schema([
                 // Flag del auto-fill: solo vive en el cliente para que los helperText
                 // del # de documento y del CAI muestren de qué compra se heredaron.
@@ -373,6 +407,18 @@ class PurchaseForm
                     ->maxLength(2000)
                     ->placeholder('Notas internas sobre esta compra'),
             ]);
+    }
+
+    private static function isExpense(mixed $kind): bool
+    {
+        return PurchaseKind::fromState($kind) === PurchaseKind::Gasto;
+    }
+
+    private static function isCash(mixed $method): bool
+    {
+        $method = $method instanceof PaymentMethod ? $method : PaymentMethod::tryFrom((string) $method);
+
+        return $method === PaymentMethod::Efectivo;
     }
 
     // ─── Auto-fill desde el último documento del proveedor ─────────────────

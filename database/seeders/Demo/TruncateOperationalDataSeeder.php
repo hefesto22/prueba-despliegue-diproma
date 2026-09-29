@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\Schema;
  * ────────────────────────────────────────────────────────────────────────
  *   - Movimientos: inventory_movements, cash_movements
  *   - Caja: cash_sessions
- *   - Gastos: expenses
+ *   - Gastos heredados: expenses (tabla legacy; desde 2026-09-28 los gastos
+ *     viven en purchases con kind = gasto)
  *   - Fiscal: isv_retention_received, isv_monthly_declarations, fiscal_periods
  *   - Notas de crédito: credit_note_items, credit_notes
  *   - Facturas: invoice_items, invoices
@@ -73,7 +74,7 @@ class TruncateOperationalDataSeeder extends Seeder
         // Caja
         'cash_sessions',
 
-        // Gastos
+        // Gastos heredados (tabla legacy; hasTable la omite cuando se elimine)
         'expenses',
 
         // Fiscal (declaraciones y períodos)

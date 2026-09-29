@@ -6,7 +6,6 @@ use App\Enums\MovementType;
 use App\Enums\PaymentStatus;
 use App\Enums\SaleStatus;
 use App\Models\Customer;
-use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Sale;
@@ -183,28 +182,40 @@ class DashboardStatsService
     }
 
     /**
-     * Total de gastos operativos del mes en curso, SIN el ISV recuperable.
+     * Total de gastos operativos del mes en curso.
      *
-     * Incluye todos los gastos del mes, deducibles y no deducibles. Pero en
-     * los deducibles (factura con CAI) el ISV no es gasto: se recupera como
-     * crédito fiscal en la Declaración ISV. Las ventas ya entran a la
-     * utilidad sin ISV (sale_items.subtotal), así que restar el ISV de los
-     * gastos deducibles mezclaba criterios y subestimaba la utilidad
-     * (corregido 2026-09-28). En los no deducibles el ISV sí es costo y se
-     * resta el monto completo.
+     * Desde "todo en Compras" (2026-09-28) los gastos son las compras tipo
+     * Gasto confirmadas, más las comisiones de tarjeta guardadas en las ventas.
      *
-     * Filtra por `expense_date` (no por created_at) para alinear con el
-     * período fiscal correcto — un gasto registrado tarde con fecha del mes
-     * pasado pertenece al mes pasado.
+     *   - Se suma el SUBTOTAL de la compra, no el total: el ISV de una factura
+     *     se recupera como crédito fiscal, no es gasto. Las ventas también
+     *     entran a la utilidad sin ISV, así que el criterio es el mismo. En un
+     *     Recibo Interno subtotal = total (no hay ISV que recuperar).
+     *   - La mercadería NO suma aquí: su costo entra por el costo de lo
+     *     vendido (grossProfitThisMonth), cuando se vende.
+     *   - Las comisiones de tarjeta se cuentan aunque la venta se haya anulado
+     *     después: el banco ya las cobró.
+     *
+     * Filtra por la fecha del documento (no created_at): una factura del mes
+     * pasado registrada tarde pertenece al mes pasado.
      */
     public function expensesThisMonth(): float
     {
         return $this->remember('expenses_month', function () {
-            $now = Carbon::now();
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
 
-            return (float) Expense::query()
-                ->forMonth($now->year, $now->month)
-                ->sum(DB::raw('amount_total - CASE WHEN is_isv_deductible THEN COALESCE(isv_amount, 0) ELSE 0 END'));
+            $expensePurchases = (float) Purchase::query()
+                ->gastos()
+                ->confirmadas()
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->sum('subtotal');
+
+            $cardFees = (float) Sale::query()
+                ->whereBetween('date', [$start, $end])
+                ->sum('card_fee_amount');
+
+            return round($expensePurchases + $cardFees, 2);
         });
     }
 
@@ -212,7 +223,7 @@ class DashboardStatsService
      * Utilidad neta del mes = ganancia bruta − gastos operativos.
      *
      * Ganancia bruta = revenue − COGS (ya calculado por grossProfitThisMonth).
-     * Gastos operativos = expensesThisMonth() (sin el ISV recuperable de los deducibles).
+     * Gastos operativos = expensesThisMonth() (compras tipo gasto sin ISV + comisiones de tarjeta).
      *
      * El COGS NO se vuelve a restar acá — ya está descontado en la ganancia
      * bruta. Tampoco se mezcla el ISV (crédito fiscal de compras o débito de

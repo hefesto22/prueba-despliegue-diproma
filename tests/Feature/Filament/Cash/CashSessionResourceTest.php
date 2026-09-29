@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\Cash;
 
 use App\Enums\CashMovementType;
-use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
 use App\Filament\Resources\Cash\Pages\ListCashSessions;
 use App\Filament\Resources\Cash\RelationManagers\CashMovementsRelationManager;
-use App\Models\CashMovement;
 use App\Models\CashSession;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Support\Utils;
@@ -33,7 +31,7 @@ use Tests\TestCase;
  *   5. "Cerrar caja" con descuadre > tolerancia sin autorizador NO cierra.
  *   6. "Cerrar caja" con descuadre > tolerancia + autorizador válido cierra con
  *      authorized_by_user_id seteado.
- *   7. "Registrar gasto" crea CashMovement Expense + Efectivo + category.
+ *   7. "Registrar gasto" ya no existe en Caja: los gastos se registran en Compras.
  *   8. CashMovementsRelationManager es read-only (canCreate = false).
  *
  * La lógica de dominio pura (cálculos, locks, excepciones) ya está cubierta en
@@ -49,7 +47,7 @@ use Tests\TestCase;
  */
 class CashSessionResourceTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     private User $cajero;
 
@@ -252,11 +250,15 @@ class CashSessionResourceTest extends TestCase
         $this->assertSame('Robo reportado — ver incidente #42', $fresh->notes);
     }
 
-    // ─── Test 7: Registrar gasto ─────────────────────────────
+    // ─── Test 7: Los gastos ya no se registran desde Caja ────
 
-    public function test_accion_registrar_gasto_crea_cash_movement_expense(): void
+    public function test_caja_no_ofrece_registrar_gasto(): void
     {
-        $session = CashSession::factory()
+        // Desde "todo en Compras" (2026-09-28) un gasto pagado con efectivo
+        // del cajón se registra como compra tipo Gasto; al confirmarla,
+        // PurchaseService saca el dinero de la caja abierta. Tener también el
+        // botón aquí duplicaría el registro.
+        CashSession::factory()
             ->forEstablishment($this->matriz)
             ->openedBy($this->cajero)
             ->openingAmount(1000.00)
@@ -264,35 +266,8 @@ class CashSessionResourceTest extends TestCase
 
         $this->actingAs($this->cajero);
 
-        // Schema actual del RecordExpenseAction (ver docblock allí — el action
-        // evolucionó para soportar payment_method seleccionable y campos
-        // fiscales opcionales). Los nombres de campo cambiaron respecto a la
-        // versión anterior:
-        //   - 'amount' → 'amount_total'
-        //   - 'occurred_at' → 'expense_date' (formato Y-m-d, no datetime)
-        //   - 'payment_method' es ahora required (default Efectivo)
         Livewire::test(ListCashSessions::class)
-            ->callAction('recordExpense', data: [
-                'amount_total' => 75.00,
-                'payment_method' => PaymentMethod::Efectivo->value,
-                'category' => ExpenseCategory::Combustible->value,
-                'description' => 'Gasolina moto mensajero recibo #1234',
-                'expense_date' => now()->format('Y-m-d'),
-            ])
-            ->assertHasNoActionErrors();
-
-        $this->assertDatabaseHas('cash_movements', [
-            'cash_session_id' => $session->id,
-            'user_id' => $this->cajero->id,
-            'type' => CashMovementType::Expense->value,
-            'payment_method' => PaymentMethod::Efectivo->value,
-            'amount' => '75.00',
-            'category' => ExpenseCategory::Combustible->value,
-            'description' => 'Gasolina moto mensajero recibo #1234',
-        ]);
-
-        // Defensa: no se crean movimientos espurios en otra sesión.
-        $this->assertSame(1, CashMovement::where('cash_session_id', $session->id)->count());
+            ->assertActionDoesNotExist('recordExpense');
     }
 
     // ─── Test 8: RelationManager read-only ───────────────────
@@ -300,9 +275,9 @@ class CashSessionResourceTest extends TestCase
     public function test_cash_movements_relation_manager_es_read_only(): void
     {
         // canCreate() false por contrato: los movimientos solo se crean vía
-        // CashSessionService / SaleService / RecordExpenseAction. Nunca desde
+        // CashSessionService / SaleService / PurchaseService. Nunca desde
         // el Filament UI del RelationManager.
-        $rm = new CashMovementsRelationManager();
+        $rm = new CashMovementsRelationManager;
 
         $this->assertFalse(
             $rm->canCreate(),

@@ -4,36 +4,31 @@ declare(strict_types=1);
 
 namespace App\Services\Expenses;
 
-use App\Models\Expense;
+use App\Models\Purchase;
+use App\Models\Sale;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
  * Service que construye el DTO `ExpensesMonthlyReport` para un período.
  *
- * Una sola query a `expenses` (con eager load de establishment + user) cubre
- * tanto el detalle como el resumen — los totales se computan iterando la
- * colección en PHP en lugar de disparar 4-5 queries de aggregation por
- * categoría/método/sucursal/deducibilidad.
+ * Fuentes (desde "todo en Compras", 2026-09-28):
+ *   - Compras tipo Gasto CONFIRMADAS del mes (los borradores todavía no son
+ *     un gasto; las anuladas ya no lo son).
+ *   - Comisiones de tarjeta de las ventas del mes (`sales.card_fee_amount`).
+ * Dos queries con eager load cubren detalle y resumen; los totales se
+ * acumulan en PHP en una sola pasada.
  *
  * POR QUÉ ITERACIÓN EN PHP Y NO SQL AGGREGATION:
- *   - Volúmenes esperados: 50-300 gastos/mes en single-tenant. Iterar 300
- *     filas en PHP es trivial (ms). Disparar 5 queries de COUNT/SUM agregadas
- *     genera más overhead de network/parse que ahorro de cómputo.
- *   - Cohesión: la regla de "deducible incompleto" (deducible sin RTN/factura/CAI)
- *     vive en `ExpensesMonthlyReportEntry::fromExpense()`. Si la calculáramos
- *     en SQL tendríamos que duplicar la lógica en dos lugares.
- *   - Cuando los volúmenes superen ~5000 gastos/mes (improbable a corto plazo
- *     en single-tenant), se cambia a aggregation queries sin tocar el
- *     contrato del DTO. Hoy el patrón es YAGNI-correcto.
+ *   - Volumen esperado: decenas a pocos cientos de gastos por mes en un
+ *     solo negocio. Iterarlos en PHP es trivial y evita 5 queries de
+ *     agregación por categoría/método/sucursal/deducibilidad.
+ *   - La regla de "deducible incompleto" vive en
+ *     `ExpensesMonthlyReportEntry`; en SQL habría que duplicarla.
  *
- * INDICES UTILIZADOS:
- *   - `expenses_estab_date_idx (establishment_id, expense_date)` cuando hay
- *     filtro de sucursal — es el caso típico.
- *   - Sin sucursal: `whereYear/whereMonth` no usa índice de columna por sí
- *     mismo, pero dado el volumen (single tenant, 1-2 sucursales), un seq
- *     scan filtrado de ~3000-5000 filas/año es <50ms en PostgreSQL. Si en el
- *     futuro escala mal, se reemplaza por `whereBetween` con expense_date
- *     calculado para usar el índice.
+ * ÍNDICES: `purchases_kind_status_date_index (kind, status, date)` y
+ * `sales.date` — ambos filtros son rangos de fecha (whereBetween), no
+ * whereMonth, para que el índice se use.
  */
 class ExpensesMonthlyReportService
 {
@@ -44,23 +39,39 @@ class ExpensesMonthlyReportService
      */
     public function build(int $year, int $month, ?int $establishmentId = null): ExpensesMonthlyReport
     {
-        $expenses = Expense::query()
+        $from = CarbonImmutable::create($year, $month, 1)->startOfMonth();
+        $to = $from->endOfMonth();
+
+        $purchases = Purchase::query()
+            ->gastos()
+            ->confirmadas()
             ->with([
                 'establishment:id,name',
-                'user:id,name',
+                'supplier:id,name,rtn',
+                'createdBy:id,name',
             ])
-            ->forMonth($year, $month)
-            ->when(
-                $establishmentId !== null,
-                fn ($q) => $q->where('establishment_id', $establishmentId),
-            )
-            ->orderBy('expense_date')
-            ->orderBy('id')
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->when($establishmentId !== null, fn ($query) => $query->where('establishment_id', $establishmentId))
             ->get();
 
-        $entries = $expenses->map(
-            fn (Expense $e) => ExpensesMonthlyReportEntry::fromExpense($e),
-        )->values();
+        $cardFees = Sale::query()
+            ->where('card_fee_amount', '>', 0)
+            ->with([
+                'establishment:id,name',
+                'createdBy:id,name',
+            ])
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->when($establishmentId !== null, fn ($query) => $query->where('establishment_id', $establishmentId))
+            ->get();
+
+        $entries = $purchases
+            ->map(fn (Purchase $purchase) => ExpensesMonthlyReportEntry::fromPurchase($purchase))
+            ->concat($cardFees->map(fn (Sale $sale) => ExpensesMonthlyReportEntry::fromCardFee($sale)))
+            ->sortBy([
+                fn (ExpensesMonthlyReportEntry $a, ExpensesMonthlyReportEntry $b) => $a->expenseDate <=> $b->expenseDate,
+                fn (ExpensesMonthlyReportEntry $a, ExpensesMonthlyReportEntry $b) => $a->reference <=> $b->reference,
+            ])
+            ->values();
 
         $summary = $this->buildSummary($year, $month, $entries);
 
@@ -79,19 +90,19 @@ class ExpensesMonthlyReportService
      */
     private function buildSummary(int $year, int $month, Collection $entries): ExpensesMonthlyReportSummary
     {
-        $gastosCount   = 0;
-        $gastosTotal   = 0.0;
+        $gastosCount = 0;
+        $gastosTotal = 0.0;
 
-        $deduciblesCount             = 0;
-        $deduciblesTotal             = 0.0;
-        $creditoFiscalDeducible      = 0.0;
-        $deduciblesIncompletosCount  = 0;
+        $deduciblesCount = 0;
+        $deduciblesTotal = 0.0;
+        $creditoFiscalDeducible = 0.0;
+        $deduciblesIncompletosCount = 0;
 
         $noDeduciblesCount = 0;
         $noDeduciblesTotal = 0.0;
 
-        $cashCount    = 0;
-        $cashTotal    = 0.0;
+        $cashCount = 0;
+        $cashTotal = 0.0;
         $nonCashCount = 0;
         $nonCashTotal = 0.0;
 
@@ -110,7 +121,7 @@ class ExpensesMonthlyReportService
             // Deducibilidad
             if ($entry->isIsvDeductible) {
                 $deduciblesCount++;
-                $deduciblesTotal        += $entry->amountTotal;
+                $deduciblesTotal += $entry->amountTotal;
                 $creditoFiscalDeducible += $entry->isvAmount;
 
                 if ($entry->deducibleIncompleto) {
@@ -159,7 +170,7 @@ class ExpensesMonthlyReportService
             $estKey = $entry->establishmentName;
             if (! isset($byEstablishment[$estKey])) {
                 $byEstablishment[$estKey] = [
-                    'name'  => $entry->establishmentName,
+                    'name' => $entry->establishmentName,
                     'count' => 0,
                     'total' => 0.0,
                 ];
@@ -171,12 +182,12 @@ class ExpensesMonthlyReportService
         // Redondeo final a 2 decimales — los acumuladores pueden arrastrar
         // residuos de float que no afectan los datos individuales pero sí
         // los totales reportados.
-        $gastosTotal            = round($gastosTotal, 2);
-        $deduciblesTotal        = round($deduciblesTotal, 2);
+        $gastosTotal = round($gastosTotal, 2);
+        $deduciblesTotal = round($deduciblesTotal, 2);
         $creditoFiscalDeducible = round($creditoFiscalDeducible, 2);
-        $noDeduciblesTotal      = round($noDeduciblesTotal, 2);
-        $cashTotal              = round($cashTotal, 2);
-        $nonCashTotal           = round($nonCashTotal, 2);
+        $noDeduciblesTotal = round($noDeduciblesTotal, 2);
+        $cashTotal = round($cashTotal, 2);
+        $nonCashTotal = round($nonCashTotal, 2);
 
         foreach ($byCategory as &$bucket) {
             $bucket['total'] = round($bucket['total'], 2);
@@ -194,7 +205,7 @@ class ExpensesMonthlyReportService
         unset($bucket);
 
         // Ordenar buckets por total desc — más relevante arriba en reportes
-        uasort($byCategory,      fn ($a, $b) => $b['total'] <=> $a['total']);
+        uasort($byCategory, fn ($a, $b) => $b['total'] <=> $a['total']);
         uasort($byPaymentMethod, fn ($a, $b) => $b['total'] <=> $a['total']);
         uasort($byEstablishment, fn ($a, $b) => $b['total'] <=> $a['total']);
 

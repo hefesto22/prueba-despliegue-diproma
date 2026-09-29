@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Services\Banking;
 
-use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
 use App\Enums\RepairItemSource;
 use App\Enums\TaxType;
@@ -10,9 +9,9 @@ use App\Models\CaiRange;
 use App\Models\CashSession;
 use App\Models\CompanySetting;
 use App\Models\DeviceCategory;
-use App\Models\Expense;
 use App\Models\Repair;
 use App\Models\RepairItem;
+use App\Models\Sale;
 use App\Models\User;
 use App\Services\Cash\CashSessionService;
 use App\Services\Repairs\RepairDeliveryService;
@@ -27,18 +26,24 @@ use Tests\TestCase;
  *   - Comisión calculada sobre el SALDO (outstanding), NO sobre el total
  *     de la venta. Si hubo anticipo, el anticipo se cobró aparte (siempre
  *     en efectivo) y no debe contaminar el cálculo de la comisión.
- *   - Si saldo = 0 (anticipo cubrió todo), no se crea Expense.
+ *   - Si saldo = 0 (anticipo cubrió todo), la venta no lleva comisión.
+ *
+ * La comisión se guarda en la venta (`sales.card_fee_amount`) desde
+ * "todo en Compras" (2026-09-28).
  *   - Si la entrega se cobra en efectivo, no hay comisión aunque el total
  *     sea grande.
  */
 class RepairDeliveryCardFeeTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private RepairDeliveryService $service;
+
     private User $cajero;
+
     private CashSession $caja;
+
     private DeviceCategory $deviceCategory;
 
     protected function setUp(): void
@@ -113,7 +118,7 @@ class RepairDeliveryCardFeeTest extends TestCase
         return $repair->fresh('items');
     }
 
-    public function test_creates_expense_when_balance_paid_with_credit_card_no_advance(): void
+    public function test_stores_fee_when_balance_paid_with_credit_card_no_advance(): void
     {
         // Total 2000, sin anticipo, todo se cobra al entregar con tarjeta.
         $repair = $this->makeRepair(totalServicio: 2000.00);
@@ -123,12 +128,8 @@ class RepairDeliveryCardFeeTest extends TestCase
             paymentMethod: PaymentMethod::TarjetaCredito,
         );
 
-        $expense = Expense::where('sale_id', $delivered->sale_id)->first();
-
-        $this->assertNotNull($expense);
-        $this->assertEquals(ExpenseCategory::ComisionesBancarias, $expense->category);
         // Comisión sobre el TOTAL (no hubo anticipo): 2000 × 3.4% = 68.00
-        $this->assertEqualsWithDelta(68.00, (float) $expense->amount_total, 0.01);
+        $this->assertEqualsWithDelta(68.00, $this->feeOf($delivered), 0.001);
     }
 
     public function test_calculates_fee_only_on_outstanding_when_advance_was_collected(): void
@@ -143,14 +144,11 @@ class RepairDeliveryCardFeeTest extends TestCase
             paymentMethod: PaymentMethod::TarjetaCredito,
         );
 
-        $expense = Expense::where('sale_id', $delivered->sale_id)->first();
-
-        $this->assertNotNull($expense);
         // 500 × 3.4% = 17.00 (NO 1000 × 3.4% = 34.00)
-        $this->assertEqualsWithDelta(17.00, (float) $expense->amount_total, 0.01);
+        $this->assertEqualsWithDelta(17.00, $this->feeOf($delivered), 0.001);
     }
 
-    public function test_does_not_create_expense_when_outstanding_is_zero(): void
+    public function test_no_fee_when_outstanding_is_zero(): void
     {
         // Total 1000. Anticipo cubre todo (1000). No hay saldo a cobrar al
         // entregar — no pasó tarjeta por el POS bancario, no hay comisión.
@@ -161,13 +159,10 @@ class RepairDeliveryCardFeeTest extends TestCase
             paymentMethod: PaymentMethod::TarjetaCredito, // método "default" pero saldo=0
         );
 
-        $this->assertDatabaseMissing('expenses', [
-            'sale_id' => $delivered->sale_id,
-            'category' => ExpenseCategory::ComisionesBancarias->value,
-        ]);
+        $this->assertEqualsWithDelta(0.0, $this->feeOf($delivered), 0.001);
     }
 
-    public function test_does_not_create_expense_when_balance_paid_with_cash(): void
+    public function test_no_fee_when_balance_paid_with_cash(): void
     {
         $repair = $this->makeRepair(totalServicio: 2000.00);
 
@@ -176,9 +171,11 @@ class RepairDeliveryCardFeeTest extends TestCase
             paymentMethod: PaymentMethod::Efectivo,
         );
 
-        $this->assertDatabaseMissing('expenses', [
-            'sale_id' => $delivered->sale_id,
-            'category' => ExpenseCategory::ComisionesBancarias->value,
-        ]);
+        $this->assertEqualsWithDelta(0.0, $this->feeOf($delivered), 0.001);
+    }
+
+    private function feeOf(Repair $delivered): float
+    {
+        return (float) Sale::findOrFail($delivered->sale_id)->card_fee_amount;
     }
 }

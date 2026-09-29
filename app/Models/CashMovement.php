@@ -32,7 +32,6 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $description
  * @property string|null $reference_type
  * @property int|null $reference_id
- * @property int|null $expense_id
  * @property \Illuminate\Support\Carbon $occurred_at
  */
 class CashMovement extends Model
@@ -49,7 +48,6 @@ class CashMovement extends Model
         'description',
         'reference_type',
         'reference_id',
-        'expense_id',
         'occurred_at',
     ];
 
@@ -93,21 +91,6 @@ class CashMovement extends Model
     public function reference(): MorphTo
     {
         return $this->morphTo();
-    }
-
-    /**
-     * Expense vinculado (solo cuando type=expense + payment_method=efectivo
-     * y el movimiento nació desde ExpenseService::register).
-     *
-     * Null si el movimiento es de otro tipo (sale_income, opening_balance, etc.)
-     * o si el caller registró el expense directo en cash_movements sin pasar
-     * por ExpenseService — ese caller legacy no debería existir tras la
-     * implementación actual, pero el campo es nullable para preservar
-     * movimientos que no nacen de Expense.
-     */
-    public function expense(): BelongsTo
-    {
-        return $this->belongsTo(Expense::class);
     }
 
     // ─── Helpers de dominio ──────────────────────────────────

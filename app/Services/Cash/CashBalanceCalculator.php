@@ -69,11 +69,13 @@ class CashBalanceCalculator
 
             if ($movement->type->isInflow()) {
                 $inflows += (float) $movement->amount;
+
                 continue;
             }
 
             if ($movement->type->isOutflow()) {
                 $outflows += (float) $movement->amount;
+
                 continue;
             }
 
@@ -121,7 +123,7 @@ class CashBalanceCalculator
      * Útil para el cuadre por método al cierre: "vendiste L. 5,000 en tarjeta,
      * L. 2,000 en transferencia, L. 8,000 en efectivo".
      *
-     * @return array<string, float>  Map [payment_method => total]
+     * @return array<string, float> Map [payment_method => total]
      */
     public function totalsByPaymentMethod(CashSession $session): array
     {
@@ -153,15 +155,14 @@ class CashBalanceCalculator
      *   - Solo `type = Expense` (no SupplierPayment ni Deposit — esos tienen
      *     sus propios reportes).
      *   - Solo `payment_method = Efectivo` — las categorías existen para
-     *     trackear caja chica, que por diseño es flujo de efectivo (ver
-     *     RecordExpenseAction). Si aparece algún Expense no-efectivo (caso
-     *     teórico hoy, no soportado por el UI), se ignora para no contaminar
-     *     el reporte del cierre con gastos que no afectaron el cajón.
+     *     trackear caja chica (compras tipo Gasto pagadas con efectivo, ver
+     *     PurchaseService). Un movimiento no-efectivo se ignora para no
+     *     contaminar el reporte del cierre con gastos que no afectaron el cajón.
      *
      * Los movimientos sin `category` (no debería pasar por validación, pero
      * defensivamente) se agrupan bajo `ExpenseCategory::Otros`.
      *
-     * @return array<string, float>  Map [expense_category => total]
+     * @return array<string, float> Map [expense_category => total]
      */
     public function totalsByExpenseCategory(CashSession $session): array
     {

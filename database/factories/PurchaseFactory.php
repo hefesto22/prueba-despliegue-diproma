@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Models\Establishment;
@@ -44,6 +46,10 @@ class PurchaseFactory extends Factory
             'isv' => 0,
             'total' => 0,
             'credit_days' => 0,
+            // Mercadería por transferencia: el caso típico que no toca la caja.
+            // Los tests de gastos y de pago en efectivo lo sobreescriben.
+            'kind' => PurchaseKind::Mercaderia,
+            'payment_method' => PaymentMethod::Transferencia,
             'notes' => fake()->optional(0.3)->sentence(),
         ];
     }

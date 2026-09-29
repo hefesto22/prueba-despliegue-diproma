@@ -7,6 +7,7 @@ namespace Database\Seeders\Demo;
 use App\Enums\DocumentType;
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Enums\TaxType;
@@ -19,9 +20,9 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Cash\CashBalanceCalculator;
 use App\Services\Cash\CashSessionService;
-use App\Services\Expenses\ExpenseService;
 use App\Services\Inventory\ProductStockLedger;
 use App\Services\Invoicing\InvoiceService;
+use App\Services\Purchases\InternalReceiptNumberGenerator;
 use App\Services\Purchases\PurchaseDocumentAmounts;
 use App\Services\Purchases\PurchaseService;
 use App\Services\Sales\SaleService;
@@ -30,6 +31,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Genera operaciones históricas realistas: ventas, compras, facturas, caja.
@@ -101,7 +103,7 @@ class HistoricalOperationsSeeder extends Seeder
         private readonly InvoiceService $invoiceService,
         private readonly CashSessionService $cashSessionService,
         private readonly CashBalanceCalculator $cashCalculator,
-        private readonly ExpenseService $expenseService,
+        private readonly InternalReceiptNumberGenerator $internalReceiptNumbers,
         private readonly ProductStockLedger $stockLedger,
     ) {}
 
@@ -452,7 +454,7 @@ class HistoricalOperationsSeeder extends Seeder
                 matriz: $matriz,
                 supplier: Supplier::forInternalReceipts(),
                 documentType: SupplierDocumentType::ReciboInterno,
-                supplierInvoiceNumber: 'RI-'.Carbon::today()->format('Ymd').'-'.mt_rand(100, 999),
+                supplierInvoiceNumber: null,
                 supplierCai: null,
                 restocked: $restocked,
             );
@@ -502,6 +504,11 @@ class HistoricalOperationsSeeder extends Seeder
      * Los montos se derivan del costo NETO de lo recibido: la base gravada
      * lleva su 15% de ISV encima; en Recibo Interno todo va como exento.
      *
+     * Se paga por transferencia: la mercadería no sale del cajón de la tienda.
+     *
+     * @param  string|null  $supplierInvoiceNumber  null en un Recibo Interno: el
+     *                                              correlativo lo asigna el generador,
+     *                                              igual que en el formulario.
      * @param  list<array{product: Product, quantity: int}>  $restocked
      */
     private function registerPurchaseDocument(
@@ -509,7 +516,7 @@ class HistoricalOperationsSeeder extends Seeder
         Establishment $matriz,
         Supplier $supplier,
         SupplierDocumentType $documentType,
-        string $supplierInvoiceNumber,
+        ?string $supplierInvoiceNumber,
         ?string $supplierCai,
         array $restocked,
         ?string $notes = null,
@@ -534,22 +541,26 @@ class HistoricalOperationsSeeder extends Seeder
             PurchaseDocumentAmounts::suggestedIsv($taxable),
         );
 
-        $purchase = Purchase::create([
+        // Transacción: el correlativo del RI toma un lock que debe vivir hasta
+        // el COMMIT del INSERT.
+        $purchase = DB::transaction(fn (): Purchase => Purchase::create([
             'establishment_id' => $matriz->id,
             'supplier_id' => $supplier->id,
             'document_type' => $documentType,
-            'supplier_invoice_number' => $supplierInvoiceNumber,
+            'supplier_invoice_number' => $supplierInvoiceNumber
+                ?? $this->internalReceiptNumbers->next(Carbon::today()),
             'supplier_cai' => $supplierCai,
             'date' => Carbon::today(),
             // Forzado a 0 mientras no exista Cuentas por Pagar.
             'credit_days' => 0,
+            'payment_method' => PaymentMethod::Transferencia,
             'notes' => $notes,
             'created_by' => $carlos->id,
             // status explícito: el default SQL no se hidrata al modelo en
             // memoria y PurchaseService::confirm() necesita leerlo.
             'status' => PurchaseStatus::Borrador,
             ...$amounts->toAttributes(),
-        ]);
+        ]));
 
         try {
             $this->purchaseService->confirm($purchase);
@@ -563,77 +574,104 @@ class HistoricalOperationsSeeder extends Seeder
 
     /**
      * Sofía registra un gasto chico del día (gasolina, papelería, mensajería)
-     * con efectivo del cajón. El ExpenseService crea el Expense + el
-     * CashMovement bajo la sesión abierta — ambos ligados por expense_id.
+     * pagado con efectivo del cajón. Desde "todo en Compras" es una compra
+     * tipo Gasto: al confirmarla, PurchaseService saca el efectivo de la caja
+     * abierta y lo enlaza a la compra — igual que en la operación real.
      */
     private function processSmallCashExpense(User $sofia, Establishment $matriz): void
     {
-        // Mix realista de tipos de gasto chico.
+        // Mix realista de tipos de gasto chico. Con proveedor → factura con CAI.
         $expenseTypes = [
             [
                 'category' => ExpenseCategory::Combustible,
                 'description' => 'Gasolina entrega a cliente',
                 'amount_min' => 80, 'amount_max' => 250,
-                'has_invoice' => true,
+                'provider' => ['name' => 'Gasolinera UNO La Granja', 'rtn' => '08019970000001'],
             ],
             [
                 'category' => ExpenseCategory::Papeleria,
                 'description' => 'Papel térmico para impresora',
                 'amount_min' => 40, 'amount_max' => 120,
-                'has_invoice' => true,
+                'provider' => ['name' => 'Librería Universal', 'rtn' => '08019970000002'],
             ],
             [
                 'category' => ExpenseCategory::Mensajeria,
                 'description' => 'Envío encomienda — Cargo Expreso',
                 'amount_min' => 50, 'amount_max' => 200,
-                'has_invoice' => false,
+                'provider' => null,
             ],
             [
                 'category' => ExpenseCategory::Otros,
                 'description' => 'Café y refrigerios — atención cliente',
                 'amount_min' => 30, 'amount_max' => 100,
-                'has_invoice' => false,
+                'provider' => null,
             ],
         ];
 
         $type = $expenseTypes[array_rand($expenseTypes)];
-        $amount = mt_rand($type['amount_min'], $type['amount_max']);
-
-        $attributes = [
-            'establishment_id' => $matriz->id,
-            'user_id' => $sofia->id,
-            'expense_date' => Carbon::today(),
-            'category' => $type['category'],
-            'payment_method' => PaymentMethod::Efectivo,
-            'amount_total' => $amount,
-            'description' => $type['description'],
-            'is_isv_deductible' => $type['has_invoice'],
-            'created_by' => $sofia->id,
-        ];
-
-        if ($type['has_invoice']) {
-            // Factura con CAI: ExpenseService la copia al Libro de Compras
-            // (ExpenseFiscalDocumentSync), como en la operación real.
-            $isvBase = round($amount / 1.15, 2);
-            $attributes['taxable_amount'] = $isvBase;
-            $attributes['isv_amount'] = round($amount - $isvBase, 2);
-            $attributes['provider_invoice_cai'] = $this->generateCaiString();
-            $attributes['provider_invoice_date'] = Carbon::today();
-            $attributes['provider_name'] = match ($type['category']) {
-                ExpenseCategory::Combustible => 'Gasolinera UNO La Granja',
-                ExpenseCategory::Papeleria => 'Librería Universal',
-                default => 'Proveedor varios',
-            };
-            $attributes['provider_rtn'] = '08019970000001';
-            $attributes['provider_invoice_number'] = sprintf('001-001-01-%08d', mt_rand(50000, 99999));
-        }
+        $amount = (float) mt_rand($type['amount_min'], $type['amount_max']);
 
         try {
-            $this->expenseService->register($attributes);
+            DB::transaction(function () use ($type, $amount, $sofia, $matriz) {
+                $purchase = Purchase::create([
+                    ...$this->smallExpenseDocumentFields($type['provider'], $amount),
+                    'establishment_id' => $matriz->id,
+                    'kind' => PurchaseKind::Gasto,
+                    'expense_category' => $type['category'],
+                    'description' => $type['description'],
+                    'payment_method' => PaymentMethod::Efectivo,
+                    'date' => Carbon::today(),
+                    'credit_days' => 0,
+                    'status' => PurchaseStatus::Borrador,
+                    'created_by' => $sofia->id,
+                ]);
+
+                $this->purchaseService->confirm($purchase);
+            });
         } catch (\Throwable) {
             // Tolerancia: si el registro falla por alguna validación
             // inesperada, no abortar el día completo.
         }
+    }
+
+    /**
+     * Documento del gasto chico: factura con CAI si hay proveedor formal
+     * (el total incluye el 15%), Recibo Interno si no. Debe correr dentro de
+     * una transacción: el correlativo del RI toma un lock.
+     *
+     * @param  array{name: string, rtn: string}|null  $provider
+     * @return array<string, mixed>
+     */
+    private function smallExpenseDocumentFields(?array $provider, float $amount): array
+    {
+        if ($provider === null) {
+            return [
+                'supplier_id' => Supplier::forInternalReceipts()->id,
+                'document_type' => SupplierDocumentType::ReciboInterno,
+                'supplier_invoice_number' => $this->internalReceiptNumbers->next(Carbon::today()),
+                'supplier_cai' => null,
+                ...PurchaseDocumentAmounts::forDocument(SupplierDocumentType::ReciboInterno, 0, $amount, 0)->toAttributes(),
+            ];
+        }
+
+        $supplier = Supplier::firstOrCreate(
+            ['rtn' => $provider['rtn']],
+            ['name' => $provider['name'], 'is_active' => true, 'credit_days' => 0],
+        );
+        $taxable = round($amount / 1.15, 2);
+
+        return [
+            'supplier_id' => $supplier->id,
+            'document_type' => SupplierDocumentType::Factura,
+            'supplier_invoice_number' => sprintf('001-001-01-%08d', mt_rand(50000, 99999)),
+            'supplier_cai' => $this->generateCaiString(),
+            ...PurchaseDocumentAmounts::forDocument(
+                SupplierDocumentType::Factura,
+                $taxable,
+                0,
+                round($amount - $taxable, 2),
+            )->toAttributes(),
+        ];
     }
 
     /**

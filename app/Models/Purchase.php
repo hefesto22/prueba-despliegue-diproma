@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\ExpenseCategory;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Observers\PurchaseObserver;
@@ -12,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -24,10 +28,14 @@ class Purchase extends Model
     protected $fillable = [
         'purchase_number',
         'establishment_id',
-        'expense_id',
         'supplier_invoice_number',
         'supplier_cai',
         'document_type',
+        'kind',
+        'expense_category',
+        'description',
+        'payment_method',
+        'legacy_expense_id',
         'supplier_id',
         'date',
         'due_date',
@@ -53,6 +61,9 @@ class Purchase extends Model
             'status' => PurchaseStatus::class,
             'payment_status' => PaymentStatus::class,
             'document_type' => SupplierDocumentType::class,
+            'kind' => PurchaseKind::class,
+            'expense_category' => ExpenseCategory::class,
+            'payment_method' => PaymentMethod::class,
             'subtotal' => 'decimal:2',
             'taxable_total' => 'decimal:2',
             'exempt_total' => 'decimal:2',
@@ -125,6 +136,9 @@ class Purchase extends Model
                 'supplier_invoice_number',
                 'supplier_cai',
                 'document_type',
+                'kind',
+                'expense_category',
+                'payment_method',
                 'supplier_id',
                 'status',
                 'payment_status',
@@ -138,9 +152,9 @@ class Purchase extends Model
     // ─── Relaciones ──────────────────────────────────────────
 
     /**
-     * Sucursal a la que pertenece la compra (define a qué bodega entra el stock).
-     * Nullable a nivel DB por backward-compatibility con datos pre-F6a;
-     * toda compra nueva debe tener establecimiento (invariante en PurchaseService).
+     * Sucursal que recibió el documento; si se paga en efectivo, el dinero
+     * sale de la caja de esta sucursal. Nullable a nivel DB por
+     * backward-compatibility con datos pre-F6a.
      */
     public function establishment(): BelongsTo
     {
@@ -153,13 +167,13 @@ class Purchase extends Model
     }
 
     /**
-     * Gasto del que se generó esta compra (Fase 1b), o null si se registró
-     * directamente en Compras. Una compra generada desde un gasto se corrige
-     * desde el gasto, no desde Compras — ver ExpenseFiscalDocumentSync.
+     * Movimientos de caja de esta compra (salida al confirmar en efectivo y,
+     * si se anuló, su devolución). Referencia polimórfica de cash_movements,
+     * igual que las ventas.
      */
-    public function expense(): BelongsTo
+    public function cashMovements(): MorphMany
     {
-        return $this->belongsTo(Expense::class);
+        return $this->morphMany(CashMovement::class, 'reference');
     }
 
     public function items(): HasMany
@@ -172,6 +186,15 @@ class Purchase extends Model
     public function scopeStatus($query, PurchaseStatus $status)
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * Gastos operativos (no mercadería) — lo que resta la Utilidad Neta y
+     * lista el Reporte Mensual de Gastos.
+     */
+    public function scopeGastos($query)
+    {
+        return $query->where('kind', PurchaseKind::Gasto);
     }
 
     public function scopeBorradores($query)
@@ -216,12 +239,12 @@ class Purchase extends Model
     }
 
     /**
-     * ¿Se generó desde un gasto con factura? Entonces no se edita ni se
-     * anula desde Compras: el gasto es la fuente de verdad.
+     * ¿Se paga con efectivo de la caja? Entonces confirmarla saca el dinero
+     * de la caja abierta y anularla lo devuelve (PurchaseService).
      */
-    public function isFromExpense(): bool
+    public function isPaidFromCash(): bool
     {
-        return $this->expense_id !== null;
+        return $this->payment_method?->affectsCashBalance() ?? false;
     }
 
     /**
