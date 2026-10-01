@@ -98,6 +98,55 @@ class ProductGuidedFormTest extends TestCase
         $this->assertSame(999999, $servicio->stock, 'Un servicio lleva stock infinito.');
     }
 
+    public function test_tipo_personalizado_pregunta_producto_o_servicio_con_producto_por_defecto(): void
+    {
+        Livewire::test(CreateProduct::class)
+            ->assertFormFieldHidden('is_service')
+            ->fillForm(['type_choice' => 'otro', 'product_type' => 'CAMARA'])
+            ->assertFormFieldVisible('is_service')
+            ->assertSee('¿Es un producto o un servicio?')
+            ->assertSee('Servicio u honorario (sin inventario)')
+            ->assertFormFieldVisible('stock')
+            ->fillForm(['is_service' => true])
+            ->assertFormFieldHidden('stock')
+            ->assertFormFieldHidden('condition');
+    }
+
+    public function test_tipo_personalizado_como_producto_lleva_inventario(): void
+    {
+        Livewire::test(CreateProduct::class)
+            ->fillForm([
+                'type_choice' => 'otro',
+                'product_type' => 'CAMARA',
+                'cost_price' => 800,
+                'sale_price' => 1150,
+                'stock' => 3,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $camara = Product::query()->latest('id')->firstOrFail();
+        $this->assertFalse($camara->is_service);
+        $this->assertSame(3, $camara->stock);
+    }
+
+    public function test_al_editar_un_servicio_se_marca_servicio(): void
+    {
+        $honorarios = Product::factory()->create([
+            'product_type' => 'HONORARIOS',
+            'is_service' => true,
+            'tax_type' => TaxType::Exento,
+        ]);
+
+        Livewire::test(EditProduct::class, ['record' => $honorarios->getRouteKey()])
+            ->assertFormSet(['is_service' => 1])
+            ->assertFormFieldHidden('stock')
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($honorarios->fresh()->is_service);
+    }
+
     public function test_otro_tipo_sin_elegir_tipo_no_se_guarda(): void
     {
         Livewire::test(CreateProduct::class)

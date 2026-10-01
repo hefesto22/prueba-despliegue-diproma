@@ -30,9 +30,10 @@ use Illuminate\Support\HtmlString;
  *
  *   1. ¿Qué estás registrando?  → botones con ícono para los 8 tipos del
  *      enum + "Otro tipo…", que abre el buscador de tipos personalizados
- *      (Honorarios, Equipo de seguridad…) con la opción de escribir uno nuevo.
+ *      (Honorarios, Equipo de seguridad…) con la opción de escribir uno nuevo,
+ *      y la pregunta "¿Es un producto o un servicio?".
  *   2. Datos del producto       → marca, modelo y specs del tipo; en tipos
- *      personalizados: servicio sí/no, subtipo y descripción técnica.
+ *      personalizados: subtipo y descripción técnica.
  *   3. Precio                   → condición, costo y precio de venta.
  *   4. Inventario               → stock y alerta (no aplica a servicios).
  *   Opcional (colapsado)        → descripción, seriales, imagen, activo.
@@ -232,7 +233,46 @@ class ProductForm
                             $set('type_choice', $enum->value);
                         }
                     }),
+
+                self::serviceQuestion(),
             ]);
+    }
+
+    /**
+     * ¿Producto o servicio? Solo para tipos personalizados: los del enum son
+     * siempre productos físicos. Va pegada al tipo porque decide el resto del
+     * formulario: si se muestran Condición e Inventario, si el POS deja editar
+     * el precio y si se descuenta stock al vender.
+     *
+     * Producto va primero y es el default: ante la duda, no se oculta el
+     * inventario.
+     */
+    private static function serviceQuestion(): ToggleButtons
+    {
+        return ToggleButtons::make('is_service')
+            ->label('¿Es un producto o un servicio?')
+            // boolean() aporta el cast a bool; las opciones se redefinen para
+            // poner Producto primero y con textos claros.
+            ->boolean()
+            ->options([
+                0 => 'Producto (lleva inventario)',
+                1 => 'Servicio u honorario (sin inventario)',
+            ])
+            ->icons([
+                0 => 'heroicon-o-cube',
+                1 => 'heroicon-o-wrench-screwdriver',
+            ])
+            ->colors([
+                0 => 'primary',
+                1 => 'primary',
+            ])
+            ->helperText(fn (callable $get): string => self::isService($get)
+                ? 'Honorarios, instalación, mantenimiento, asesoría: no lleva stock y el precio se ajusta al facturar.'
+                : 'Cámaras, biométricos, equipos: lleva stock y se descuenta al vender.')
+            ->inline()
+            ->default(false)
+            ->visible(fn (callable $get): bool => self::isCustomType($get))
+            ->live();
     }
 
     /**
@@ -365,20 +405,6 @@ class ProductForm
             ->description(fn (callable $get): ?string => self::detailsSectionDescription($get))
             ->compact()
             ->schema([
-                // Solo tipos personalizados: los del enum son siempre productos
-                // físicos. Controla si se muestran Condición e Inventario, si
-                // el POS deja editar el precio y si se descuenta stock al vender.
-                // Default false: ante la duda, producto físico (no oculta el
-                // inventario).
-                Toggle::make('is_service')
-                    ->label('Es un servicio (sin inventario)')
-                    ->helperText('Sí: honorarios, instalación, mantenimiento, asesoría. No: equipos físicos como cámaras o biométricos.')
-                    ->default(false)
-                    ->onColor('warning')
-                    ->offColor('success')
-                    ->visible(fn (callable $get): bool => self::isCustomType($get))
-                    ->live(),
-
                 Grid::make(2)->schema([
                     TextInput::make('brand')
                         ->label('Marca')
@@ -760,7 +786,7 @@ class ProductForm
 
     /**
      * ¿El tipo seleccionado es CUSTOM (no es uno de los 8 enum cases)?
-     * Determina si se muestran servicio sí/no, subtipo y descripción técnica.
+     * Determina si se muestran "¿producto o servicio?", subtipo y descripción técnica.
      */
     private static function isCustomType($get): bool
     {
