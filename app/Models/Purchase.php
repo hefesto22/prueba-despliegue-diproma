@@ -167,9 +167,9 @@ class Purchase extends Model
     }
 
     /**
-     * Movimientos de caja de esta compra (salida al confirmar en efectivo y,
-     * si se anuló, su devolución). Referencia polimórfica de cash_movements,
-     * igual que las ventas.
+     * Salida de caja histórica de los gastos migrados del módulo Gastos
+     * (2026-09-28). Las compras nuevas no mueven la caja: esta relación solo
+     * conserva el rastro de lo que ya había salido del cajón.
      */
     public function cashMovements(): MorphMany
     {
@@ -236,15 +236,6 @@ class Purchase extends Model
     public function isEditable(): bool
     {
         return $this->status->isEditable();
-    }
-
-    /**
-     * ¿Se paga con efectivo de la caja? Entonces confirmarla saca el dinero
-     * de la caja abierta y anularla lo devuelve (PurchaseService).
-     */
-    public function isPaidFromCash(): bool
-    {
-        return $this->payment_method?->affectsCashBalance() ?? false;
     }
 
     /**

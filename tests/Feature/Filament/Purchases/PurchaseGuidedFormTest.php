@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Purchases;
 
-use App\Enums\CashMovementType;
 use App\Enums\ExpenseCategory;
-use App\Enums\PaymentMethod;
 use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
@@ -16,7 +14,7 @@ use App\Models\CashMovement;
 use App\Models\Establishment;
 use App\Models\Purchase;
 use App\Models\User;
-use App\Services\Cash\CashSessionService;
+use App\Services\Purchases\PurchaseService;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,9 +28,10 @@ use Tests\TestCase;
 
 /**
  * Formulario guiado de Compras (rediseño 2026-09-29):
- *   - Elegir el tipo sugiere documento y forma de pago (solo al crear).
- *   - "Guardar y confirmar" registra y confirma de un clic; si confirmar
- *     falla, la compra queda como borrador y se avisa por qué.
+ *   - Elegir el tipo sugiere el documento (solo al crear).
+ *   - "Guardar y confirmar" registra y confirma de un clic, sin mover la
+ *     caja; si confirmar falla, queda como borrador y se avisa por qué.
+ *   - Los montos empiezan vacíos: vacío cuenta como 0.
  *   - La sucursal se oculta con una sola sucursal activa, pero se guarda.
  *   - El resumen muestra el total y lo que pasará al confirmar.
  */
@@ -84,33 +83,22 @@ class PurchaseGuidedFormTest extends TestCase
 
     // ─── Sugerencias al elegir el tipo ───────────────────────
 
-    public function test_elegir_gasto_sugiere_recibo_y_efectivo(): void
+    public function test_elegir_gasto_sugiere_recibo_sin_elegir_forma_de_pago(): void
     {
         Livewire::test(CreatePurchase::class)
             ->fillForm(['kind' => PurchaseKind::Gasto->value])
             ->assertFormSet([
                 'document_type' => SupplierDocumentType::ReciboInterno->value,
-                'payment_method' => PaymentMethod::Efectivo,
+                'payment_method' => null,
             ]);
     }
 
-    public function test_volver_a_mercaderia_sugiere_factura_y_respeta_la_forma_de_pago(): void
+    public function test_volver_a_mercaderia_sugiere_factura(): void
     {
         Livewire::test(CreatePurchase::class)
             ->fillForm(['kind' => PurchaseKind::Gasto->value])
             ->fillForm(['kind' => PurchaseKind::Mercaderia->value])
-            ->assertFormSet([
-                'document_type' => SupplierDocumentType::Factura->value,
-                'payment_method' => PaymentMethod::Efectivo,
-            ]);
-    }
-
-    public function test_la_forma_de_pago_elegida_no_se_pisa(): void
-    {
-        Livewire::test(CreatePurchase::class)
-            ->fillForm(['payment_method' => PaymentMethod::Transferencia->value])
-            ->fillForm(['kind' => PurchaseKind::Gasto->value])
-            ->assertFormSet(['payment_method' => PaymentMethod::Transferencia]);
+            ->assertFormSet(['document_type' => SupplierDocumentType::Factura->value]);
     }
 
     public function test_al_editar_cambiar_el_tipo_no_cambia_el_documento(): void
@@ -127,10 +115,8 @@ class PurchaseGuidedFormTest extends TestCase
 
     // ─── Guardar y confirmar ─────────────────────────────────
 
-    public function test_guardar_y_confirmar_registra_el_gasto_y_saca_el_efectivo(): void
+    public function test_guardar_y_confirmar_registra_el_gasto_sin_mover_la_caja(): void
     {
-        $caja = app(CashSessionService::class)->open($this->matriz->id, $this->admin, 500.00);
-
         Livewire::test(CreatePurchase::class)
             ->fillForm($this->taxiPayload())
             ->call('createAndConfirm')
@@ -140,32 +126,32 @@ class PurchaseGuidedFormTest extends TestCase
         $gasto = Purchase::query()->latest('id')->firstOrFail();
         $this->assertSame(PurchaseStatus::Confirmada, $gasto->status);
         $this->assertSame(SupplierDocumentType::ReciboInterno, $gasto->document_type);
-        $this->assertDatabaseHas('cash_movements', [
-            'cash_session_id' => $caja->id,
-            'type' => CashMovementType::Expense->value,
-            'amount' => '120.00',
-            'reference_type' => Purchase::class,
-            'reference_id' => $gasto->id,
-        ]);
+        $this->assertNull($gasto->payment_method, 'La forma de pago es opcional.');
+        $this->assertSame(0, CashMovement::count());
     }
 
-    public function test_guardar_y_confirmar_sin_caja_abierta_deja_el_borrador_y_avisa(): void
+    public function test_si_confirmar_falla_queda_el_borrador_y_avisa(): void
     {
+        $this->app->instance(PurchaseService::class, new class extends PurchaseService
+        {
+            public function confirm(Purchase $purchase): void
+            {
+                throw new \InvalidArgumentException('El período fiscal ya fue declarado.');
+            }
+        });
+
         Livewire::test(CreatePurchase::class)
             ->fillForm($this->taxiPayload())
             ->call('createAndConfirm')
             ->assertHasNoFormErrors()
             ->assertNotified('Se guardó como borrador, sin confirmar');
 
-        $gasto = Purchase::query()->latest('id')->firstOrFail();
-        $this->assertSame(PurchaseStatus::Borrador, $gasto->status, 'Lo capturado no se pierde.');
-        $this->assertSame(0, CashMovement::count());
+        $this->assertSame(PurchaseStatus::Borrador, Purchase::query()->latest('id')->value('status'),
+            'Lo capturado no se pierde.');
     }
 
     public function test_guardar_borrador_no_confirma(): void
     {
-        app(CashSessionService::class)->open($this->matriz->id, $this->admin, 500.00);
-
         Livewire::test(CreatePurchase::class)
             ->fillForm($this->taxiPayload())
             ->call('create')
@@ -173,7 +159,6 @@ class PurchaseGuidedFormTest extends TestCase
             ->assertNotified('Borrador guardado');
 
         $this->assertSame(PurchaseStatus::Borrador, Purchase::query()->latest('id')->value('status'));
-        $this->assertSame(0, CashMovement::where('type', CashMovementType::Expense->value)->count());
     }
 
     public function test_sin_permiso_de_confirmar_solo_se_guarda_borrador(): void
@@ -186,8 +171,6 @@ class PurchaseGuidedFormTest extends TestCase
         $user->assignRole($role);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->actingAs($user);
-
-        app(CashSessionService::class)->open($this->matriz->id, $this->admin, 500.00);
 
         Livewire::test(CreatePurchase::class)
             ->assertDontSee('Guardar y confirmar')
@@ -229,7 +212,39 @@ class PurchaseGuidedFormTest extends TestCase
             ->fillForm($this->taxiPayload())
             ->assertSee('L 120.00')
             ->assertSee('No entra al Libro de Compras.')
-            ->assertSee('de la caja abierta')
-            ->assertSee('Resta de la utilidad del mes.');
+            ->assertSee('Resta de la utilidad del mes.')
+            ->assertDontSee('caja abierta');
+    }
+
+    public function test_los_montos_empiezan_vacios_y_vacio_cuenta_como_cero(): void
+    {
+        Livewire::test(CreatePurchase::class)
+            ->assertFormSet(['exempt_total' => null, 'taxable_total' => null, 'isv' => null])
+            ->fillForm([
+                'supplier_id' => \App\Models\Supplier::factory()->create(['is_generic' => false])->id,
+                'supplier_invoice_number' => '001-001-01-00000077',
+                'supplier_cai' => 'ABCDEF-123456-789ABC-DEF012-345678-AB',
+                'taxable_total' => 200.00,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $factura = Purchase::query()->latest('id')->firstOrFail();
+        $this->assertEquals(0.00, (float) $factura->exempt_total, 'Exento vacío se guarda como 0.');
+        $this->assertEquals(230.00, (float) $factura->total);
+    }
+
+    public function test_factura_sin_ningun_monto_se_rechaza(): void
+    {
+        Livewire::test(CreatePurchase::class)
+            ->fillForm([
+                'supplier_id' => \App\Models\Supplier::factory()->create(['is_generic' => false])->id,
+                'supplier_invoice_number' => '001-001-01-00000078',
+                'supplier_cai' => 'ABCDEF-123456-789ABC-DEF012-345678-AB',
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['taxable_total']);
+
+        $this->assertSame(0, Purchase::count());
     }
 }

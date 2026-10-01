@@ -155,9 +155,9 @@ class CashBalanceCalculator
      *   - Solo `type = Expense` (no SupplierPayment ni Deposit — esos tienen
      *     sus propios reportes).
      *   - Solo `payment_method = Efectivo` — las categorías existen para
-     *     trackear caja chica (compras tipo Gasto pagadas con efectivo, ver
-     *     PurchaseService). Un movimiento no-efectivo se ignora para no
-     *     contaminar el reporte del cierre con gastos que no afectaron el cajón.
+     *     trackear caja chica. Hoy solo quedan movimientos históricos (las
+     *     compras no mueven la caja desde 2026-09-29). Un movimiento
+     *     no-efectivo se ignora para no contaminar el reporte del cierre.
      *
      * Los movimientos sin `category` (no debería pasar por validación, pero
      * defensivamente) se agrupan bajo `ExpenseCategory::Otros`.

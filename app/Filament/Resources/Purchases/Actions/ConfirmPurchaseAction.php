@@ -71,17 +71,12 @@ final class ConfirmPurchaseAction
             ? '<li>Es un <strong>Recibo Interno</strong>: queda como control interno y <strong>no entra al Libro de Compras SAR</strong>.</li>'
             : '<li>El documento <strong>entra al Libro de Compras SAR</strong> del mes y su ISV cuenta como crédito fiscal.</li>';
 
-        $cashLine = $record->isPaidFromCash()
-            ? '<li>Se paga en <strong>efectivo</strong>: salen <strong>L '.number_format((float) $record->total, 2).'</strong> de la caja abierta de la sucursal (si no hay caja abierta, no se puede confirmar).</li>'
-            : '';
-
         return '<div class="space-y-3 text-sm">'
             .'<p>Al confirmar, esta compra deja de ser un borrador editable:</p>'
             .'<ul class="list-disc list-inside space-y-1">'
             .$bookLine
-            .$cashLine
             .'<li>Si es de contado, queda <strong>marcada como Pagada</strong>.</li>'
-            .'<li>El inventario <strong>no cambia</strong>: los equipos se ingresan desde Productos.</li>'
+            .'<li>La caja <strong>no cambia</strong> y el inventario tampoco: los equipos se ingresan desde Productos.</li>'
             .'</ul>'
             .'<div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-amber-900 dark:text-amber-200">'
             .'Verifique número, CAI y montos contra la factura antes de confirmar: después solo se puede anular.'

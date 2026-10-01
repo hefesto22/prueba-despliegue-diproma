@@ -76,9 +76,9 @@ class CreatePurchase extends CreateRecord
     }
 
     /**
-     * Si confirmar falla (p. ej. pago en efectivo sin caja abierta) la compra
-     * NO se pierde: queda como borrador y el aviso explica por qué. Confirmar
-     * corre en su propia transacción dentro de PurchaseService.
+     * Si confirmar falla (p. ej. el período fiscal ya fue declarado) la
+     * compra NO se pierde: queda como borrador y el aviso explica por qué.
+     * Confirmar corre en su propia transacción dentro de PurchaseService.
      */
     protected function afterCreate(): void
     {

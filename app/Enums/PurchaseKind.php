@@ -69,19 +69,6 @@ enum PurchaseKind: string implements HasColor, HasIcon, HasLabel
     }
 
     /**
-     * Forma de pago habitual, o null si no hay una que predomine. Un gasto
-     * del día se paga del cajón; la mercadería varía (transferencia, cheque…)
-     * y es mejor que el operador la elija.
-     */
-    public function suggestedPaymentMethod(): ?PaymentMethod
-    {
-        return match ($this) {
-            self::Mercaderia => null,
-            self::Gasto => PaymentMethod::Efectivo,
-        };
-    }
-
-    /**
      * Normaliza el state de un campo de formulario (string o enum) a enum.
      */
     public static function fromState(mixed $state): ?self

@@ -2,7 +2,7 @@
     Resumen de la compra — columna derecha del formulario de Compras.
 
     Muestra el total del documento y lo que pasará al confirmar (Libro de
-    Compras, caja, utilidad). El total NO es un campo editable: se deriva de
+    Compras, utilidad). Registrar una compra no mueve la caja. El total NO es un campo editable: se deriva de
     exento + gravado + ISV en PurchaseDocumentAmounts, así que el invariante
     no se puede romper. Se muestra grande para que el operador lo compare
     contra el total impreso en el documento.
@@ -30,6 +30,9 @@
         </div>
         @if ($supplierName)
             <div class="text-gray-500 dark:text-gray-400">{{ $supplierName }}</div>
+        @endif
+        @if ($paymentMethod)
+            <div class="text-gray-500 dark:text-gray-400">Pagado con {{ mb_strtolower($paymentMethod->getLabel()) }}</div>
         @endif
     </div>
 
@@ -74,14 +77,6 @@
                     <li>No entra al Libro de Compras.</li>
                 @else
                     <li>Entra al Libro de Compras con L {{ number_format($amounts->isv, 2) }} de crédito fiscal.</li>
-                @endif
-
-                @if ($paymentMethod === \App\Enums\PaymentMethod::Efectivo)
-                    <li>Salen <strong>L {{ number_format($amounts->total(), 2) }}</strong> de la caja abierta.</li>
-                @elseif ($paymentMethod)
-                    <li>Pago con {{ mb_strtolower($paymentMethod->getLabel()) }}: la caja no cambia.</li>
-                @else
-                    <li>Falta elegir la forma de pago.</li>
                 @endif
 
                 @if ($kind === \App\Enums\PurchaseKind::Gasto)

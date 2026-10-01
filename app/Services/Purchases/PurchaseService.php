@@ -2,18 +2,14 @@
 
 namespace App\Services\Purchases;
 
-use App\Enums\CashMovementType;
 use App\Enums\MovementType;
-use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
-use App\Enums\PurchaseKind;
 use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Enums\TaxType;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Purchase;
-use App\Services\Cash\CashSessionService;
 use App\Services\Purchases\Exceptions\CompraConProductosHeredadaException;
 use Illuminate\Support\Facades\DB;
 
@@ -34,15 +30,11 @@ use Illuminate\Support\Facades\DB;
  *   - Una CONFIRMADA heredada que se anula sigue revirtiendo su stock, porque
  *     esas unidades sí entraron al inventario cuando se confirmó.
  *
- * ─── Pago con efectivo de caja ("todo en Compras", 2026-09-28) ─────────────
- * Compras registra también los gastos operativos, así que es quien saca el
- * dinero del cajón. Si la compra se paga en efectivo:
- *   - confirmar registra la salida en la caja ABIERTA de su sucursal
- *     (Gasto si es gasto operativo, Pago a proveedor si es mercadería). Sin
- *     caja abierta no se puede confirmar: el cierre no cuadraría.
- *   - anular una confirmada devuelve el dinero a la caja abierta, igual que
- *     se hace al anular una venta.
- * Ambos movimientos van enlazados a la compra (referencia polimórfica).
+ * ─── Compras NO mueven la caja (decisión 2026-09-29) ───────────────────────
+ * Registrar una compra o un gasto es solo registrar el documento. La forma de
+ * pago es informativa: confirmar o anular nunca crea movimientos de caja.
+ * Los gastos migrados del módulo Gastos conservan su salida de caja histórica
+ * enlazada (Purchase::cashMovements), pero anularlos no la revierte.
  *
  * ─── Concurrencia ───────────────────────────────────────────────────────────
  * Ambas transiciones releen la compra con `lockForUpdate()` y validan el
@@ -52,17 +44,12 @@ use Illuminate\Support\Facades\DB;
  */
 class PurchaseService
 {
-    public function __construct(
-        private readonly CashSessionService $cashSessions,
-    ) {}
-
     /**
      * Confirmar una compra: el documento pasa a formar parte del Libro de
      * Compras (salvo Recibo Interno) y, si es de contado, queda Pagada.
      *
      * @throws \InvalidArgumentException Si la compra no está en Borrador.
      * @throws CompraConProductosHeredadaException Si es un borrador heredado con líneas de producto.
-     * @throws \App\Exceptions\Cash\NoHayCajaAbiertaException Si se paga en efectivo y la sucursal no tiene caja abierta.
      */
     public function confirm(Purchase $purchase): void
     {
@@ -90,10 +77,6 @@ class PurchaseService
             }
 
             $locked->update($updates);
-
-            if ($locked->isPaidFromCash()) {
-                $this->recordCashOutflow($locked);
-            }
         });
 
         $purchase->refresh();
@@ -110,7 +93,6 @@ class PurchaseService
      * El payment_status no se toca: queda como histórico de que se pagó.
      *
      * @throws \InvalidArgumentException Si la compra ya está anulada.
-     * @throws \App\Exceptions\Cash\NoHayCajaAbiertaException Si su pago salió de caja y no hay caja abierta para devolverlo.
      */
     public function cancel(Purchase $purchase): void
     {
@@ -123,7 +105,6 @@ class PurchaseService
 
             if ($locked->status === PurchaseStatus::Confirmada) {
                 $this->reverseLegacyStock($locked);
-                $this->returnCashIfPaidFromDrawer($locked);
             }
 
             $locked->update(['status' => PurchaseStatus::Anulada]);
@@ -171,70 +152,6 @@ class PurchaseService
             ->whereKey($purchase->getKey())
             ->lockForUpdate()
             ->firstOrFail();
-    }
-
-    /**
-     * Registrar en la caja abierta de la sucursal el dinero que sale para
-     * pagar esta compra.
-     */
-    private function recordCashOutflow(Purchase $purchase): void
-    {
-        $isExpense = $purchase->kind === PurchaseKind::Gasto;
-
-        $this->cashSessions->recordMovementWithinTransaction(
-            establishmentId: (int) $purchase->establishment_id,
-            attributes: [
-                'user_id' => auth()->id() ?? $purchase->created_by,
-                'type' => $isExpense ? CashMovementType::Expense : CashMovementType::SupplierPayment,
-                'payment_method' => PaymentMethod::Efectivo,
-                'amount' => (float) $purchase->total,
-                'category' => $isExpense ? $purchase->expense_category : null,
-                'description' => $this->cashDescription($purchase),
-                'reference_type' => Purchase::class,
-                'reference_id' => $purchase->id,
-            ],
-        );
-    }
-
-    /**
-     * Devolver a la caja abierta el efectivo que salió al confirmar la
-     * compra. Se basa en el movimiento registrado, no en payment_method, para
-     * cubrir también los gastos migrados (su salida de caja es anterior).
-     */
-    private function returnCashIfPaidFromDrawer(Purchase $purchase): void
-    {
-        $paidFromDrawer = $purchase->cashMovements()
-            ->whereIn('type', [CashMovementType::Expense->value, CashMovementType::SupplierPayment->value])
-            ->where('payment_method', PaymentMethod::Efectivo->value)
-            ->sum('amount');
-
-        if ((float) $paidFromDrawer <= 0) {
-            return;
-        }
-
-        $this->cashSessions->recordMovementWithinTransaction(
-            establishmentId: (int) $purchase->establishment_id,
-            attributes: [
-                'user_id' => auth()->id() ?? $purchase->created_by,
-                'type' => CashMovementType::PurchaseCancellation,
-                'payment_method' => PaymentMethod::Efectivo,
-                'amount' => round((float) $paidFromDrawer, 2),
-                'description' => "Anulación de la compra {$purchase->purchase_number}",
-                'reference_type' => Purchase::class,
-                'reference_id' => $purchase->id,
-            ],
-        );
-    }
-
-    private function cashDescription(Purchase $purchase): string
-    {
-        $purchase->loadMissing('supplier:id,name');
-
-        $concept = $purchase->kind === PurchaseKind::Gasto && filled($purchase->description)
-            ? $purchase->description
-            : ($purchase->supplier?->name ?? 'Proveedor');
-
-        return "Compra {$purchase->purchase_number} — {$concept}";
     }
 
     /**

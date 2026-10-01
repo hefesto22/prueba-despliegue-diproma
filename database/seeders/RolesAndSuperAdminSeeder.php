@@ -67,6 +67,16 @@ class RolesAndSuperAdminSeeder extends Seeder
     public const ROLE_TECNICO = 'tecnico';
 
     /**
+     * Email del super_admin — público porque otros seeders (DemoUsersSeeder)
+     * necesitan ubicarlo para encadenar `created_by`. Mantenerlo privado
+     * obligaría a duplicar el string, lo que rompería al cambiar el dueño
+     * del sistema en el futuro.
+     */
+    public const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
+
+    private const SUPER_ADMIN_NAME = 'Administrador Diproma';
+
+    /**
      * Datos del super admin humano — se ubica/crea por email para que re-correr
      * el seeder no resetee password ni name si Mauricio los cambió desde el panel.
      *
@@ -77,16 +87,6 @@ class RolesAndSuperAdminSeeder extends Seeder
      * aún rotar el password directamente desde el panel y dejar el seeder solo
      * para crear el usuario inicial.
      */
-    /**
-     * Email del super_admin — público porque otros seeders (DemoUsersSeeder)
-     * necesitan ubicarlo para encadenar `created_by`. Mantenerlo privado
-     * obligaría a duplicar el string, lo que rompería al cambiar el dueño
-     * del sistema en el futuro.
-     */
-    public const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
-
-    private const SUPER_ADMIN_NAME = 'Administrador Diproma';
-
     private const SUPER_ADMIN_DEFAULT_PASSWORD = '12345678';
 
     /**
@@ -527,8 +527,8 @@ class RolesAndSuperAdminSeeder extends Seeder
 
         // Compras: desde "todo en Compras" (2026-09-28) los gastos del día
         // (taxi, gasolina, papelería) se registran aquí como compra tipo
-        // Gasto pagada en efectivo. Update para corregir su borrador antes de
-        // confirmarlo; sin Delete (anular es la vía, con su rastro en caja).
+        // Gasto. Update para corregir su borrador y confirmarlo; sin Delete
+        // (anular una confirmada queda para el admin).
         $deseados = array_merge(
             $deseados,
             $this->buildResourcePermissions('Purchase', [

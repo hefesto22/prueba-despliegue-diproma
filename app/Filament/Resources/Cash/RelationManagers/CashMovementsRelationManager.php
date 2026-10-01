@@ -26,8 +26,10 @@ use Illuminate\Database\Eloquent\Builder;
  *   - CashSessionService::close()     → ClosingBalance
  *   - SaleService::process()          → SaleIncome
  *   - SaleService::cancel()           → SaleCancellation
- *   - PurchaseService::confirm()      → Expense / SupplierPayment (compra en efectivo)
- *   - PurchaseService::cancel()       → PurchaseCancellation (devuelve ese efectivo)
+ *
+ * Las compras no mueven la caja (2026-09-29). Los Expense/SupplierPayment y
+ * PurchaseCancellation que aparezcan son históricos (módulo Gastos y
+ * pruebas del 2026-09-28).
  *
  * NO se exponen create/edit/delete actions ni en el header ni por row. Esto
  * es consistente con CashMovementPolicy que documenta que los permisos

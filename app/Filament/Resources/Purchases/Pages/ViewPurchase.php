@@ -118,9 +118,7 @@ class ViewPurchase extends ViewRecord
             .'<p>Anular una compra confirmada es para casos excepcionales (documento registrado por error o duplicado):</p>'
             .'<ul class="list-disc list-inside space-y-1">'
             .'<li>La compra <strong>sale del Libro de Compras</strong> y su ISV deja de contar como crédito fiscal.</li>'
-            .($record->isPaidFromCash()
-                ? '<li>Se pagó en <strong>efectivo</strong>: los <strong>L '.number_format((float) $record->total, 2).'</strong> vuelven a la caja abierta de la sucursal (hace falta una caja abierta para anular).</li>'
-                : '<li>Si era de contado sigue marcada <strong>Pagada</strong>: el dinero ya se entregó.</li>')
+            .'<li>Si era de contado sigue marcada <strong>Pagada</strong>: el dinero ya se entregó. La caja no cambia.</li>'
             .$legacyStock
             .'</ul>'
             .'<p class="text-xs italic text-gray-500 dark:text-gray-400">Si el período fiscal ya fue declarado, el sistema no permitirá anularla sin reabrirlo.</p>'

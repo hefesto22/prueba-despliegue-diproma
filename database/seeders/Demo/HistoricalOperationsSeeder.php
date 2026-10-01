@@ -574,9 +574,8 @@ class HistoricalOperationsSeeder extends Seeder
 
     /**
      * Sofía registra un gasto chico del día (gasolina, papelería, mensajería)
-     * pagado con efectivo del cajón. Desde "todo en Compras" es una compra
-     * tipo Gasto: al confirmarla, PurchaseService saca el efectivo de la caja
-     * abierta y lo enlaza a la compra — igual que en la operación real.
+     * pagado en efectivo. Desde "todo en Compras" es una compra tipo Gasto;
+     * registrarla no mueve la caja (2026-09-29).
      */
     private function processSmallCashExpense(User $sofia, Establishment $matriz): void
     {

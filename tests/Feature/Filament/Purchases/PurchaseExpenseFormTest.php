@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Purchases;
 
-use App\Enums\CashMovementType;
 use App\Enums\ExpenseCategory;
 use App\Enums\PaymentMethod;
 use App\Enums\PurchaseKind;
@@ -16,7 +15,6 @@ use App\Filament\Resources\Purchases\Pages\ViewPurchase;
 use App\Models\CashMovement;
 use App\Models\Purchase;
 use App\Models\User;
-use App\Services\Cash\CashSessionService;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,7 +29,7 @@ use Tests\TestCase;
 /**
  * Gastos registrados desde Compras ("todo en Compras", 2026-09-28):
  *   - Tipo Gasto exige categoría y concepto; Mercadería no los guarda.
- *   - El borrador no mueve la caja; confirmar un gasto en efectivo sí.
+ *   - Ni el borrador ni la confirmación mueven la caja.
  *   - Permisos de las acciones: confirmar exige Update; anular una
  *     confirmada exige Delete (el cajero confirma sus gastos pero no anula).
  */
@@ -139,7 +137,7 @@ class PurchaseExpenseFormTest extends TestCase
         $this->assertSame(PurchaseStatus::Borrador, $gasto->status);
         $this->assertSame('RI-20260928-0001', $gasto->supplier_invoice_number);
         $this->assertEquals(120.00, (float) $gasto->total);
-        $this->assertSame(0, CashMovement::count(), 'El borrador todavía no saca dinero de la caja.');
+        $this->assertSame(0, CashMovement::count(), 'Registrar compras no mueve la caja.');
     }
 
     public function test_pasar_un_gasto_a_mercaderia_limpia_categoria_y_concepto(): void
@@ -164,10 +162,10 @@ class PurchaseExpenseFormTest extends TestCase
         $this->assertNull($gasto->description);
     }
 
-    public function test_confirmar_gasto_en_efectivo_desde_la_vista_saca_el_dinero_de_la_caja(): void
+    public function test_confirmar_gasto_en_efectivo_no_mueve_la_caja(): void
     {
-        $caja = app(CashSessionService::class)->open($this->matriz->id, $this->admin, 500.00);
-
+        // Registrar compras no mueve la caja (2026-09-29): ni con caja abierta
+        // ni hace falta abrirla para confirmar un gasto pagado en efectivo.
         Livewire::test(CreatePurchase::class)
             ->fillForm($this->gastoPayload())
             ->call('create');
@@ -177,33 +175,8 @@ class PurchaseExpenseFormTest extends TestCase
             ->callAction('confirm')
             ->assertHasNoActionErrors();
 
-        $this->assertDatabaseHas('cash_movements', [
-            'cash_session_id' => $caja->id,
-            'type' => CashMovementType::Expense->value,
-            'amount' => '120.00',
-            'category' => ExpenseCategory::Otros->value,
-            'reference_type' => Purchase::class,
-            'reference_id' => $gasto->id,
-        ]);
-    }
-
-    public function test_sin_caja_abierta_la_vista_avisa_y_el_gasto_queda_en_borrador(): void
-    {
-        $gasto = Purchase::factory()->forEstablishment($this->matriz)->create([
-            'kind' => PurchaseKind::Gasto,
-            'expense_category' => ExpenseCategory::Otros,
-            'description' => 'Taxi',
-            'payment_method' => PaymentMethod::Efectivo,
-            'exempt_total' => 80,
-            'subtotal' => 80,
-            'total' => 80,
-        ]);
-
-        Livewire::test(ViewPurchase::class, ['record' => $gasto->getRouteKey()])
-            ->callAction('confirm')
-            ->assertNotified('No se pudo confirmar');
-
-        $this->assertSame(PurchaseStatus::Borrador, $gasto->fresh()->status);
+        $this->assertSame(PurchaseStatus::Confirmada, $gasto->fresh()->status);
+        $this->assertSame(0, CashMovement::count());
     }
 
     // ─── Permisos de las acciones ────────────────────────────

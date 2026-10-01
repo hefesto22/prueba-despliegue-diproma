@@ -41,8 +41,10 @@ use Illuminate\Validation\Rule;
  *   3. Datos del documento        → concepto, proveedor, fecha, # y CAI
  *   4. Monto y pago
  *
- * Al elegir el tipo se sugieren documento y forma de pago
- * (PurchaseKind::suggestedDocumentType / suggestedPaymentMethod).
+ * Al elegir el tipo se sugiere el documento (PurchaseKind::suggestedDocumentType).
+ *
+ * Registrar una compra no mueve la caja (2026-09-29): la forma de pago es
+ * opcional e informativa.
  *
  * Sin pestañas a propósito: el operador está transcribiendo un documento en
  * papel y necesita verlo completo para compararlo contra el original.
@@ -91,37 +93,29 @@ class PurchaseForm
                     ->inline()
                     ->required()
                     ->live()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get, string $operation): void {
+                    ->afterStateUpdated(function ($state, callable $set, string $operation): void {
                         // Solo al crear: en una edición el operador ya eligió
-                        // documento y pago a propósito.
+                        // el documento a propósito.
                         if ($operation === 'create') {
-                            self::applyKindSuggestions($state, $set, $get);
+                            self::applyKindSuggestion($state, $set);
                         }
                     }),
             ]);
     }
 
     /**
-     * Preselecciona el documento y la forma de pago habituales del tipo
-     * elegido. La forma de pago solo se completa si está vacía.
+     * Preselecciona el documento habitual del tipo elegido.
      */
-    private static function applyKindSuggestions(mixed $kind, callable $set, callable $get): void
+    private static function applyKindSuggestion(mixed $kind, callable $set): void
     {
-        $kind = PurchaseKind::fromState($kind);
+        $documentType = PurchaseKind::fromState($kind)?->suggestedDocumentType();
 
-        if ($kind === null) {
+        if ($documentType === null) {
             return;
         }
 
-        $documentType = $kind->suggestedDocumentType();
         $set('document_type', $documentType->value);
         self::applyDocumentType($documentType->value, $set);
-
-        $payment = $kind->suggestedPaymentMethod();
-
-        if ($payment !== null && blank($get('payment_method'))) {
-            $set('payment_method', $payment->value);
-        }
     }
 
     // ─── 2. ¿Qué documento te dieron? ───────────────────────────────────────
@@ -172,8 +166,8 @@ class PurchaseForm
         $set('supplier_invoice_number', '');
         $set('credit_days', 0);
         $set('_prefill_source_date', null);
-        $set('taxable_total', 0);
-        $set('isv', 0);
+        $set('taxable_total', null);
+        $set('isv', null);
     }
 
     // ─── 3. Datos del documento ─────────────────────────────────────────────
@@ -374,6 +368,8 @@ class PurchaseForm
                         ->label(fn (callable $get): string => SupplierDocumentType::isReciboInterno($get('document_type'))
                             ? 'Total pagado'
                             : 'Importe exento')
+                        // En un recibo es el único monto: tiene que venir.
+                        ->required(fn (callable $get): bool => SupplierDocumentType::isReciboInterno($get('document_type')))
                         ->helperText(fn (callable $get): ?string => SupplierDocumentType::isReciboInterno($get('document_type'))
                             ? null
                             : 'Usados, servicios exentos, combustible.'),
@@ -385,7 +381,7 @@ class PurchaseForm
                         // operador puede corregirlo para que coincida con el documento.
                         ->afterStateUpdated(fn ($state, callable $set) => $set(
                             'isv',
-                            PurchaseDocumentAmounts::suggestedIsv((float) $state),
+                            blank($state) ? null : PurchaseDocumentAmounts::suggestedIsv((float) $state),
                         )),
                     self::amountInput('isv')
                         ->label('ISV 15%')
@@ -393,28 +389,30 @@ class PurchaseForm
                         ->visible(fn (callable $get): bool => ! SupplierDocumentType::isReciboInterno($get('document_type'))),
                 ]),
                 ToggleButtons::make('payment_method')
-                    ->label('Forma de pago')
+                    ->label('Forma de pago (opcional)')
                     ->options(PaymentMethod::class)
                     ->inline()
-                    ->required()
                     ->live()
-                    ->helperText(fn (callable $get): string => self::isCash($get('payment_method'))
-                        ? 'Al confirmar, el dinero sale de la caja abierta de la sucursal.'
-                        : 'Solo "Efectivo" descuenta de la caja.'),
+                    ->helperText('Solo informativa: registrar la compra no mueve la caja.'),
             ]);
     }
 
     /**
-     * Campo de monto con las reglas comunes. La validación cruzada (ISV sin
-     * gravado, documento en cero…) la decide PurchaseDocumentAmounts — ver
-     * amountsRule().
+     * Campo de monto con las reglas comunes. Vacío cuenta como 0: el campo
+     * no trae un 0 escrito que haya que borrar antes de teclear.
+     *
+     * La validación cruzada (ISV sin gravado, documento en cero…) la decide
+     * PurchaseDocumentAmounts — ver amountsRule(). Si todos quedan vacíos la
+     * regla no corre (Laravel omite campos vacíos no obligatorios) y el
+     * error lo da ResolvesPurchaseDocument al guardar, bajo el mismo campo.
      */
     private static function amountInput(string $field): TextInput
     {
         return TextInput::make($field)
             ->numeric()
-            ->required()
-            ->default(0)
+            ->placeholder('0.00')
+            // Al editar, un 0 guardado también se muestra vacío.
+            ->formatStateUsing(fn ($state) => blank($state) || (float) $state === 0.0 ? null : $state)
             ->minValue(0)
             ->step(0.01)
             ->prefix('L')
@@ -523,11 +521,6 @@ class PurchaseForm
     private static function isExpense(mixed $kind): bool
     {
         return PurchaseKind::fromState($kind) === PurchaseKind::Gasto;
-    }
-
-    private static function isCash(mixed $method): bool
-    {
-        return self::paymentMethodFromState($method) === PaymentMethod::Efectivo;
     }
 
     /**

@@ -113,8 +113,9 @@ enum CashMovementType: string implements HasColor, HasIcon, HasLabel
             self::SaleIncome,
             self::RepairAdvancePayment,
             self::RepairFinalIncome,
-            // Anular una compra pagada en efectivo devuelve ese dinero a la
-            // caja: es el espejo del Expense/SupplierPayment que registró.
+            // Histórico: lo generaba la anulación de una compra pagada del
+            // cajón. Desde 2026-09-29 las compras no mueven la caja y ya no se
+            // crea; el caso se conserva para leer registros existentes.
             self::PurchaseCancellation => true,
             default => false,
         };
