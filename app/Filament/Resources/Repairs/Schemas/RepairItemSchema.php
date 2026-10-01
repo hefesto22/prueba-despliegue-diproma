@@ -100,7 +100,7 @@ class RepairItemSchema
                         // accessor sale_price_with_isv reconstruye el
                         // precio con ISV (gravado: ×1.15, exento: igual).
                         ->mapWithKeys(fn (Product $p) => [
-                            $p->id => "{$p->name} (stock: {$p->stock} | L. " . number_format($p->sale_price_with_isv, 2) . ')',
+                            $p->id => "{$p->name} (stock: {$p->stock} | L. ".number_format($p->sale_price_with_isv, 2).')',
                         ])
                         ->toArray();
                 })

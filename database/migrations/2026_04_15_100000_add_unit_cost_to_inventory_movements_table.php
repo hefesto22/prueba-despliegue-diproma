@@ -35,7 +35,7 @@ return new class extends Migration
         // Backfill solo donde el dato es reconstruible con certeza:
         // movimientos de compra → purchase_items conserva el unit_cost exacto.
         // Los movimientos de venta/ajuste pre-migración quedan NULL a propósito.
-        DB::statement("
+        DB::statement('
             UPDATE inventory_movements im
             INNER JOIN purchase_items pi
                 ON pi.purchase_id = im.reference_id
@@ -44,7 +44,7 @@ return new class extends Migration
             WHERE im.reference_type = ?
               AND im.type IN (?, ?)
               AND im.unit_cost IS NULL
-        ", [
+        ', [
             Purchase::class,
             MovementType::EntradaCompra->value,
             MovementType::SalidaAnulacionCompra->value,

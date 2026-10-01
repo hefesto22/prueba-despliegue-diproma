@@ -15,7 +15,7 @@ class LowStockAlert extends TableWidget
 {
     protected static ?int $sort = 8;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = '300s';
 

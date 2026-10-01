@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\Purchases;
 
-use App\Enums\PurchaseStatus;
 use App\Enums\SupplierDocumentType;
 use App\Models\Establishment;
 use App\Models\Purchase;
@@ -162,9 +161,9 @@ class InternalReceiptNumberGeneratorTest extends TestCase
         Purchase::factory()
             ->confirmada()
             ->create([
-                'establishment_id'        => $this->matriz->id,
-                'date'                    => $fecha,
-                'document_type'           => SupplierDocumentType::Factura,
+                'establishment_id' => $this->matriz->id,
+                'date' => $fecha,
+                'document_type' => SupplierDocumentType::Factura,
                 'supplier_invoice_number' => '001-001-01-99999999',
             ]);
 
@@ -185,12 +184,12 @@ class InternalReceiptNumberGeneratorTest extends TestCase
         return Purchase::factory()
             ->confirmada()
             ->create([
-                'establishment_id'        => $this->matriz->id,
-                'supplier_id'             => $this->generico->id,
-                'document_type'           => SupplierDocumentType::ReciboInterno,
+                'establishment_id' => $this->matriz->id,
+                'supplier_id' => $this->generico->id,
+                'document_type' => SupplierDocumentType::ReciboInterno,
                 'supplier_invoice_number' => $numero,
-                'supplier_cai'            => null,
-                'date'                    => $fecha,
+                'supplier_cai' => null,
+                'date' => $fecha,
             ]);
     }
 }

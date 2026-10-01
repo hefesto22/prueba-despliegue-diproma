@@ -32,9 +32,9 @@ final class ConciliacionPendienteException extends RuntimeException
     ) {
         parent::__construct(sprintf(
             'No se puede abrir una nueva caja en la sucursal #%d: la sesión #%d '
-            . 'fue auto-cerrada por el sistema hace %d días y aún no fue conciliada. '
-            . 'Conciliá esa sesión (ingresá el conteo físico real) antes de abrir otra. '
-            . 'Umbral configurado: %d días.',
+            .'fue auto-cerrada por el sistema hace %d días y aún no fue conciliada. '
+            .'Conciliá esa sesión (ingresá el conteo físico real) antes de abrir otra. '
+            .'Umbral configurado: %d días.',
             $establishmentId,
             $pendingSessionId,
             $daysSinceAutoClose,

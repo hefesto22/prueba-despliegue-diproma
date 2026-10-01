@@ -12,12 +12,12 @@ use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Filament\Forms\Components\Select;
 
 class IsvRetentionsReceivedTable
 {
@@ -42,8 +42,8 @@ class IsvRetentionsReceivedTable
                     ->formatStateUsing(fn (IsvRetentionType $state) => $state->shortLabel())
                     ->color(fn (IsvRetentionType $state) => match ($state) {
                         IsvRetentionType::TarjetasCreditoDebito => 'info',
-                        IsvRetentionType::VentasEstado          => 'warning',
-                        IsvRetentionType::Acuerdo215_2010       => 'success',
+                        IsvRetentionType::VentasEstado => 'warning',
+                        IsvRetentionType::Acuerdo215_2010 => 'success',
                     })
                     ->sortable(),
 
@@ -123,8 +123,9 @@ class IsvRetentionsReceivedTable
                             $indicators[] = "Año: {$y}";
                         }
                         if ($m = $data['period_month'] ?? null) {
-                            $indicators[] = 'Mes: ' . self::monthOptions()[$m];
+                            $indicators[] = 'Mes: '.self::monthOptions()[$m];
                         }
+
                         return $indicators;
                     }),
 
@@ -170,15 +171,15 @@ class IsvRetentionsReceivedTable
     private static function monthOptions(): array
     {
         return [
-            1  => 'Enero',
-            2  => 'Febrero',
-            3  => 'Marzo',
-            4  => 'Abril',
-            5  => 'Mayo',
-            6  => 'Junio',
-            7  => 'Julio',
-            8  => 'Agosto',
-            9  => 'Septiembre',
+            1 => 'Enero',
+            2 => 'Febrero',
+            3 => 'Marzo',
+            4 => 'Abril',
+            5 => 'Mayo',
+            6 => 'Junio',
+            7 => 'Julio',
+            8 => 'Agosto',
+            9 => 'Septiembre',
             10 => 'Octubre',
             11 => 'Noviembre',
             12 => 'Diciembre',

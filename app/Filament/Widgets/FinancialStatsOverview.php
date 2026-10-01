@@ -46,21 +46,21 @@ class FinancialStatsOverview extends StatsOverviewWidget
 
         return [
             // Ganancia bruta del mes
-            Stat::make('Ganancia Bruta', 'L. ' . number_format($profit['gross_profit'], 2))
+            Stat::make('Ganancia Bruta', 'L. '.number_format($profit['gross_profit'], 2))
                 ->description(
-                    'De L. ' . number_format($profit['revenue'], 2) . ' facturado'
+                    'De L. '.number_format($profit['revenue'], 2).' facturado'
                 )
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color($profit['gross_profit'] > 0 ? 'success' : 'gray'),
 
             // Margen de ganancia
-            Stat::make('Margen Promedio', number_format($profit['margin_percent'], 1) . '%')
+            Stat::make('Margen Promedio', number_format($profit['margin_percent'], 1).'%')
                 ->description($this->marginDescription($profit['margin_percent']))
                 ->descriptionIcon($this->marginIcon($profit['margin_percent']))
                 ->color($this->marginColor($profit['margin_percent'])),
 
             // Ticket promedio
-            Stat::make('Ticket Promedio', 'L. ' . number_format($avgTicket, 2))
+            Stat::make('Ticket Promedio', 'L. '.number_format($avgTicket, 2))
                 ->description('Valor promedio por venta')
                 ->descriptionIcon('heroicon-m-receipt-percent')
                 ->color('primary'),

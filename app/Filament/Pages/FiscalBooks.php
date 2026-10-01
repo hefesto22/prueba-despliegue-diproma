@@ -82,8 +82,8 @@ class FiscalBooks extends Page implements HasForms
         $now = CarbonImmutable::now();
 
         $this->form->fill([
-            'period_year'      => $now->year,
-            'period_month'     => $now->month,
+            'period_year' => $now->year,
+            'period_month' => $now->month,
             'establishment_id' => null,
         ]);
     }
@@ -107,15 +107,15 @@ class FiscalBooks extends Page implements HasForms
                             Select::make('period_month')
                                 ->label('Mes')
                                 ->options([
-                                    1  => 'Enero',
-                                    2  => 'Febrero',
-                                    3  => 'Marzo',
-                                    4  => 'Abril',
-                                    5  => 'Mayo',
-                                    6  => 'Junio',
-                                    7  => 'Julio',
-                                    8  => 'Agosto',
-                                    9  => 'Septiembre',
+                                    1 => 'Enero',
+                                    2 => 'Febrero',
+                                    3 => 'Marzo',
+                                    4 => 'Abril',
+                                    5 => 'Mayo',
+                                    6 => 'Junio',
+                                    7 => 'Julio',
+                                    8 => 'Agosto',
+                                    9 => 'Septiembre',
                                     10 => 'Octubre',
                                     11 => 'Noviembre',
                                     12 => 'Diciembre',
@@ -172,7 +172,7 @@ class FiscalBooks extends Page implements HasForms
         [$year, $month, $establishmentId] = $selection;
 
         try {
-            $book   = $service->build($year, $month, $establishmentId);
+            $book = $service->build($year, $month, $establishmentId);
             $export = new SalesBookExport($book);
 
             return Excel::download($export, $export->fileName());
@@ -206,7 +206,7 @@ class FiscalBooks extends Page implements HasForms
         [$year, $month, $establishmentId] = $selection;
 
         try {
-            $book   = $service->build($year, $month, $establishmentId);
+            $book = $service->build($year, $month, $establishmentId);
             $export = new PurchaseBookExport($book);
 
             return Excel::download($export, $export->fileName());
@@ -241,7 +241,7 @@ class FiscalBooks extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $year  = (int) ($data['period_year'] ?? 0);
+        $year = (int) ($data['period_year'] ?? 0);
         $month = (int) ($data['period_month'] ?? 0);
         $estId = isset($data['establishment_id']) && $data['establishment_id'] !== '' && $data['establishment_id'] !== null
             ? (int) $data['establishment_id']
@@ -258,8 +258,8 @@ class FiscalBooks extends Page implements HasForms
         }
 
         $selected = CarbonImmutable::create($year, $month, 1);
-        $now      = CarbonImmutable::now()->startOfMonth();
-        $start    = CompanySetting::current()->fiscal_period_start;
+        $now = CarbonImmutable::now()->startOfMonth();
+        $start = CompanySetting::current()->fiscal_period_start;
 
         if ($start === null) {
             Notification::make()
@@ -289,7 +289,7 @@ class FiscalBooks extends Page implements HasForms
                 ->title('Período fuera de rango')
                 ->body(
                     "El período seleccionado es anterior al inicio del tracking fiscal ({$startMonth->format('m/Y')}). "
-                    . 'Las facturas previas a esa fecha no están en el libro.'
+                    .'Las facturas previas a esa fecha no están en el libro.'
                 )
                 ->warning()
                 ->send();
@@ -320,7 +320,7 @@ class FiscalBooks extends Page implements HasForms
         }
 
         $startYear = CarbonImmutable::instance($start)->year;
-        $endYear   = CarbonImmutable::now()->year;
+        $endYear = CarbonImmutable::now()->year;
 
         $years = [];
         for ($y = $endYear; $y >= $startYear; $y--) {

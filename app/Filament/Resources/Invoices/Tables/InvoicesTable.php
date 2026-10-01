@@ -132,7 +132,7 @@ class InvoicesTable
                     ->falseIcon('heroicon-o-check')
                     ->trueColor('warning')
                     ->falseColor('success')
-                    ->getStateUsing(fn (Invoice $record): bool => !$record->without_cai)
+                    ->getStateUsing(fn (Invoice $record): bool => ! $record->without_cai)
                     ->tooltip(fn (Invoice $record): string => $record->without_cai ? 'Sin CAI' : 'Con CAI'),
 
                 TextColumn::make('sale.sale_number')
@@ -223,8 +223,8 @@ class InvoicesTable
                     ->modalHeading(fn (Invoice $record): string => "Emitir Nota de Crédito sobre {$record->invoice_number}")
                     ->modalDescription(
                         'Indicá la cantidad a acreditar por línea. La "Devolución física" '
-                        . 'retornará stock al kardex; las demás razones son solo ajustes '
-                        . 'fiscales. La cantidad máxima respeta NCs previas no anuladas.'
+                        .'retornará stock al kardex; las demás razones son solo ajustes '
+                        .'fiscales. La cantidad máxima respeta NCs previas no anuladas.'
                     )
                     ->modalSubmitActionLabel('Emitir NC')
                     ->modalWidth('5xl')
@@ -244,8 +244,7 @@ class InvoicesTable
                     // botón — el Repeater renderizará vacío y el submit se
                     // bloqueará. Trade-off deliberado: costo mínimo de UX vs.
                     // query extra por fila del listado.
-                    ->visible(fn (Invoice $record, CaiAvailabilityService $caiAvailability): bool =>
-                        ! $record->is_void
+                    ->visible(fn (Invoice $record, CaiAvailabilityService $caiAvailability): bool => ! $record->is_void
                         && ! $record->without_cai
                         && $caiAvailability->hasActiveCaiFor(DocumentType::NotaCredito, $record->establishment_id)
                     )
@@ -277,10 +276,9 @@ class InvoicesTable
                                     ->minValue(0)
                                     ->maxValue(fn ($get) => (int) $get('disponible'))
                                     ->required()
-                                    ->helperText(fn ($get): string =>
-                                        'Vendida: ' . (int) $get('vendida')
-                                        . ' · Ya NC: ' . (int) $get('ya_acreditada')
-                                        . ' · Disponible: ' . (int) $get('disponible')
+                                    ->helperText(fn ($get): string => 'Vendida: '.(int) $get('vendida')
+                                        .' · Ya NC: '.(int) $get('ya_acreditada')
+                                        .' · Disponible: '.(int) $get('disponible')
                                     )
                                     ->columnSpan(2),
                             ])
@@ -295,8 +293,7 @@ class InvoicesTable
                             ->native(false)
                             ->live()
                             ->helperText(fn ($state): ?string => match ($state) {
-                                CreditNoteReason::DevolucionFisica->value =>
-                                    '⚠️ Los productos volverán al inventario (kardex: EntradaNotaCredito).',
+                                CreditNoteReason::DevolucionFisica->value => '⚠️ Los productos volverán al inventario (kardex: EntradaNotaCredito).',
                                 null, '' => null,
                                 default => 'Solo ajuste fiscal. No toca inventario. Requiere notas explicativas.',
                             }),
@@ -307,13 +304,11 @@ class InvoicesTable
                             ->maxLength(500)
                             // Obligatorio cuando razón != DevolucionFisica (regla del
                             // enum::requiresNotes, que el DTO también valida).
-                            ->required(fn ($get): bool =>
-                                $get('reason') !== null
+                            ->required(fn ($get): bool => $get('reason') !== null
                                 && $get('reason') !== ''
                                 && $get('reason') !== CreditNoteReason::DevolucionFisica->value
                             )
-                            ->visible(fn ($get): bool =>
-                                $get('reason') !== null
+                            ->visible(fn ($get): bool => $get('reason') !== null
                                 && $get('reason') !== ''
                                 && $get('reason') !== CreditNoteReason::DevolucionFisica->value
                             ),
@@ -332,7 +327,7 @@ class InvoicesTable
                                 ->filter(fn (array $l): bool => (int) ($l['quantity'] ?? 0) > 0)
                                 ->map(fn (array $l): LineaAcreditarInput => new LineaAcreditarInput(
                                     saleItemId: (int) $l['sale_item_id'],
-                                    quantity:   (int) $l['quantity'],
+                                    quantity: (int) $l['quantity'],
                                 ))
                                 ->values()
                                 ->all();
@@ -348,9 +343,9 @@ class InvoicesTable
                             }
 
                             $input = new EmitirNotaCreditoInput(
-                                invoice:     $record,
-                                reason:      CreditNoteReason::from($data['reason']),
-                                lineas:      $lineas,
+                                invoice: $record,
+                                reason: CreditNoteReason::from($data['reason']),
+                                lineas: $lineas,
                                 reasonNotes: $data['reason_notes'] ?? null,
                             );
 
@@ -371,7 +366,7 @@ class InvoicesTable
                                 ])
                                 ->persistent()
                                 ->send();
-                        } catch (FacturaAnuladaNoAcreditableException | FacturaWithoutCaiNoAcreditableException $e) {
+                        } catch (FacturaAnuladaNoAcreditableException|FacturaWithoutCaiNoAcreditableException $e) {
                             // Regla fiscal infringida: factura no elegible para NC.
                             // Persistente porque el usuario debe leer el motivo exacto.
                             Notification::make()
@@ -435,9 +430,9 @@ class InvoicesTable
                     ->modalHeading('¿Anular esta factura?')
                     ->modalDescription(
                         'Se anulará la factura Y SU VENTA asociada: el stock de los productos '
-                        . 'se devolverá al inventario con movimientos de kardex y la venta quedará '
-                        . 'marcada como Anulada. Esta acción solo es válida si el período fiscal aún '
-                        . 'no fue declarado al SAR.'
+                        .'se devolverá al inventario con movimientos de kardex y la venta quedará '
+                        .'marcada como Anulada. Esta acción solo es válida si el período fiscal aún '
+                        .'no fue declarado al SAR.'
                     )
                     ->modalSubmitActionLabel('Sí, anular con cascada')
                     // Visibilidad: factura no anulada + período abierto + no pre-tracking.
@@ -445,8 +440,7 @@ class InvoicesTable
                     // DI via closure: Filament resuelve FiscalPeriodService desde el
                     // container. El singleton registrado en AppServiceProvider mantiene
                     // el memo interno entre las 50 llamadas por render de tabla.
-                    ->visible(fn (Invoice $record, FiscalPeriodService $fiscal): bool =>
-                        $fiscal->canVoidInvoice($record)
+                    ->visible(fn (Invoice $record, FiscalPeriodService $fiscal): bool => $fiscal->canVoidInvoice($record)
                     )
                     ->action(function (Invoice $record, FiscalPeriodService $fiscal, SaleService $sales): void {
                         try {
@@ -556,17 +550,17 @@ class InvoicesTable
             ')
             ->get()
             ->map(function ($row): array {
-                $vendida     = (int) $row->vendida;
+                $vendida = (int) $row->vendida;
                 $yaAcreditada = (int) $row->ya_acreditada;
-                $disponible  = $vendida - $yaAcreditada;
+                $disponible = $vendida - $yaAcreditada;
 
                 return [
-                    'sale_item_id'  => (int) $row->sale_item_id,
-                    'producto'      => "{$row->product_sku} — {$row->product_name}",
-                    'vendida'       => $vendida,
+                    'sale_item_id' => (int) $row->sale_item_id,
+                    'producto' => "{$row->product_sku} — {$row->product_name}",
+                    'vendida' => $vendida,
                     'ya_acreditada' => $yaAcreditada,
-                    'disponible'    => $disponible,
-                    'quantity'      => 0,
+                    'disponible' => $disponible,
+                    'quantity' => 0,
                 ];
             })
             ->filter(fn (array $row): bool => $row['disponible'] > 0)

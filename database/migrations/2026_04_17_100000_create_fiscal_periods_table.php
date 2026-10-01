@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Schema;
  * Diproma es single-tenant: no se agrega company_setting_id — hay una única empresa
  * por instalación. Si en el futuro se necesita multi-tenancy, se hace en otro proyecto.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('fiscal_periods', function (Blueprint $table) {

@@ -22,15 +22,18 @@ class CorrelativoPorSucursalTest extends TestCase
     use RefreshDatabase;
 
     private CorrelativoPorSucursal $resolver;
+
     private CompanySetting $company;
+
     private Establishment $matriz;
+
     private Establishment $sucursalB;
 
     protected function setUp(): void
     {
         parent::setUp();
         Cache::forget('company_settings');
-        $this->resolver = new CorrelativoPorSucursal();
+        $this->resolver = new CorrelativoPorSucursal;
         $this->company = CompanySetting::factory()->create();
         $this->matriz = Establishment::factory()
             ->for($this->company, 'companySetting')

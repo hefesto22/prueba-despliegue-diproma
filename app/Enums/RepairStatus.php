@@ -25,7 +25,7 @@ use Filament\Support\Contracts\HasLabel;
  * evitando saltos ilegales (ej: Recibido → Entregada directo, que rompería
  * la auditoría de cambios y la trazabilidad de cobros de anticipo).
  */
-enum RepairStatus: string implements HasLabel, HasColor, HasIcon
+enum RepairStatus: string implements HasColor, HasIcon, HasLabel
 {
     case Recibido = 'recibido';
     case Cotizado = 'cotizado';

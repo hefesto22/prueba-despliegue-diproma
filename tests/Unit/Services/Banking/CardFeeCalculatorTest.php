@@ -26,7 +26,7 @@ class CardFeeCalculatorTest extends TestCase
         parent::setUp();
 
         // Stub in-memory de CompanySetting con tasas conocidas — no toca BD.
-        $settings = new CompanySetting();
+        $settings = new CompanySetting;
         $settings->card_fee_rate_credit = 0.0340;
         $settings->card_fee_rate_debit = 0.0250;
 

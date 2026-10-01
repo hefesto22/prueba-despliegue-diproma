@@ -215,6 +215,7 @@ class RepairQuotationService
                 );
             }
             $product = Product::findOrFail($productId);
+
             return $product->tax_type instanceof TaxType
                 ? $product->tax_type
                 : TaxType::from($product->tax_type);

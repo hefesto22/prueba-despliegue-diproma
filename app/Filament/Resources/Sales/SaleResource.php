@@ -4,8 +4,8 @@ namespace App\Filament\Resources\Sales;
 
 use App\Filament\Resources\Sales\Pages\ListSales;
 use App\Filament\Resources\Sales\Pages\ViewSale;
-use App\Filament\Resources\Sales\Tables\SalesTable;
 use App\Filament\Resources\Sales\Schemas\SaleInfolist;
+use App\Filament\Resources\Sales\Tables\SalesTable;
 use App\Models\Sale;
 use BackedEnum;
 use Filament\Resources\Resource;

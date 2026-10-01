@@ -26,24 +26,24 @@ namespace App\Services\FiscalPeriods\Exceptions;
 class DeclaracionIsvYaExisteException extends FiscalPeriodException
 {
     /**
-     * @param  int  $periodYear            Año del período con snapshot activo.
-     * @param  int  $periodMonth           Mes del período con snapshot activo.
-     * @param  int  $existingDeclarationId ID del snapshot que ya está activo
-     *                                     — útil para que el caller pueda
-     *                                     redirigir al usuario al registro.
+     * @param  int  $periodYear  Año del período con snapshot activo.
+     * @param  int  $periodMonth  Mes del período con snapshot activo.
+     * @param  int  $existingDeclarationId  ID del snapshot que ya está activo
+     *                                      — útil para que el caller pueda
+     *                                      redirigir al usuario al registro.
      */
     public function __construct(
         public readonly int $periodYear,
         public readonly int $periodMonth,
         public readonly int $existingDeclarationId,
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         parent::__construct(
             "Ya existe una declaración ISV activa para el período {$periodo} "
-            . "(ID #{$this->existingDeclarationId}). Para corregirla, reabra el "
-            . 'período fiscal como rectificativa y vuelva a declarar — el sistema '
-            . 'marcará la declaración anterior como reemplazada automáticamente.'
+            ."(ID #{$this->existingDeclarationId}). Para corregirla, reabra el "
+            .'período fiscal como rectificativa y vuelva a declarar — el sistema '
+            .'marcará la declaración anterior como reemplazada automáticamente.'
         );
     }
 }

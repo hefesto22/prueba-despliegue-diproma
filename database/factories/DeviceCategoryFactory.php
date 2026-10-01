@@ -24,7 +24,7 @@ class DeviceCategoryFactory extends Factory
             'Laptop', 'Desktop', 'Tablet', 'Consola', 'Teléfono',
             'Impresora', 'Monitor', 'Componente',
         ]);
-        $name = $base . ' Test ' . fake()->unique()->numerify('###');
+        $name = $base.' Test '.fake()->unique()->numerify('###');
 
         return [
             'name' => $name,

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\CaiRanges;
 
-use App\Filament\Resources\CaiRanges\Pages;
 use App\Filament\Resources\CaiRanges\Schemas\CaiRangeForm;
 use App\Filament\Resources\CaiRanges\Tables\CaiRangesTable;
 use App\Models\CaiRange;
@@ -40,7 +39,7 @@ class CaiRangeResource extends Resource
         }
 
         if ($active->isNearExhaustion()) {
-            return $active->remaining . ' restantes';
+            return $active->remaining.' restantes';
         }
 
         return null;

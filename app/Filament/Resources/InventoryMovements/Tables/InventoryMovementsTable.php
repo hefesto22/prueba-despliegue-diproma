@@ -94,7 +94,8 @@ class InventoryMovementsTable
                         if (! $from && ! $until) {
                             return null;
                         }
-                        return 'Rango: ' . ($from ?? '…') . ' → ' . ($until ?? '…');
+
+                        return 'Rango: '.($from ?? '…').' → '.($until ?? '…');
                     })
                     ->schema([
                         DatePicker::make('from')->label('Desde'),

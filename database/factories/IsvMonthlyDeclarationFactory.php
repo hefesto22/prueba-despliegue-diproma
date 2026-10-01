@@ -26,44 +26,44 @@ class IsvMonthlyDeclarationFactory extends Factory
     public function definition(): array
     {
         // Totales base sintéticos — cantidades plausibles para una PYME hondureña.
-        $ventasGravadas   = $this->faker->randomFloat(2, 50000, 500000);
-        $ventasExentas    = $this->faker->randomFloat(2, 0, 20000);
-        $comprasGravadas  = $this->faker->randomFloat(2, 10000, 300000);
-        $comprasExentas   = $this->faker->randomFloat(2, 0, 10000);
+        $ventasGravadas = $this->faker->randomFloat(2, 50000, 500000);
+        $ventasExentas = $this->faker->randomFloat(2, 0, 20000);
+        $comprasGravadas = $this->faker->randomFloat(2, 10000, 300000);
+        $comprasExentas = $this->faker->randomFloat(2, 0, 10000);
 
-        $isvDebito     = round($ventasGravadas * 0.15, 2);
-        $isvCredito    = round($comprasGravadas * 0.15, 2);
-        $retenciones   = $this->faker->randomFloat(2, 0, 5000);
+        $isvDebito = round($ventasGravadas * 0.15, 2);
+        $isvCredito = round($comprasGravadas * 0.15, 2);
+        $retenciones = $this->faker->randomFloat(2, 0, 5000);
         $saldoAnterior = 0.0;
 
         $deuda = $isvDebito - $isvCredito - $retenciones - $saldoAnterior;
-        $isvAPagar            = $deuda > 0 ? round($deuda, 2) : 0.0;
+        $isvAPagar = $deuda > 0 ? round($deuda, 2) : 0.0;
         $saldoAFavorSiguiente = $deuda < 0 ? round(abs($deuda), 2) : 0.0;
 
         return [
             'fiscal_period_id' => FiscalPeriod::factory(),
-            'declared_at'      => now(),
+            'declared_at' => now(),
             'declared_by_user_id' => User::factory(),
             'siisar_acuse_number' => $this->faker->optional(0.8)->numerify('SIISAR-########'),
 
             'ventas_gravadas' => $ventasGravadas,
-            'ventas_exentas'  => $ventasExentas,
-            'ventas_totales'  => round($ventasGravadas + $ventasExentas, 2),
+            'ventas_exentas' => $ventasExentas,
+            'ventas_totales' => round($ventasGravadas + $ventasExentas, 2),
 
             'compras_gravadas' => $comprasGravadas,
-            'compras_exentas'  => $comprasExentas,
-            'compras_totales'  => round($comprasGravadas + $comprasExentas, 2),
+            'compras_exentas' => $comprasExentas,
+            'compras_totales' => round($comprasGravadas + $comprasExentas, 2),
 
-            'isv_debito_fiscal'          => $isvDebito,
-            'isv_credito_fiscal'         => $isvCredito,
-            'isv_retenciones_recibidas'  => $retenciones,
-            'saldo_a_favor_anterior'     => $saldoAnterior,
-            'isv_a_pagar'                => $isvAPagar,
-            'saldo_a_favor_siguiente'    => $saldoAFavorSiguiente,
+            'isv_debito_fiscal' => $isvDebito,
+            'isv_credito_fiscal' => $isvCredito,
+            'isv_retenciones_recibidas' => $retenciones,
+            'saldo_a_favor_anterior' => $saldoAnterior,
+            'isv_a_pagar' => $isvAPagar,
+            'saldo_a_favor_siguiente' => $saldoAFavorSiguiente,
 
             'notes' => null,
 
-            'superseded_at'         => null,
+            'superseded_at' => null,
             'superseded_by_user_id' => null,
         ];
     }
@@ -87,7 +87,7 @@ class IsvMonthlyDeclarationFactory extends Factory
     public function superseded(?User $user = null): static
     {
         return $this->state(fn () => [
-            'superseded_at'         => now(),
+            'superseded_at' => now(),
             'superseded_by_user_id' => $user?->id ?? User::factory(),
         ]);
     }
@@ -99,18 +99,18 @@ class IsvMonthlyDeclarationFactory extends Factory
     public function zeroed(): static
     {
         return $this->state(fn () => [
-            'ventas_gravadas'           => 0,
-            'ventas_exentas'            => 0,
-            'ventas_totales'            => 0,
-            'compras_gravadas'          => 0,
-            'compras_exentas'           => 0,
-            'compras_totales'           => 0,
-            'isv_debito_fiscal'         => 0,
-            'isv_credito_fiscal'        => 0,
+            'ventas_gravadas' => 0,
+            'ventas_exentas' => 0,
+            'ventas_totales' => 0,
+            'compras_gravadas' => 0,
+            'compras_exentas' => 0,
+            'compras_totales' => 0,
+            'isv_debito_fiscal' => 0,
+            'isv_credito_fiscal' => 0,
             'isv_retenciones_recibidas' => 0,
-            'saldo_a_favor_anterior'    => 0,
-            'isv_a_pagar'               => 0,
-            'saldo_a_favor_siguiente'   => 0,
+            'saldo_a_favor_anterior' => 0,
+            'isv_a_pagar' => 0,
+            'saldo_a_favor_siguiente' => 0,
         ]);
     }
 
@@ -122,15 +122,15 @@ class IsvMonthlyDeclarationFactory extends Factory
     public function withSaldoAnterior(float $monto): static
     {
         return $this->state(function (array $attrs) use ($monto) {
-            $debito    = (float) ($attrs['isv_debito_fiscal']         ?? 0);
-            $credito   = (float) ($attrs['isv_credito_fiscal']        ?? 0);
-            $retenc    = (float) ($attrs['isv_retenciones_recibidas'] ?? 0);
+            $debito = (float) ($attrs['isv_debito_fiscal'] ?? 0);
+            $credito = (float) ($attrs['isv_credito_fiscal'] ?? 0);
+            $retenc = (float) ($attrs['isv_retenciones_recibidas'] ?? 0);
 
             $deuda = $debito - $credito - $retenc - $monto;
 
             return [
-                'saldo_a_favor_anterior'  => $monto,
-                'isv_a_pagar'             => $deuda > 0 ? round($deuda, 2) : 0.0,
+                'saldo_a_favor_anterior' => $monto,
+                'isv_a_pagar' => $deuda > 0 ? round($deuda, 2) : 0.0,
                 'saldo_a_favor_siguiente' => $deuda < 0 ? round(abs($deuda), 2) : 0.0,
             ];
         });

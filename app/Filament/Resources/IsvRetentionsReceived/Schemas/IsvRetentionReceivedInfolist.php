@@ -31,8 +31,8 @@ class IsvRetentionReceivedInfolist
                                 ->formatStateUsing(fn (IsvRetentionType $state) => $state->label())
                                 ->color(fn (IsvRetentionType $state) => match ($state) {
                                     IsvRetentionType::TarjetasCreditoDebito => 'info',
-                                    IsvRetentionType::VentasEstado          => 'warning',
-                                    IsvRetentionType::Acuerdo215_2010       => 'success',
+                                    IsvRetentionType::VentasEstado => 'warning',
+                                    IsvRetentionType::Acuerdo215_2010 => 'success',
                                 }),
                             TextEntry::make('establishment.name')
                                 ->label('Sucursal')

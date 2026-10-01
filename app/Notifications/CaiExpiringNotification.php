@@ -78,7 +78,7 @@ class CaiExpiringNotification extends Notification
             ? "[CRÍTICO] Sistema Diproma · {$count} CAI(s) próximos a vencer"
             : "Sistema Diproma · {$count} CAI(s) próximos a vencer";
 
-        $mail = (new MailMessage())
+        $mail = (new MailMessage)
             ->subject($subject)
             ->greeting("Hola {$notifiable->name},")
             ->line($this->title($count, $severity));
@@ -86,21 +86,21 @@ class CaiExpiringNotification extends Notification
         // Una línea por alerta para que el contador vea el detalle de cada CAI
         // sin tener que abrir el panel. Útil especialmente en móvil.
         foreach ($this->alerts as $alert) {
-            $mail->line('• ' . $alert->shortLabel());
+            $mail->line('• '.$alert->shortLabel());
         }
 
         if ($this->hasAlertsWithoutSuccessor()) {
             $mail->line('⚠️ Hay CAIs sin sucesor pre-registrado. Solicita el siguiente CAI al SAR '
-                . 'y regístralo en el sistema ANTES del vencimiento para evitar cortar la operación.');
+                .'y regístralo en el sistema ANTES del vencimiento para evitar cortar la operación.');
         } else {
             $mail->line('Todos los CAIs en alerta tienen sucesor pre-registrado — cuando el actual '
-                . 'venza, el sistema podrá promover el siguiente.');
+                .'venza, el sistema podrá promover el siguiente.');
         }
 
         return $mail
             ->action('Ir al módulo CAI', CaiRangeResource::getUrl('index', panel: 'admin'))
             ->line('Esta alerta se genera automáticamente cada mañana — dejará de llegarte una vez '
-                . 'resueltos los vencimientos pendientes.');
+                .'resueltos los vencimientos pendientes.');
     }
 
     /**

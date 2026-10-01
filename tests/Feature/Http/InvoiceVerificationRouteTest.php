@@ -43,26 +43,26 @@ class InvoiceVerificationRouteTest extends TestCase
         $company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, SPS',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, SPS',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $company, 60 * 60 * 24);
 
         Establishment::factory()->for($company, 'companySetting')->main()->create();
 
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         $sale = Sale::factory()->completada()->create([
-            'subtotal'        => 1000,
-            'isv'             => 150,
-            'total'           => 1150,
+            'subtotal' => 1000,
+            'isv' => 150,
+            'total' => 1150,
             'discount_amount' => 0,
         ]);
         // Convención del dominio: SaleItem.unit_price INCLUYE ISV — ver comentario
@@ -72,9 +72,9 @@ class InvoiceVerificationRouteTest extends TestCase
             ->forSale($sale)
             ->forProduct(Product::factory()->create())
             ->create([
-                'quantity'   => 1,
+                'quantity' => 1,
                 'unit_price' => 1150,
-                'tax_type'   => TaxType::Gravado15,
+                'tax_type' => TaxType::Gravado15,
             ]);
 
         $this->invoice = app(InvoiceService::class)->generateFromSale($sale->fresh());
@@ -144,9 +144,9 @@ class InvoiceVerificationRouteTest extends TestCase
         // El regex `[a-f0-9]{64}` en la ruta rechaza antes de golpear la BD.
         // Casos: hash corto, caracteres invalidos, payload de ataque tipico.
         $this->get('/facturas/verificar/short')->assertNotFound();
-        $this->get('/facturas/verificar/' . str_repeat('z', 64))->assertNotFound();
-        $this->get('/facturas/verificar/' . str_repeat('a', 63))->assertNotFound();
-        $this->get('/facturas/verificar/' . str_repeat('a', 65))->assertNotFound();
+        $this->get('/facturas/verificar/'.str_repeat('z', 64))->assertNotFound();
+        $this->get('/facturas/verificar/'.str_repeat('a', 63))->assertNotFound();
+        $this->get('/facturas/verificar/'.str_repeat('a', 65))->assertNotFound();
     }
 
     #[Test]

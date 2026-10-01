@@ -26,10 +26,10 @@ return [
     |
     */
     'software' => [
-        'name'        => env('FISCAL_SOFTWARE_NAME', 'OlymPos'),
-        'version'     => env('FISCAL_SOFTWARE_VERSION', '1.0.0'),
-        'developer'   => env('FISCAL_DEVELOPER_NAME', 'Inversiones Olympo'),
-        'origin'      => env('FISCAL_DEVELOPER_ORIGIN', 'nacional'),
+        'name' => env('FISCAL_SOFTWARE_NAME', 'OlymPos'),
+        'version' => env('FISCAL_SOFTWARE_VERSION', '1.0.0'),
+        'developer' => env('FISCAL_DEVELOPER_NAME', 'Inversiones Olympo'),
+        'origin' => env('FISCAL_DEVELOPER_ORIGIN', 'nacional'),
         'maintenance' => env('FISCAL_MAINTENANCE_TYPE', 'proveedor_software'),
     ],
 

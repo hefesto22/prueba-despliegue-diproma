@@ -44,9 +44,13 @@ class CreditNoteServiceTest extends TestCase
     use RefreshDatabase;
 
     private CreditNoteService $service;
+
     private InvoiceService $invoiceService;
+
     private SaleService $saleService;
+
     private CompanySetting $company;
+
     private Establishment $matriz;
 
     protected function setUp(): void
@@ -58,10 +62,10 @@ class CreditNoteServiceTest extends TestCase
         $this->company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, 5ta Ave',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, 5ta Ave',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $this->company, 60 * 60 * 24);
 
@@ -85,25 +89,25 @@ class CreditNoteServiceTest extends TestCase
 
         // CAI para facturas
         CaiRange::factory()->active()->create([
-            'prefix'          => '001-001-01',
-            'document_type'   => '01',
-            'range_start'     => 1,
-            'range_end'       => 100,
-            'current_number'  => 0,
+            'prefix' => '001-001-01',
+            'document_type' => '01',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         // CAI para notas de crédito
         CaiRange::factory()->active()->create([
-            'prefix'          => '001-001-03',
-            'document_type'   => '03',
-            'range_start'     => 1,
-            'range_end'       => 100,
-            'current_number'  => 0,
+            'prefix' => '001-001-03',
+            'document_type' => '03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         $this->invoiceService = app(InvoiceService::class);
-        $this->saleService    = app(SaleService::class);
-        $this->service        = app(CreditNoteService::class);
+        $this->saleService = app(SaleService::class);
+        $this->service = app(CreditNoteService::class);
     }
 
     // ─── Helpers ──────────────────────────────────────────────
@@ -112,11 +116,10 @@ class CreditNoteServiceTest extends TestCase
      * Procesa una venta real vía SaleService (crea SalidaVenta en kardex),
      * emite la factura, y retorna [Invoice, Product].
      *
-     * @param  int       $stock      Stock inicial del producto.
-     * @param  float     $unitPrice  Precio unitario con ISV.
-     * @param  int       $quantity   Cantidad a vender.
-     * @param  TaxType   $taxType
-     * @param  float     $costPrice  Costo para el kardex.
+     * @param  int  $stock  Stock inicial del producto.
+     * @param  float  $unitPrice  Precio unitario con ISV.
+     * @param  int  $quantity  Cantidad a vender.
+     * @param  float  $costPrice  Costo para el kardex.
      */
     private function sellAndInvoice(
         int $stock = 10,
@@ -126,21 +129,21 @@ class CreditNoteServiceTest extends TestCase
         float $costPrice = 50.00,
     ): array {
         $product = Product::factory()->create([
-            'stock'      => $stock,
+            'stock' => $stock,
             'cost_price' => $costPrice,
-            'tax_type'   => $taxType,
+            'tax_type' => $taxType,
         ]);
 
         $sale = $this->saleService->processSale(
             cartItems: [[
                 'product_id' => $product->id,
-                'quantity'   => $quantity,
+                'quantity' => $quantity,
                 'unit_price' => $unitPrice,
-                'tax_type'   => $taxType->value,
+                'tax_type' => $taxType->value,
             ]],
             paymentMethod: PaymentMethod::Efectivo,
             customerName: 'Cliente Test',
-            customerRtn:  '08011999000999',
+            customerRtn: '08011999000999',
         );
 
         $invoice = $this->invoiceService->generateFromSale($sale->fresh(['items']));
@@ -160,29 +163,29 @@ class CreditNoteServiceTest extends TestCase
      */
     private function sellAndInvoiceMulti(array $lines): array
     {
-        $products  = [];
+        $products = [];
         $cartItems = [];
 
         foreach ($lines as $line) {
             $product = Product::factory()->create([
-                'stock'      => $line['stock']      ?? 100,
+                'stock' => $line['stock'] ?? 100,
                 'cost_price' => $line['cost_price'] ?? 50.00,
-                'tax_type'   => $line['tax_type'],
+                'tax_type' => $line['tax_type'],
             ]);
-            $products[]  = $product;
+            $products[] = $product;
             $cartItems[] = [
                 'product_id' => $product->id,
-                'quantity'   => $line['quantity'],
+                'quantity' => $line['quantity'],
                 'unit_price' => $line['unit_price'],
-                'tax_type'   => $line['tax_type']->value,
+                'tax_type' => $line['tax_type']->value,
             ];
         }
 
         $sale = $this->saleService->processSale(
-            cartItems:     $cartItems,
+            cartItems: $cartItems,
             paymentMethod: PaymentMethod::Efectivo,
-            customerName:  'Cliente Test',
-            customerRtn:   '08011999000999',
+            customerName: 'Cliente Test',
+            customerRtn: '08011999000999',
         );
 
         $invoice = $this->invoiceService->generateFromSale($sale->fresh(['items']));
@@ -199,8 +202,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         // Número SAR con prefijo '03'
@@ -222,7 +225,7 @@ class CreditNoteServiceTest extends TestCase
 
         // Totales: 1 x 115 con ISV => base 100, isv 15
         $this->assertEquals(100.00, (float) $nc->taxable_total);
-        $this->assertEquals(15.00,  (float) $nc->isv);
+        $this->assertEquals(15.00, (float) $nc->isv);
         $this->assertEquals(115.00, (float) $nc->total);
 
         // Items
@@ -237,8 +240,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc1 = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         // Segunda factura + NC para ver que el correlativo avanza
@@ -247,8 +250,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc2 = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice2,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem2->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem2->id, 1)],
         ));
 
         $this->assertEquals('001-001-03-00000001', $nc1->credit_note_number);
@@ -262,8 +265,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         $this->assertNotNull($nc->emitted_at);
@@ -276,15 +279,15 @@ class CreditNoteServiceTest extends TestCase
     public function test_bloquea_nc_sobre_factura_anulada(): void
     {
         [$invoice] = $this->sellAndInvoice();
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
         $invoice->void();
 
         $this->expectException(FacturaAnuladaNoAcreditableException::class);
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice->fresh(),
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
     }
 
@@ -292,12 +295,12 @@ class CreditNoteServiceTest extends TestCase
     {
         // Emitir factura SIN CAI (referencia interna)
         $product = Product::factory()->create(['stock' => 10, 'cost_price' => 50]);
-        $sale    = $this->saleService->processSale(
+        $sale = $this->saleService->processSale(
             cartItems: [[
                 'product_id' => $product->id,
-                'quantity'   => 2,
+                'quantity' => 2,
                 'unit_price' => 115.00,
-                'tax_type'   => TaxType::Gravado15->value,
+                'tax_type' => TaxType::Gravado15->value,
             ]],
             paymentMethod: PaymentMethod::Efectivo,
             customerName: 'Cliente Test',
@@ -309,8 +312,8 @@ class CreditNoteServiceTest extends TestCase
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
     }
 
@@ -324,8 +327,8 @@ class CreditNoteServiceTest extends TestCase
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoiceA,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItemDeB->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItemDeB->id, 1)],
         ));
     }
 
@@ -334,27 +337,27 @@ class CreditNoteServiceTest extends TestCase
     public function test_validacion_acumulativa_bloquea_exceder_cantidad_vendida(): void
     {
         [$invoice] = $this->sellAndInvoice(quantity: 2);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         $this->expectException(CantidadYaAcreditadaException::class);
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 3)], // > vendido
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 3)], // > vendido
         ));
     }
 
     public function test_suma_ncs_previas_no_anuladas_en_validacion_acumulativa(): void
     {
         [$invoice] = $this->sellAndInvoice(quantity: 3);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         // Primera NC: 2 unidades (OK, quedan 1)
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 2)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 2)],
         ));
 
         // Segunda NC: pedir 2 más → debe fallar (solo queda 1)
@@ -362,20 +365,20 @@ class CreditNoteServiceTest extends TestCase
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 2)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 2)],
         ));
     }
 
     public function test_nc_anulada_no_cuenta_contra_el_saldo(): void
     {
         [$invoice] = $this->sellAndInvoice(quantity: 2);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         $nc1 = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 2)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 2)],
         ));
 
         // Anular la primera NC: su cantidad deja de contar contra el saldo
@@ -384,8 +387,8 @@ class CreditNoteServiceTest extends TestCase
         // Ahora puedo emitir una nueva NC por las 2 unidades completas
         $nc2 = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice->fresh(),
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 2)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 2)],
         ));
 
         $this->assertNotEquals($nc1->id, $nc2->id);
@@ -397,9 +400,9 @@ class CreditNoteServiceTest extends TestCase
     public function test_devolucion_fisica_registra_entrada_nota_credito_y_suma_stock(): void
     {
         [$invoice, $product] = $this->sellAndInvoice(
-            stock:     10,
+            stock: 10,
             unitPrice: 115.00,
-            quantity:  2,
+            quantity: 2,
             costPrice: 50.00,
         );
         // Stock post-venta: 10 - 2 = 8
@@ -409,8 +412,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         // Stock vuelve: 8 + 1 = 9
@@ -442,8 +445,8 @@ class CreditNoteServiceTest extends TestCase
         // Emitimos NC: el movimiento de entrada debe preservar 50, no 99.99
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         $entrada = InventoryMovement::where('reference_type', CreditNote::class)
@@ -461,9 +464,9 @@ class CreditNoteServiceTest extends TestCase
         $saleItem = $invoice->sale->items->first();
 
         $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
-            invoice:     $invoice,
-            reason:      CreditNoteReason::CorreccionError,
-            lineas:      [new LineaAcreditarInput($saleItem->id, 1)],
+            invoice: $invoice,
+            reason: CreditNoteReason::CorreccionError,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
             reasonNotes: 'Error en digitación del precio',
         ));
 
@@ -473,7 +476,7 @@ class CreditNoteServiceTest extends TestCase
         // No debe haber movimiento EntradaNotaCredito
         $this->assertDatabaseMissing('inventory_movements', [
             'product_id' => $product->id,
-            'type'       => MovementType::EntradaNotaCredito->value,
+            'type' => MovementType::EntradaNotaCredito->value,
         ]);
     }
 
@@ -497,7 +500,7 @@ class CreditNoteServiceTest extends TestCase
         // Inyectamos descuento=23 → gross correcto = 207 + 23 = 230, ratio = 23/230 = 0.10
         Invoice::where('id', $invoice->id)->update([
             'discount' => 23.00,
-            'total'    => 207.00,
+            'total' => 207.00,
         ]);
         $invoice = $invoice->fresh(['sale.items']);
 
@@ -505,8 +508,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         // Nominal de la línea (qty=1 de gravado 115): base=100, isv=15, total=115
@@ -514,20 +517,20 @@ class CreditNoteServiceTest extends TestCase
         //   taxable' = round(100 * 0.90, 2) = 90.00
         //   isv'     = round( 15 * 0.90, 2) = 13.50
         //   total    = round(90.00 + 13.50, 2) = 103.50
-        $this->assertSame(90.00,  (float) $nc->taxable_total);
-        $this->assertSame(13.50,  (float) $nc->isv);
+        $this->assertSame(90.00, (float) $nc->taxable_total);
+        $this->assertSame(13.50, (float) $nc->isv);
         $this->assertSame(103.50, (float) $nc->total);
     }
 
     public function test_factura_sin_descuento_acredita_precio_nominal_exacto(): void
     {
         [$invoice] = $this->sellAndInvoice(unitPrice: 115.00, quantity: 2);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         $this->assertEquals(100.00, (float) $nc->taxable_total);
@@ -566,23 +569,23 @@ class CreditNoteServiceTest extends TestCase
         // 46.55 * 3 = 139.65 → base = 139.65/1.15 = 121.43478... → round 121.43
         // isv = 139.65 - 121.43 = 18.22 (exacto)
         [$invoice] = $this->sellAndInvoice(
-            stock:     10,
+            stock: 10,
             unitPrice: 46.55,
-            quantity:  3,
-            taxType:   TaxType::Gravado15,
+            quantity: 3,
+            taxType: TaxType::Gravado15,
         );
         $saleItem = $invoice->sale->items->first();
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 3)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 3)],
         ));
 
         // Exactos — sin delta. Capturan la regla de redondeo per-línea actual.
         $this->assertSame(121.43, (float) $nc->taxable_total);
-        $this->assertSame(0.00,   (float) $nc->exempt_total);
-        $this->assertSame(18.22,  (float) $nc->isv);
+        $this->assertSame(0.00, (float) $nc->exempt_total);
+        $this->assertSame(18.22, (float) $nc->isv);
         $this->assertSame(139.65, (float) $nc->total);
     }
 
@@ -597,15 +600,15 @@ class CreditNoteServiceTest extends TestCase
         //   isv'     = round(30  * 0.89130..., 2) =  26.74
         //   total    = round(178.26 + 26.74, 2)   = 205.00
         [$invoice] = $this->sellAndInvoice(
-            stock:     10,
+            stock: 10,
             unitPrice: 115.00,
-            quantity:  2,
-            taxType:   TaxType::Gravado15,
+            quantity: 2,
+            taxType: TaxType::Gravado15,
         );
 
         Invoice::where('id', $invoice->id)->update([
             'discount' => 25.00,
-            'total'    => 205.00, // 230 - 25 (los campos base/isv siguen 200/30)
+            'total' => 205.00, // 230 - 25 (los campos base/isv siguen 200/30)
         ]);
         $invoice = $invoice->fresh(['sale.items']);
 
@@ -613,13 +616,13 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 2)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 2)],
         ));
 
         $this->assertSame(178.26, (float) $nc->taxable_total);
-        $this->assertSame(0.00,   (float) $nc->exempt_total);
-        $this->assertSame(26.74,  (float) $nc->isv);
+        $this->assertSame(0.00, (float) $nc->exempt_total);
+        $this->assertSame(26.74, (float) $nc->isv);
         $this->assertSame(205.00, (float) $nc->total);
     }
 
@@ -630,7 +633,7 @@ class CreditNoteServiceTest extends TestCase
         // Acreditamos ambas líneas completas, sin descuento.
         [$invoice, $products] = $this->sellAndInvoiceMulti([
             ['unit_price' => 115.00, 'quantity' => 2, 'tax_type' => TaxType::Gravado15, 'stock' => 10],
-            ['unit_price' =>  50.00, 'quantity' => 3, 'tax_type' => TaxType::Exento,    'stock' => 10],
+            ['unit_price' => 50.00, 'quantity' => 3, 'tax_type' => TaxType::Exento,    'stock' => 10],
         ]);
 
         // Los saleItems se crean en el mismo orden que el cartItems pasado a processSale.
@@ -647,8 +650,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [
                 new LineaAcreditarInput($saleItemA->id, 2),
                 new LineaAcreditarInput($saleItemB->id, 3),
             ],
@@ -656,7 +659,7 @@ class CreditNoteServiceTest extends TestCase
 
         $this->assertSame(200.00, (float) $nc->taxable_total);
         $this->assertSame(150.00, (float) $nc->exempt_total);
-        $this->assertSame(30.00,  (float) $nc->isv);
+        $this->assertSame(30.00, (float) $nc->isv);
         $this->assertSame(380.00, (float) $nc->total);
     }
 
@@ -676,12 +679,12 @@ class CreditNoteServiceTest extends TestCase
         //   total    = round(178.95 + 134.21 + 26.84, 2) = 340.00
         [$invoice, $products] = $this->sellAndInvoiceMulti([
             ['unit_price' => 115.00, 'quantity' => 2, 'tax_type' => TaxType::Gravado15, 'stock' => 10],
-            ['unit_price' =>  50.00, 'quantity' => 3, 'tax_type' => TaxType::Exento,    'stock' => 10],
+            ['unit_price' => 50.00, 'quantity' => 3, 'tax_type' => TaxType::Exento,    'stock' => 10],
         ]);
 
         Invoice::where('id', $invoice->id)->update([
             'discount' => 40.00,
-            'total'    => 340.00, // 380 - 40
+            'total' => 340.00, // 380 - 40
         ]);
         $invoice = $invoice->fresh(['sale.items']);
 
@@ -694,8 +697,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [
                 new LineaAcreditarInput($saleItemA->id, 2),
                 new LineaAcreditarInput($saleItemB->id, 3),
             ],
@@ -703,7 +706,7 @@ class CreditNoteServiceTest extends TestCase
 
         $this->assertSame(178.95, (float) $nc->taxable_total);
         $this->assertSame(134.21, (float) $nc->exempt_total);
-        $this->assertSame(26.84,  (float) $nc->isv);
+        $this->assertSame(26.84, (float) $nc->isv);
         $this->assertSame(340.00, (float) $nc->total);
     }
 
@@ -716,8 +719,8 @@ class CreditNoteServiceTest extends TestCase
 
         new EmitirNotaCreditoInput(
             invoice: Invoice::factory()->make(['id' => 1]),
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [
                 new LineaAcreditarInput(10, 1),
                 new LineaAcreditarInput(10, 2),
             ],
@@ -731,8 +734,8 @@ class CreditNoteServiceTest extends TestCase
 
         new EmitirNotaCreditoInput(
             invoice: Invoice::factory()->make(['id' => 1]),
-            reason:  CreditNoteReason::CorreccionError, // requires notes
-            lineas:  [new LineaAcreditarInput(10, 1)],
+            reason: CreditNoteReason::CorreccionError, // requires notes
+            lineas: [new LineaAcreditarInput(10, 1)],
             reasonNotes: '   ', // whitespace → inválido
         );
     }
@@ -741,8 +744,8 @@ class CreditNoteServiceTest extends TestCase
     {
         $dto = new EmitirNotaCreditoInput(
             invoice: Invoice::factory()->make(['id' => 1]),
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput(10, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput(10, 1)],
         );
 
         $this->assertEquals(CreditNoteReason::DevolucionFisica, $dto->reason);
@@ -770,9 +773,9 @@ class CreditNoteServiceTest extends TestCase
     public function test_anular_nc_con_devolucion_fisica_revierte_stock_y_registra_salida(): void
     {
         [$invoice, $product] = $this->sellAndInvoice(
-            stock:     10,
+            stock: 10,
             unitPrice: 115.00,
-            quantity:  2,
+            quantity: 2,
             costPrice: 50.00,
         );
         // Stock post-venta: 10 - 2 = 8
@@ -782,8 +785,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
         // Stock post-NC: 8 + 1 = 9 (la NC devolvio mercaderia)
         $this->assertEquals(9, $product->fresh()->stock);
@@ -813,9 +816,9 @@ class CreditNoteServiceTest extends TestCase
         $saleItem = $invoice->sale->items->first();
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
-            invoice:     $invoice,
-            reason:      CreditNoteReason::CorreccionError,
-            lineas:      [new LineaAcreditarInput($saleItem->id, 1)],
+            invoice: $invoice,
+            reason: CreditNoteReason::CorreccionError,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
             reasonNotes: 'Error en digitación del precio',
         ));
 
@@ -828,20 +831,20 @@ class CreditNoteServiceTest extends TestCase
         // No debe registrar SalidaAnulacionNotaCredito si no hubo EntradaNotaCredito previa.
         $this->assertDatabaseMissing('inventory_movements', [
             'reference_type' => CreditNote::class,
-            'reference_id'   => $nc->id,
-            'type'           => MovementType::SalidaAnulacionNotaCredito->value,
+            'reference_id' => $nc->id,
+            'type' => MovementType::SalidaAnulacionNotaCredito->value,
         ]);
     }
 
     public function test_anular_nc_dos_veces_lanza_nota_credito_ya_anulada_exception(): void
     {
         [$invoice] = $this->sellAndInvoice(quantity: 1);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         $this->service->voidNotaCredito($nc);
@@ -856,9 +859,9 @@ class CreditNoteServiceTest extends TestCase
         // cliente, ahora stock = 0. El primer cliente retracta la devolucion y
         // queremos anular la NC — pero no hay 3 unidades en stock para retirar.
         [$invoice, $product] = $this->sellAndInvoice(
-            stock:     3,
+            stock: 3,
             unitPrice: 115.00,
-            quantity:  3,
+            quantity: 3,
             costPrice: 50.00,
         );
         // Stock post-venta: 0
@@ -868,8 +871,8 @@ class CreditNoteServiceTest extends TestCase
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 3)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 3)],
         ));
         // Stock post-NC: 0 + 3 = 3 (NC devolvio mercaderia)
         $this->assertEquals(3, $product->fresh()->stock);
@@ -899,8 +902,8 @@ class CreditNoteServiceTest extends TestCase
         $this->assertEquals(0, $product->fresh()->stock, 'El stock no debio modificarse');
         $this->assertDatabaseMissing('inventory_movements', [
             'reference_type' => CreditNote::class,
-            'reference_id'   => $nc->id,
-            'type'           => MovementType::SalidaAnulacionNotaCredito->value,
+            'reference_id' => $nc->id,
+            'type' => MovementType::SalidaAnulacionNotaCredito->value,
         ]);
     }
 
@@ -910,12 +913,12 @@ class CreditNoteServiceTest extends TestCase
         // no debe recalcularlo. Un QR impreso sigue resolviendo y el verify
         // publico muestra banner "ANULADA".
         [$invoice] = $this->sellAndInvoice(quantity: 1);
-        $saleItem  = $invoice->sale->items->first();
+        $saleItem = $invoice->sale->items->first();
 
         $nc = $this->service->generateFromInvoice(new EmitirNotaCreditoInput(
             invoice: $invoice,
-            reason:  CreditNoteReason::DevolucionFisica,
-            lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+            reason: CreditNoteReason::DevolucionFisica,
+            lineas: [new LineaAcreditarInput($saleItem->id, 1)],
         ));
 
         $hashAntes = $nc->integrity_hash;

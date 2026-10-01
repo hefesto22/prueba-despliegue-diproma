@@ -2,8 +2,6 @@
 
 namespace App\Services\Repairs;
 
-use App\Enums\RepairPhotoPurpose;
-use App\Enums\RepairStatus;
 use App\Models\CompanySetting;
 use App\Models\Repair;
 

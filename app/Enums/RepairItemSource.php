@@ -32,7 +32,7 @@ use Filament\Support\Contracts\HasLabel;
  *     El tax_type viene del `Product` del catálogo (consistente con SaleItem).
  *     Este source es el ÚNICO que afecta kardex/stock al entregar.
  */
-enum RepairItemSource: string implements HasLabel, HasColor, HasIcon
+enum RepairItemSource: string implements HasColor, HasIcon, HasLabel
 {
     case HonorariosReparacion = 'honorarios_reparacion';
     case HonorariosMantenimiento = 'honorarios_mantenimiento';

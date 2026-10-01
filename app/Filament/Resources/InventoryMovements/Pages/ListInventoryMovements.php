@@ -24,7 +24,7 @@ class ListInventoryMovements extends ListRecords
                 ->icon('heroicon-m-document-arrow-down')
                 ->color('success')
                 ->action(function () {
-                    $filename = 'kardex-global-' . now()->format('Ymd-His') . '.xlsx';
+                    $filename = 'kardex-global-'.now()->format('Ymd-His').'.xlsx';
 
                     return Excel::download(
                         new KardexExport(

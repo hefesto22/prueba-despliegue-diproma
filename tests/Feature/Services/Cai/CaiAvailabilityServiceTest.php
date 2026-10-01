@@ -28,8 +28,11 @@ class CaiAvailabilityServiceTest extends TestCase
     use RefreshDatabase;
 
     private CaiAvailabilityService $service;
+
     private CompanySetting $company;
+
     private Establishment $matriz;
+
     private Establishment $sucursalB;
 
     protected function setUp(): void
@@ -40,7 +43,7 @@ class CaiAvailabilityServiceTest extends TestCase
         // CompanySetting puede contaminar entre tests si el SUT lo lee.
         Cache::forget('company_settings');
 
-        $this->service = new CaiAvailabilityService();
+        $this->service = new CaiAvailabilityService;
         $this->company = CompanySetting::factory()->create();
         $this->matriz = Establishment::factory()
             ->for($this->company, 'companySetting')
@@ -67,10 +70,10 @@ class CaiAvailabilityServiceTest extends TestCase
     public function test_centralizado_retorna_true_con_cai_activo_del_tipo_correcto(): void
     {
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -85,11 +88,11 @@ class CaiAvailabilityServiceTest extends TestCase
         // el alcance es global por empresa, debe servir igual.
         CaiRange::factory()->active()->create([
             'establishment_id' => $this->sucursalB->id,
-            'document_type'    => DocumentType::NotaCredito->value,
-            'prefix'           => '002-001-03',
-            'range_start'      => 1,
-            'range_end'        => 100,
-            'current_number'   => 0,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '002-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         $this->assertTrue(
@@ -103,10 +106,10 @@ class CaiAvailabilityServiceTest extends TestCase
         // Defensa contra el bug clásico: el resolver tampoco usaría este CAI
         // para emitir NC, así que la UI no debe ofrecer el botón.
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::Factura->value,
-            'prefix'         => '001-001-01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::Factura->value,
+            'prefix' => '001-001-01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -119,12 +122,12 @@ class CaiAvailabilityServiceTest extends TestCase
     {
         // is_active=false (default del factory sin ->active()).
         CaiRange::factory()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
-            'is_active'      => false,
+            'is_active' => false,
         ]);
 
         $this->assertFalse(
@@ -135,10 +138,10 @@ class CaiAvailabilityServiceTest extends TestCase
     public function test_no_cuenta_cai_vencido(): void
     {
         CaiRange::factory()->active()->expired()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -153,10 +156,10 @@ class CaiAvailabilityServiceTest extends TestCase
         // rechazaría con RangoCaiAgotadoException, así que el botón no
         // debe verse.
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 100,
         ]);
 
@@ -173,11 +176,11 @@ class CaiAvailabilityServiceTest extends TestCase
 
         CaiRange::factory()->active()->create([
             'establishment_id' => $this->matriz->id,
-            'document_type'    => DocumentType::NotaCredito->value,
-            'prefix'           => '001-001-03',
-            'range_start'      => 1,
-            'range_end'        => 100,
-            'current_number'   => 0,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         $this->assertTrue(
@@ -192,11 +195,11 @@ class CaiAvailabilityServiceTest extends TestCase
         // CAI vinculado SOLO a sucursalB, pregunta por matriz → false
         CaiRange::factory()->active()->create([
             'establishment_id' => $this->sucursalB->id,
-            'document_type'    => DocumentType::NotaCredito->value,
-            'prefix'           => '002-001-03',
-            'range_start'      => 1,
-            'range_end'        => 100,
-            'current_number'   => 0,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '002-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         $this->assertFalse(
@@ -213,11 +216,11 @@ class CaiAvailabilityServiceTest extends TestCase
         // resolver, que lanza InvalidArgumentException).
         CaiRange::factory()->active()->create([
             'establishment_id' => $this->matriz->id,
-            'document_type'    => DocumentType::NotaCredito->value,
-            'prefix'           => '001-001-03',
-            'range_start'      => 1,
-            'range_end'        => 100,
-            'current_number'   => 0,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         // Capturamos las queries para verificar que el short-circuit por
@@ -244,10 +247,10 @@ class CaiAvailabilityServiceTest extends TestCase
     public function test_memo_evita_segunda_query_con_misma_clave(): void
     {
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -283,10 +286,10 @@ class CaiAvailabilityServiceTest extends TestCase
         // Sin esto, un listado de 50 facturas con 5 sucursales distintas
         // dispararía 5 queries en vez de 1.
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -313,11 +316,11 @@ class CaiAvailabilityServiceTest extends TestCase
         // Solo matriz tiene CAI; sucursalB no.
         CaiRange::factory()->active()->create([
             'establishment_id' => $this->matriz->id,
-            'document_type'    => DocumentType::NotaCredito->value,
-            'prefix'           => '001-001-03',
-            'range_start'      => 1,
-            'range_end'        => 100,
-            'current_number'   => 0,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
+            'current_number' => 0,
         ]);
 
         DB::enableQueryLog();
@@ -342,10 +345,10 @@ class CaiAvailabilityServiceTest extends TestCase
     public function test_flush_cache_invalida_el_memo(): void
     {
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 

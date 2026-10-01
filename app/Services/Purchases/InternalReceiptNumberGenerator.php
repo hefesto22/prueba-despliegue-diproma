@@ -57,15 +57,15 @@ class InternalReceiptNumberGenerator
      * Genera el siguiente correlativo para la fecha indicada.
      *
      * @param  CarbonInterface  $fecha  Fecha de emisión del RI (define el segmento YYYYMMDD).
-     * @return string  Número formateado: `RI-YYYYMMDD-NNNN`.
+     * @return string Número formateado: `RI-YYYYMMDD-NNNN`.
      *
-     * @throws TransaccionRequeridaException         Si no hay transacción abierta.
-     * @throws LimiteReciboInternoDiarioException    Si ya existen 9999 RIs ese día.
+     * @throws TransaccionRequeridaException Si no hay transacción abierta.
+     * @throws LimiteReciboInternoDiarioException Si ya existen 9999 RIs ese día.
      */
     public function next(CarbonInterface $fecha): string
     {
         if (DB::transactionLevel() === 0) {
-            throw new TransaccionRequeridaException();
+            throw new TransaccionRequeridaException;
         }
 
         // Lock serializador: todas las solicitudes de RI compiten por esta fila.

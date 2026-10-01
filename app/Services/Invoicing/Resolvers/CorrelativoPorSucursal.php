@@ -29,13 +29,13 @@ class CorrelativoPorSucursal implements ResuelveCorrelativoFactura
         ?int $establishmentId = null,
     ): CorrelativoResuelto {
         if (DB::transactionLevel() === 0) {
-            throw new TransaccionRequeridaException();
+            throw new TransaccionRequeridaException;
         }
 
         if (! $establishmentId) {
             throw new InvalidArgumentException(
                 'En modo "por_sucursal" el establishment_id es obligatorio al resolver el correlativo. '
-                . 'Verifique que el punto de venta o flujo de emisión esté enviando el establecimiento activo.'
+                .'Verifique que el punto de venta o flujo de emisión esté enviando el establecimiento activo.'
             );
         }
 
@@ -72,7 +72,7 @@ class CorrelativoPorSucursal implements ResuelveCorrelativoFactura
         // 4. Avanzar correlativo
         $caiRange->increment('current_number');
         $nextNumber = $caiRange->current_number;
-        $documentNumber = $caiRange->prefix . '-' . str_pad((string) $nextNumber, 8, '0', STR_PAD_LEFT);
+        $documentNumber = $caiRange->prefix.'-'.str_pad((string) $nextNumber, 8, '0', STR_PAD_LEFT);
 
         // 5. Snapshot del establishment (el del CAI — garantizado no-null en este modo)
         $establishment = Establishment::findOrFail($caiRange->establishment_id);

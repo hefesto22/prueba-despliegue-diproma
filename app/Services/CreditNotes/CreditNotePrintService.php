@@ -54,25 +54,25 @@ class CreditNotePrintService
         ]);
 
         return [
-            'creditNote'     => $creditNote,
-            'items'          => $this->mapItemsForView($creditNote),
-            'totals'         => $this->buildTotals($creditNote),
-            'company'        => $this->buildCompanyBlock($creditNote),
-            'customer'       => $this->buildCustomerBlock($creditNote),
-            'cai'            => $this->buildCaiBlock($creditNote),
-            'reason'         => $this->buildReasonBlock($creditNote),
-            'originalInvoice'=> $this->buildOriginalInvoiceBlock($creditNote),
-            'qrSvg'          => $this->qr->generateSvg(
+            'creditNote' => $creditNote,
+            'items' => $this->mapItemsForView($creditNote),
+            'totals' => $this->buildTotals($creditNote),
+            'company' => $this->buildCompanyBlock($creditNote),
+            'customer' => $this->buildCustomerBlock($creditNote),
+            'cai' => $this->buildCaiBlock($creditNote),
+            'reason' => $this->buildReasonBlock($creditNote),
+            'originalInvoice' => $this->buildOriginalInvoiceBlock($creditNote),
+            'qrSvg' => $this->qr->generateSvg(
                 $creditNote->integrity_hash ?? '',
                 self::VERIFY_PATH_PREFIX,
             ),
-            'verifyUrl'      => $this->qr->buildVerificationUrl(
+            'verifyUrl' => $this->qr->buildVerificationUrl(
                 $creditNote->integrity_hash ?? '',
                 self::VERIFY_PATH_PREFIX,
             ),
-            'software'       => $this->buildSoftwareMetadata(),
-            'footerLegend'   => (string) config('fiscal.footer_legend'),
-            'isVoid'         => (bool) $creditNote->is_void,
+            'software' => $this->buildSoftwareMetadata(),
+            'footerLegend' => (string) config('fiscal.footer_legend'),
+            'isVoid' => (bool) $creditNote->is_void,
         ];
     }
 
@@ -91,16 +91,16 @@ class CreditNotePrintService
 
         return $creditNote->items->map(function ($item) {
             $unitPrice = (float) $item->unit_price;
-            $quantity  = (float) $item->quantity;
+            $quantity = (float) $item->quantity;
             $lineTotal = (float) $item->total;
 
             return [
                 'description' => $item->product?->name ?? 'Producto',
-                'sku'         => $item->product?->sku,
-                'quantity'    => $this->formatQuantity($quantity),
-                'unit_price'  => $this->formatMoney($unitPrice),
-                'line_total'  => $this->formatMoney($lineTotal),
-                'tax_type'    => $item->tax_type instanceof \App\Enums\TaxType
+                'sku' => $item->product?->sku,
+                'quantity' => $this->formatQuantity($quantity),
+                'unit_price' => $this->formatMoney($unitPrice),
+                'line_total' => $this->formatMoney($lineTotal),
+                'tax_type' => $item->tax_type instanceof \App\Enums\TaxType
                     ? $item->tax_type->value
                     : (string) $item->tax_type,
             ];
@@ -118,11 +118,11 @@ class CreditNotePrintService
     private function buildTotals(CreditNote $creditNote): array
     {
         return [
-            'subtotal'   => $this->formatMoney((float) $creditNote->subtotal),
-            'exempt'     => $this->formatMoney((float) $creditNote->exempt_total),
-            'taxable'    => $this->formatMoney((float) $creditNote->taxable_total),
-            'isv'        => $this->formatMoney((float) $creditNote->isv),
-            'total'      => $this->formatMoney((float) $creditNote->total),
+            'subtotal' => $this->formatMoney((float) $creditNote->subtotal),
+            'exempt' => $this->formatMoney((float) $creditNote->exempt_total),
+            'taxable' => $this->formatMoney((float) $creditNote->taxable_total),
+            'isv' => $this->formatMoney((float) $creditNote->isv),
+            'total' => $this->formatMoney((float) $creditNote->total),
             'has_exempt' => (float) $creditNote->exempt_total > 0,
         ];
     }
@@ -134,11 +134,11 @@ class CreditNotePrintService
     private function buildCompanyBlock(CreditNote $creditNote): array
     {
         return [
-            'name'    => (string) $creditNote->company_name,
-            'rtn'     => (string) $creditNote->company_rtn,
+            'name' => (string) $creditNote->company_name,
+            'rtn' => (string) $creditNote->company_rtn,
             'address' => (string) $creditNote->company_address,
-            'phone'   => (string) $creditNote->company_phone,
-            'email'   => (string) $creditNote->company_email,
+            'phone' => (string) $creditNote->company_phone,
+            'email' => (string) $creditNote->company_email,
         ];
     }
 
@@ -150,7 +150,7 @@ class CreditNotePrintService
     {
         return [
             'name' => $creditNote->customer_name ?: 'Consumidor Final',
-            'rtn'  => $creditNote->customer_rtn ?: null,
+            'rtn' => $creditNote->customer_rtn ?: null,
         ];
     }
 
@@ -162,13 +162,13 @@ class CreditNotePrintService
         $caiRange = $creditNote->caiRange;
 
         return [
-            'number'             => (string) $creditNote->cai,
+            'number' => (string) $creditNote->cai,
             'credit_note_number' => (string) $creditNote->credit_note_number,
-            'emission_point'     => (string) $creditNote->emission_point,
-            'expiration_date'    => $creditNote->cai_expiration_date?->format('d/m/Y'),
-            'range_from'         => $caiRange?->range_from,
-            'range_to'           => $caiRange?->range_to,
-            'without_cai'        => (bool) $creditNote->without_cai,
+            'emission_point' => (string) $creditNote->emission_point,
+            'expiration_date' => $creditNote->cai_expiration_date?->format('d/m/Y'),
+            'range_from' => $caiRange?->range_from,
+            'range_to' => $caiRange?->range_to,
+            'without_cai' => (bool) $creditNote->without_cai,
         ];
     }
 
@@ -181,7 +181,7 @@ class CreditNotePrintService
         $reason = $creditNote->reason;
 
         return [
-            'code'  => $reason?->value,
+            'code' => $reason?->value,
             'label' => $reason?->getLabel() ?? '',
             'notes' => (string) ($creditNote->reason_notes ?? ''),
         ];
@@ -196,8 +196,8 @@ class CreditNotePrintService
     {
         return [
             'number' => (string) $creditNote->original_invoice_number,
-            'cai'    => (string) ($creditNote->original_invoice_cai ?? ''),
-            'date'   => $creditNote->original_invoice_date?->format('d/m/Y'),
+            'cai' => (string) ($creditNote->original_invoice_cai ?? ''),
+            'date' => $creditNote->original_invoice_date?->format('d/m/Y'),
         ];
     }
 
@@ -208,8 +208,8 @@ class CreditNotePrintService
     private function buildSoftwareMetadata(): array
     {
         return [
-            'name'      => (string) config('fiscal.software.name'),
-            'version'   => (string) config('fiscal.software.version'),
+            'name' => (string) config('fiscal.software.name'),
+            'version' => (string) config('fiscal.software.version'),
             'developer' => (string) config('fiscal.software.developer'),
             'structure' => (string) config('fiscal.structure'),
         ];

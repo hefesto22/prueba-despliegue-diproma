@@ -21,9 +21,9 @@ use RuntimeException;
 final class DocumentoFiscalInmutableException extends RuntimeException
 {
     /**
-     * @param  string    $documentType  Nombre corto del modelo (Invoice, CreditNote, ...).
-     * @param  int|string $documentId   PK del documento afectado.
-     * @param  string[]  $dirtyFields   Campos dirty bloqueados por la whitelist.
+     * @param  string  $documentType  Nombre corto del modelo (Invoice, CreditNote, ...).
+     * @param  int|string  $documentId  PK del documento afectado.
+     * @param  string[]  $dirtyFields  Campos dirty bloqueados por la whitelist.
      */
     public function __construct(
         public readonly string $documentType,

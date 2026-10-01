@@ -34,11 +34,11 @@ class FiscalQrService
     /**
      * Genera el SVG inline del QR de verificacion publica.
      *
-     * @param  string  $hash         integrity_hash del documento (SHA-256, 64 hex chars).
-     * @param  string  $pathPrefix   Prefijo de la ruta publica de verificacion.
-     *                               Ej: 'facturas/verificar', 'notas-credito/verificar'.
-     *                               Se normaliza: se eliminan slashes iniciales/finales.
-     * @param  int     $sizePixels   Tamano del SVG en pixeles.
+     * @param  string  $hash  integrity_hash del documento (SHA-256, 64 hex chars).
+     * @param  string  $pathPrefix  Prefijo de la ruta publica de verificacion.
+     *                              Ej: 'facturas/verificar', 'notas-credito/verificar'.
+     *                              Se normaliza: se eliminan slashes iniciales/finales.
+     * @param  int  $sizePixels  Tamano del SVG en pixeles.
      *
      * @throws \DomainException si el hash esta vacio (documento no sellado).
      */
@@ -61,12 +61,12 @@ class FiscalQrService
      * en texto legible debajo del QR como respaldo (para casos donde el QR no
      * escanea o el usuario quiere teclear la URL).
      *
-     * @param  string  $hash         integrity_hash del documento.
-     * @param  string  $pathPrefix   Prefijo de la ruta publica (sin slashes).
+     * @param  string  $hash  integrity_hash del documento.
+     * @param  string  $pathPrefix  Prefijo de la ruta publica (sin slashes).
      */
     public function buildVerificationUrl(string $hash, string $pathPrefix): string
     {
-        $base   = rtrim((string) config('fiscal.verify_url_base'), '/');
+        $base = rtrim((string) config('fiscal.verify_url_base'), '/');
         $prefix = trim($pathPrefix, '/');
 
         return "{$base}/{$prefix}/{$hash}";
@@ -100,7 +100,7 @@ class FiscalQrService
     private function renderSvg(string $data, int $sizePixels): string
     {
         $result = (new Builder(
-            writer: new SvgWriter(),
+            writer: new SvgWriter,
             data: $data,
             encoding: new Encoding('UTF-8'),
             errorCorrectionLevel: ErrorCorrectionLevel::Medium,

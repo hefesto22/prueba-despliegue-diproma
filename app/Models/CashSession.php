@@ -38,7 +38,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class CashSession extends Model
 {
-    use HasFactory, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity;
 
     protected $fillable = [
         'establishment_id',

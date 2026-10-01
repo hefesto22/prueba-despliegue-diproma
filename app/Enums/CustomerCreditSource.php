@@ -20,7 +20,7 @@ use Filament\Support\Contracts\HasLabel;
  *   - CustomerCredit: saldo a favor que existe ANTES de cualquier factura
  *     (en este caso: anticipo cobrado pero la reparación nunca se entregó).
  */
-enum CustomerCreditSource: string implements HasLabel, HasColor, HasIcon
+enum CustomerCreditSource: string implements HasColor, HasIcon, HasLabel
 {
     case RepairAdvance = 'repair_advance';
 

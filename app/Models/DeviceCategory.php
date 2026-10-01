@@ -19,7 +19,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class DeviceCategory extends Model
 {
-    use HasFactory, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity;
 
     protected $fillable = [
         'name',

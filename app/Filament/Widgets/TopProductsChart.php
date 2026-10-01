@@ -17,7 +17,7 @@ class TopProductsChart extends ChartWidget
 
     protected ?string $description = 'Por cantidad vendida en el mes actual';
 
-    protected int | string | array $columnSpan = [
+    protected int|string|array $columnSpan = [
         'default' => 'full',
         'xl' => 1,
     ];
@@ -91,7 +91,7 @@ class TopProductsChart extends ChartWidget
         // Truncar nombres largos para legibilidad del eje
         $labels = $rows->map(
             fn ($row) => strlen($row->product_name) > 35
-                ? substr($row->product_name, 0, 32) . '...'
+                ? substr($row->product_name, 0, 32).'...'
                 : $row->product_name
         )->toArray();
 

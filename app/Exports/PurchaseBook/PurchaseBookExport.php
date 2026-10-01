@@ -40,6 +40,6 @@ class PurchaseBookExport implements WithMultipleSheets
      */
     public function fileName(): string
     {
-        return 'Libro-Compras-' . $this->book->summary->periodSlug() . '.xlsx';
+        return 'Libro-Compras-'.$this->book->summary->periodSlug().'.xlsx';
     }
 }

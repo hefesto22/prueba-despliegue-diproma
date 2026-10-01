@@ -150,6 +150,7 @@ class FiscalClosureDemoSeeder extends Seeder
                     $existingActive->id,
                     $existingActive->siisar_acuse_number ?? '—',
                 ));
+
                 return;
             }
 

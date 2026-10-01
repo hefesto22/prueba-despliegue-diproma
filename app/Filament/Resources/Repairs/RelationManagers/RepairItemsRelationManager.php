@@ -106,6 +106,7 @@ class RepairItemsRelationManager extends RelationManager
                     ->icon('heroicon-o-plus')
                     ->using(function (array $data, RepairQuotationService $service) {
                         $data = $this->normalizeData($data);
+
                         return $service->addItem($this->getOwnerRecord(), $data);
                     }),
             ])
@@ -113,6 +114,7 @@ class RepairItemsRelationManager extends RelationManager
                 EditAction::make()
                     ->using(function ($record, array $data, RepairQuotationService $service) {
                         $data = $this->normalizeData($data);
+
                         return $service->updateItem($record, $data);
                     }),
                 DeleteAction::make()

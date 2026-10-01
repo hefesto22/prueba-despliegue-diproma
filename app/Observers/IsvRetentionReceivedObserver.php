@@ -63,7 +63,7 @@ class IsvRetentionReceivedObserver
         // Período ORIGINAL bloqueado → no se puede tocar la retención, da igual
         // a qué nuevo período se quiera mover. Cierra el attack vector de
         // "muevo a período abierto, edito el monto, devuelvo al período cerrado".
-        $originalYear  = $retention->getOriginal('period_year');
+        $originalYear = $retention->getOriginal('period_year');
         $originalMonth = $retention->getOriginal('period_month');
 
         if ($originalYear !== null && $originalMonth !== null) {

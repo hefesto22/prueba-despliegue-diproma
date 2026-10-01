@@ -223,9 +223,9 @@ class CompanySettings extends Page implements HasForms
                             ->label('Inicio del Período Fiscal')
                             ->helperText(
                                 'Primer mes que el sistema controla para declaración de ISV al SAR. '
-                                . 'Debe ser el día 1 del mes. Las facturas emitidas antes de esta fecha '
-                                . 'solo podrán corregirse por Nota de Crédito (nunca anulación directa). '
-                                . '⚠️ Editar después de declarar períodos puede desalinear las declaraciones existentes.'
+                                .'Debe ser el día 1 del mes. Las facturas emitidas antes de esta fecha '
+                                .'solo podrán corregirse por Nota de Crédito (nunca anulación directa). '
+                                .'⚠️ Editar después de declarar períodos puede desalinear las declaraciones existentes.'
                             )
                             ->required()
                             ->native(false)
@@ -253,8 +253,7 @@ class CompanySettings extends Page implements HasForms
                             // Bloqueo suave: una vez que hay períodos declarados, no permitir
                             // edición del inicio (protege declaraciones SAR ya presentadas).
                             // El super-admin puede alterar por BD si hay una causa legítima.
-                            ->disabled(fn (): bool =>
-                                FiscalPeriod::whereNotNull('declared_at')->exists()
+                            ->disabled(fn (): bool => FiscalPeriod::whereNotNull('declared_at')->exists()
                             )
                             ->dehydrated(), // persistir aunque esté disabled
                     ]),

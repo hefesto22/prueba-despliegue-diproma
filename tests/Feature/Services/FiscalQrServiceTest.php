@@ -27,7 +27,7 @@ class FiscalQrServiceTest extends TestCase
         // Base fija para tests independiente del .env que cargue CI local
         config(['fiscal.verify_url_base' => 'https://facturas.diproma.test']);
 
-        $this->qr = new FiscalQrService();
+        $this->qr = new FiscalQrService;
     }
 
     #[Test]
@@ -67,7 +67,7 @@ class FiscalQrServiceTest extends TestCase
 
         $this->assertSame(
             "https://facturas.diproma.test/facturas/verificar/{$hash}",
-            (new FiscalQrService())->buildVerificationUrl($hash, 'facturas/verificar')
+            (new FiscalQrService)->buildVerificationUrl($hash, 'facturas/verificar')
         );
     }
 

@@ -107,12 +107,12 @@ class CreditNotesTable
                 SelectFilter::make('estado')
                     ->options([
                         'valid' => 'Válidas',
-                        'void'  => 'Anuladas',
+                        'void' => 'Anuladas',
                     ])
                     ->query(function ($query, array $data) {
                         return match ($data['value']) {
                             'valid' => $query->where('is_void', false),
-                            'void'  => $query->where('is_void', true),
+                            'void' => $query->where('is_void', true),
                             default => $query,
                         };
                     }),
@@ -178,8 +178,8 @@ class CreditNotesTable
                     ->modalHeading('¿Anular esta Nota de Crédito?')
                     ->modalDescription(
                         'Si la razón fue "Devolución física", el stock del producto '
-                        . 'se retirará nuevamente del inventario. Esta acción no se '
-                        . 'puede revertir y queda registrada en el kardex.'
+                        .'se retirará nuevamente del inventario. Esta acción no se '
+                        .'puede revertir y queda registrada en el kardex.'
                     )
                     ->modalSubmitActionLabel('Sí, anular')
                     ->visible(fn (CreditNote $record): bool => ! $record->is_void)

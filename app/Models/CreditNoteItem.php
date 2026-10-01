@@ -39,12 +39,12 @@ class CreditNoteItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity'   => 'integer',
+            'quantity' => 'integer',
             'unit_price' => 'decimal:2',
-            'tax_type'   => TaxType::class,
-            'subtotal'   => 'decimal:2',
+            'tax_type' => TaxType::class,
+            'subtotal' => 'decimal:2',
             'isv_amount' => 'decimal:2',
-            'total'      => 'decimal:2',
+            'total' => 'decimal:2',
         ];
     }
 

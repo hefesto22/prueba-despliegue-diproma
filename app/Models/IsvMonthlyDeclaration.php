@@ -41,7 +41,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[ObservedBy([IsvMonthlyDeclarationObserver::class])]
 class IsvMonthlyDeclaration extends Model
 {
-    use HasFactory, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity;
 
     protected $fillable = [
         'fiscal_period_id',

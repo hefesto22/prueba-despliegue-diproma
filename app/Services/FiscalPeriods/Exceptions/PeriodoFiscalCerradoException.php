@@ -24,13 +24,13 @@ namespace App\Services\FiscalPeriods\Exceptions;
 class PeriodoFiscalCerradoException extends FiscalPeriodException
 {
     /**
-     * @param  int     $periodYear     Año del período cerrado.
-     * @param  int     $periodMonth    Mes del período cerrado.
+     * @param  int  $periodYear  Año del período cerrado.
+     * @param  int  $periodMonth  Mes del período cerrado.
      * @param  string  $documentLabel  Descripción human-readable del documento que
      *                                 se intentó mutar. Ejemplos:
-     *                                   - "la factura 000-001-01-00000123"
-     *                                   - "la compra RI-2026-0001"
-     *                                   - "la retención ISV #42"
+     *                                 - "la factura 000-001-01-00000123"
+     *                                 - "la compra RI-2026-0001"
+     *                                 - "la retención ISV #42"
      *                                 Si se omite, se usa "este documento" como
      *                                 fallback genérico.
      */
@@ -39,12 +39,12 @@ class PeriodoFiscalCerradoException extends FiscalPeriodException
         public readonly int $periodMonth,
         public readonly string $documentLabel = 'este documento',
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         parent::__construct(
             "No se puede modificar {$this->documentLabel}: el período fiscal {$periodo} "
-            . 'ya fue declarado al SAR. Para corregir, reabra el período como rectificativa '
-            . 'o (en caso de facturas) emita una Nota de Crédito.'
+            .'ya fue declarado al SAR. Para corregir, reabra el período como rectificativa '
+            .'o (en caso de facturas) emita una Nota de Crédito.'
         );
     }
 }

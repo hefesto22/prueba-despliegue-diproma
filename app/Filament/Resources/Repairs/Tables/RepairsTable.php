@@ -45,7 +45,7 @@ class RepairsTable
                     ->tooltip(fn ($record) => $record->deviceCategory?->name),
                 TextColumn::make('device_brand')
                     ->label('Marca / Modelo')
-                    ->formatStateUsing(fn ($record) => trim(($record->device_brand ?? '') . ' ' . ($record->device_model ?? '')))
+                    ->formatStateUsing(fn ($record) => trim(($record->device_brand ?? '').' '.($record->device_model ?? '')))
                     ->searchable(['device_brand', 'device_model'])
                     ->limit(30),
                 TextColumn::make('status')

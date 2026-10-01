@@ -709,7 +709,7 @@ class ProductSeeder extends Seeder
             'specs' => ['component_type' => 'MEMORIA RAM', 'capacity' => '4 GB', 'comp_speed' => '1600 MHZ', 'comp_interface' => 'DDR3'],
         ]);
 
-        $this->command->info("✅ 80 productos creados (8 tipos × 10 cada uno: 5 nuevos + 5 usados)");
+        $this->command->info('✅ 80 productos creados (8 tipos × 10 cada uno: 5 nuevos + 5 usados)');
     }
 
     /**

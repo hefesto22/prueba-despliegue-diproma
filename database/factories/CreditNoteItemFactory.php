@@ -21,26 +21,26 @@ class CreditNoteItemFactory extends Factory
 {
     public function definition(): array
     {
-        $quantity  = $this->faker->numberBetween(1, 5);
+        $quantity = $this->faker->numberBetween(1, 5);
         $unitPrice = $this->faker->randomFloat(2, 50, 1000); // CON ISV
         $multiplier = (float) config('tax.multiplier', 1.15);
 
         $lineTotal = round($unitPrice * $quantity, 2);
-        $subtotal  = round($lineTotal / $multiplier, 2);
-        $isv       = round($lineTotal - $subtotal, 2);
+        $subtotal = round($lineTotal / $multiplier, 2);
+        $isv = round($lineTotal - $subtotal, 2);
 
         return [
             'credit_note_id' => CreditNote::factory(),
-            'sale_item_id'   => SaleItem::factory(),
-            'product_id'     => Product::factory(),
+            'sale_item_id' => SaleItem::factory(),
+            'product_id' => Product::factory(),
 
-            'quantity'   => $quantity,
+            'quantity' => $quantity,
             'unit_price' => $unitPrice,
-            'tax_type'   => TaxType::Gravado15,
+            'tax_type' => TaxType::Gravado15,
 
-            'subtotal'   => $subtotal,
+            'subtotal' => $subtotal,
             'isv_amount' => $isv,
-            'total'      => $lineTotal,
+            'total' => $lineTotal,
         ];
     }
 
@@ -50,10 +50,10 @@ class CreditNoteItemFactory extends Factory
             $lineTotal = round((float) $attrs['unit_price'] * (int) $attrs['quantity'], 2);
 
             return [
-                'tax_type'   => TaxType::Exento,
-                'subtotal'   => $lineTotal,
+                'tax_type' => TaxType::Exento,
+                'subtotal' => $lineTotal,
                 'isv_amount' => 0.0,
-                'total'      => $lineTotal,
+                'total' => $lineTotal,
             ];
         });
     }

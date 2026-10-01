@@ -16,7 +16,7 @@ use Filament\Support\Contracts\HasLabel;
  * Esta regla la implementa `affectsCashBalance()` — cualquier cálculo de
  * saldo de caja DEBE consultar este método, nunca comparar strings a mano.
  */
-enum PaymentMethod: string implements HasLabel, HasColor, HasIcon
+enum PaymentMethod: string implements HasColor, HasIcon, HasLabel
 {
     case Efectivo = 'efectivo';
     case TarjetaCredito = 'tarjeta_credito';

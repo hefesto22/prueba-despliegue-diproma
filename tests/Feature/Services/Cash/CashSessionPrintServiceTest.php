@@ -26,7 +26,7 @@ use Tests\TestCase;
  */
 class CashSessionPrintServiceTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     private CashSessionPrintService $service;
 

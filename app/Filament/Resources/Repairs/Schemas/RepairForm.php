@@ -83,13 +83,14 @@ class RepairForm
                         ->limit(20)
                         ->get()
                         ->mapWithKeys(fn (Customer $c) => [
-                            $c->id => $c->name . ' — ' . ($c->phone ?? 's/tel') . (filled($c->rtn) ? ' (' . $c->rtn . ')' : ''),
+                            $c->id => $c->name.' — '.($c->phone ?? 's/tel').(filled($c->rtn) ? ' ('.$c->rtn.')' : ''),
                         ])
                         ->toArray();
                 })
                 ->getOptionLabelUsing(function ($value): ?string {
                     $c = Customer::find($value);
-                    return $c ? "{$c->name} — " . ($c->phone ?? 's/tel') : null;
+
+                    return $c ? "{$c->name} — ".($c->phone ?? 's/tel') : null;
                 })
                 ->afterStateUpdated(function ($state, Set $set) {
                     if ($state) {

@@ -9,7 +9,7 @@ use Filament\Support\Contracts\HasLabel;
  * Estado de pago de una compra.
  * Aplica principalmente para compras a crédito.
  */
-enum PaymentStatus: string implements HasLabel, HasColor
+enum PaymentStatus: string implements HasColor, HasLabel
 {
     case Pendiente = 'pendiente';
     case Parcial = 'parcial';

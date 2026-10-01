@@ -84,6 +84,7 @@ class RepairStatusService
                 'quoted_at' => now(),
             ]);
             $this->logStatusChange($repair, $from, RepairStatus::Cotizado, $note);
+
             return $repair->fresh();
         });
     }
@@ -237,6 +238,7 @@ class RepairStatusService
                 'rejected_at' => now(),
             ]);
             $this->logStatusChange($repair, $from, RepairStatus::Rechazada, $reason);
+
             return $repair->fresh();
         });
     }
@@ -304,6 +306,7 @@ class RepairStatusService
                 'completed_at' => now(),
             ]);
             $this->logStatusChange($repair, $from, RepairStatus::ListoEntrega, $note);
+
             return $repair->fresh();
         });
 
@@ -345,6 +348,7 @@ class RepairStatusService
                 'cancelled_at' => now(),
             ]);
             $this->logStatusChange($repair, $from, RepairStatus::Anulada, $reason);
+
             return $repair->fresh();
         });
     }
@@ -434,7 +438,7 @@ class RepairStatusService
         if (! $repair->customer_id) {
             throw new \DomainException(
                 'No se puede crear crédito a favor: el cliente no está registrado (walk-in). '
-                . 'Crea el cliente primero o usa la opción de devolución en efectivo.'
+                .'Crea el cliente primero o usa la opción de devolución en efectivo.'
             );
         }
 

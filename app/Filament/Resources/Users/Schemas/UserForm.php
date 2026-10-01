@@ -8,7 +8,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Illuminate\Validation\Rules\Password;
 
@@ -75,8 +74,7 @@ class UserForm
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->rule(Password::default())
                             ->prefixIcon('heroicon-o-key')
-                            ->placeholder(fn (string $operation): string =>
-                                $operation === 'edit' ? 'Dejar vacío para mantener actual' : 'Mínimo 8 caracteres'
+                            ->placeholder(fn (string $operation): string => $operation === 'edit' ? 'Dejar vacío para mantener actual' : 'Mínimo 8 caracteres'
                             ),
                         DateTimePicker::make('email_verified_at')
                             ->label('Email verificado el')

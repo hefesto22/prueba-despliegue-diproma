@@ -25,7 +25,7 @@ class NoActiveEstablishmentException extends EstablishmentException
 
         parent::__construct(
             "{$contexto}. "
-            . 'Asigne una sucursal al usuario en Administración o configure la matriz de la empresa antes de continuar.'
+            .'Asigne una sucursal al usuario en Administración o configure la matriz de la empresa antes de continuar.'
         );
     }
 }

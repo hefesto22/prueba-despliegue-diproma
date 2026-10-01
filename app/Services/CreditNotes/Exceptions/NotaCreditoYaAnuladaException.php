@@ -20,7 +20,7 @@ class NotaCreditoYaAnuladaException extends CreditNoteException
     ) {
         parent::__construct(
             "La nota de crédito {$creditNoteNumber} (#{$creditNoteId}) ya fue anulada "
-            . 'y no puede anularse nuevamente.'
+            .'y no puede anularse nuevamente.'
         );
     }
 }

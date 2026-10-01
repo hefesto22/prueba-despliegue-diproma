@@ -37,6 +37,6 @@ class SalesBookExport implements WithMultipleSheets
      */
     public function fileName(): string
     {
-        return 'Libro-Ventas-' . $this->book->summary->periodSlug() . '.xlsx';
+        return 'Libro-Ventas-'.$this->book->summary->periodSlug().'.xlsx';
     }
 }

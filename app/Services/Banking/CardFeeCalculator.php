@@ -28,8 +28,8 @@ class CardFeeCalculator
 {
     /**
      * @param  \Closure(): CompanySetting  $settingsResolver
-     *         Resolvedor de settings — se invoca cada vez que se necesita la
-     *         tasa, para reflejar cambios en runtime sin reiniciar el container.
+     *                                                        Resolvedor de settings — se invoca cada vez que se necesita la
+     *                                                        tasa, para reflejar cambios en runtime sin reiniciar el container.
      */
     public function __construct(
         private readonly \Closure $settingsResolver,
@@ -60,8 +60,8 @@ class CardFeeCalculator
      *
      * @param  float  $totalAmount  Total bruto en lempiras (el monto que el
      *                              cliente pagó con tarjeta, IVA incluido).
-     * @return float  Comisión en lempiras, redondeada a 2 decimales. Cero si
-     *                el método no aplica o el total es <= 0.
+     * @return float Comisión en lempiras, redondeada a 2 decimales. Cero si
+     *               el método no aplica o el total es <= 0.
      *
      * @throws \InvalidArgumentException Si el total es negativo (programmer error).
      */

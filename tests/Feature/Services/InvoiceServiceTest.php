@@ -6,7 +6,6 @@ use App\Enums\TaxType;
 use App\Models\CaiRange;
 use App\Models\CompanySetting;
 use App\Models\Establishment;
-use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -21,7 +20,9 @@ class InvoiceServiceTest extends TestCase
     use RefreshDatabase;
 
     private InvoiceService $service;
+
     private CompanySetting $company;
+
     private Establishment $matriz;
 
     protected function setUp(): void

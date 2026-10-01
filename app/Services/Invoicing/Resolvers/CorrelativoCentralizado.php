@@ -33,7 +33,7 @@ class CorrelativoCentralizado implements ResuelveCorrelativoFactura
         ?int $establishmentId = null,
     ): CorrelativoResuelto {
         if (DB::transactionLevel() === 0) {
-            throw new TransaccionRequeridaException();
+            throw new TransaccionRequeridaException;
         }
 
         // 1. CAI activo del tipo de documento (ignora establishment en modo centralizado)
@@ -68,7 +68,7 @@ class CorrelativoCentralizado implements ResuelveCorrelativoFactura
         // 4. Avanzar correlativo (atómico dentro de la transacción + lock)
         $caiRange->increment('current_number');
         $nextNumber = $caiRange->current_number;
-        $documentNumber = $caiRange->prefix . '-' . str_pad((string) $nextNumber, 8, '0', STR_PAD_LEFT);
+        $documentNumber = $caiRange->prefix.'-'.str_pad((string) $nextNumber, 8, '0', STR_PAD_LEFT);
 
         // 5. Resolver establishment para snapshot en el documento fiscal
         $resolvedEstablishment = $this->resolveEstablishment($caiRange, $establishmentId);

@@ -34,7 +34,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         parent::setUp();
 
         Cache::forget('company_settings');
-        Cache::forget('fiscal-period-alerts-sent:' . now()->toDateString());
+        Cache::forget('fiscal-period-alerts-sent:'.now()->toDateString());
 
         CompanySetting::factory()->create([
             'fiscal_period_start' => '2026-01-01',
@@ -71,7 +71,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
 
         $empleadoSinPermiso = User::factory()->create();
 
-        (new SendFiscalPeriodAlertsJob())->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
+        (new SendFiscalPeriodAlertsJob)->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
 
         Notification::assertSentTo($contador, FiscalPeriodsPendingNotification::class);
         Notification::assertNotSentTo($empleadoSinPermiso, FiscalPeriodsPendingNotification::class);
@@ -86,7 +86,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole($superRole);
 
-        (new SendFiscalPeriodAlertsJob())->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
+        (new SendFiscalPeriodAlertsJob)->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
 
         Notification::assertSentTo($admin, FiscalPeriodsPendingNotification::class);
     }
@@ -104,7 +104,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         $inactivo = User::factory()->create(['is_active' => false]);
         $inactivo->assignRole('contador');
 
-        (new SendFiscalPeriodAlertsJob())->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
+        (new SendFiscalPeriodAlertsJob)->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
 
         Notification::assertSentTo($activo, FiscalPeriodsPendingNotification::class);
         Notification::assertNotSentTo($inactivo, FiscalPeriodsPendingNotification::class);
@@ -123,10 +123,10 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         $service = app(\App\Services\FiscalPeriods\FiscalPeriodService::class);
 
         // Primera corrida: envía.
-        (new SendFiscalPeriodAlertsJob())->handle($service);
+        (new SendFiscalPeriodAlertsJob)->handle($service);
 
         // Segunda corrida el mismo día: NO envía de nuevo.
-        (new SendFiscalPeriodAlertsJob())->handle($service);
+        (new SendFiscalPeriodAlertsJob)->handle($service);
 
         Notification::assertSentToTimes($contador, FiscalPeriodsPendingNotification::class, 1);
     }
@@ -145,7 +145,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         $contador = User::factory()->create();
         $contador->assignRole('contador');
 
-        (new SendFiscalPeriodAlertsJob())->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
+        (new SendFiscalPeriodAlertsJob)->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
 
         Notification::assertNothingSent();
     }
@@ -161,7 +161,7 @@ class SendFiscalPeriodAlertsJobTest extends TestCase
         $user->assignRole('contador');
         $user->givePermissionTo(CustomPermission::DeclareFiscalPeriod->value);
 
-        (new SendFiscalPeriodAlertsJob())->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
+        (new SendFiscalPeriodAlertsJob)->handle(app(\App\Services\FiscalPeriods\FiscalPeriodService::class));
 
         // Debe recibir exactamente 1 notificación aunque matchee por dos rutas.
         Notification::assertSentToTimes($user, FiscalPeriodsPendingNotification::class, 1);

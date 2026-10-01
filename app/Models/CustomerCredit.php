@@ -31,7 +31,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class CustomerCredit extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'customer_id',

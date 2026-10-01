@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
-use App\Enums\TaxType;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -45,7 +44,7 @@ class ProductInfolist
                         TextEntry::make('specs')
                             ->label('')
                             ->formatStateUsing(function ($state, $record) {
-                                if (!is_array($state) || empty($state)) {
+                                if (! is_array($state) || empty($state)) {
                                     return 'Sin especificaciones';
                                 }
 
@@ -61,12 +60,12 @@ class ProductInfolist
                                 }
 
                                 return collect($state)
-                                    ->map(fn ($value, $key) => '**' . ($labels[$key] ?? ucfirst($key)) . ':** ' . $value)
+                                    ->map(fn ($value, $key) => '**'.($labels[$key] ?? ucfirst($key)).':** '.$value)
                                     ->implode("\n\n");
                             })
                             ->markdown(),
                     ])
-                    ->visible(fn ($record) => !empty($record->specs)),
+                    ->visible(fn ($record) => ! empty($record->specs)),
 
                 Section::make('Precio')
                     ->schema([
@@ -117,7 +116,7 @@ class ProductInfolist
                     ]),
 
                 Section::make('Seriales')
-                    ->visible(fn ($record) => !empty($record->serial_numbers))
+                    ->visible(fn ($record) => ! empty($record->serial_numbers))
                     ->schema([
                         TextEntry::make('serial_numbers')
                             ->label('')

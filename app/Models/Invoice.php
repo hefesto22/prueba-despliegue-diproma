@@ -101,7 +101,7 @@ class Invoice extends Model
     public function getDisplayNumberAttribute(): string
     {
         if ($this->without_cai) {
-            return $this->invoice_number . ' (Sin CAI)';
+            return $this->invoice_number.' (Sin CAI)';
         }
 
         return $this->invoice_number;

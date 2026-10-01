@@ -24,16 +24,16 @@ namespace App\Services\CreditNotes\Totals;
 final class TotalsResult
 {
     /**
-     * @param  float  $taxableTotal   Base gravada agregada POST descuento, 2 decimales.
-     * @param  float  $exemptTotal    Base exenta agregada POST descuento, 2 decimales.
-     * @param  float  $isv            ISV agregado POST descuento, 2 decimales.
-     * @param  float  $total          Suma (taxableTotal + exemptTotal + isv), 2 decimales.
+     * @param  float  $taxableTotal  Base gravada agregada POST descuento, 2 decimales.
+     * @param  float  $exemptTotal  Base exenta agregada POST descuento, 2 decimales.
+     * @param  float  $isv  ISV agregado POST descuento, 2 decimales.
+     * @param  float  $total  Suma (taxableTotal + exemptTotal + isv), 2 decimales.
      * @param  array<int, array<string, mixed>>  $items  Shape listo para
-     *   `CreditNoteItem::create`. Llaves: sale_item_id, product_id, quantity,
-     *   unit_price, tax_type, subtotal, isv_amount, total. Los montos
-     *   per-línea NO aplican ratio — son el nominal de la venta, preservando
-     *   el comportamiento previo (el ticket/factura muestra el tachado y el
-     *   descuento como línea separada cuando aplica).
+     *                                                   `CreditNoteItem::create`. Llaves: sale_item_id, product_id, quantity,
+     *                                                   unit_price, tax_type, subtotal, isv_amount, total. Los montos
+     *                                                   per-línea NO aplican ratio — son el nominal de la venta, preservando
+     *                                                   el comportamiento previo (el ticket/factura muestra el tachado y el
+     *                                                   descuento como línea separada cuando aplica).
      */
     public function __construct(
         public readonly float $taxableTotal,

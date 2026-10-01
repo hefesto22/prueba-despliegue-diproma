@@ -21,7 +21,7 @@ class InsufficientStockOnDeliveryException extends RepairDeliveryException
     ) {
         parent::__construct(sprintf(
             'Stock insuficiente para "%s". Cotizado: %s · Disponible ahora: %d. '
-            . 'Reemplaza la pieza por una externa o anula la reparación.',
+            .'Reemplaza la pieza por una externa o anula la reparación.',
             $product->name,
             number_format($requested, 2),
             $available,

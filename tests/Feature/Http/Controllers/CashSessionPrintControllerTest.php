@@ -32,7 +32,7 @@ use Tests\TestCase;
  */
 class CashSessionPrintControllerTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -137,7 +137,7 @@ class CashSessionPrintControllerTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('cash-sessions.print');
         $response->assertSee('CIERRE DE CAJA', false);
-        $response->assertSee('Sesión #' . $session->id, false);
+        $response->assertSee('Sesión #'.$session->id, false);
         $response->assertSee($this->matriz->name);
         $response->assertSee('Combustible'); // categoría aparece en el desglose
         $response->assertSee('1,000.00');    // monto apertura formateado

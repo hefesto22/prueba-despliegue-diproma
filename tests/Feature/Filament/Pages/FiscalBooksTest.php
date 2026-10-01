@@ -7,7 +7,6 @@ namespace Tests\Feature\Filament\Pages;
 use App\Exports\PurchaseBook\PurchaseBookExport;
 use App\Exports\SalesBook\SalesBookExport;
 use App\Filament\Pages\FiscalBooks;
-use App\Models\Invoice;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Carbon\CarbonImmutable;
@@ -40,7 +39,7 @@ use Tests\TestCase;
  */
 class FiscalBooksTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     private User $admin;
 

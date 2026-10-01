@@ -11,7 +11,7 @@ class RangoCaiAgotadoException extends InvoicingException
     ) {
         parent::__construct(
             "El rango del CAI {$cai} (ID {$caiRangeId}) agotó su último folio ({$rangeEnd}). "
-            . "Registre un nuevo rango CAI en Administración antes de continuar emitiendo."
+            .'Registre un nuevo rango CAI en Administración antes de continuar emitiendo.'
         );
     }
 }

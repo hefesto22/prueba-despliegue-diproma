@@ -8,7 +8,6 @@ use App\Models\Repair;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use Illuminate\Database\Eloquent\Builder;
@@ -67,10 +66,10 @@ class MyRepairsWidget extends TableWidget
                                 ]);
                         })
                         // O sin técnico asignado, listas para iniciar.
-                        ->orWhere(function (Builder $sub) {
-                            $sub->whereNull('technician_id')
-                                ->where('status', RepairStatus::Aprobado->value);
-                        });
+                            ->orWhere(function (Builder $sub) {
+                                $sub->whereNull('technician_id')
+                                    ->where('status', RepairStatus::Aprobado->value);
+                            });
                     })
                     ->orderByRaw("CASE status
                         WHEN 'en_reparacion' THEN 1
@@ -96,7 +95,7 @@ class MyRepairsWidget extends TableWidget
                     ->tooltip(fn (Repair $r) => $r->deviceCategory?->name),
                 TextColumn::make('device_brand')
                     ->label('Equipo')
-                    ->formatStateUsing(fn (Repair $r) => trim(($r->device_brand ?? '') . ' ' . ($r->device_model ?? '')))
+                    ->formatStateUsing(fn (Repair $r) => trim(($r->device_brand ?? '').' '.($r->device_model ?? '')))
                     ->limit(30),
                 TextColumn::make('total')
                     ->label('Total')

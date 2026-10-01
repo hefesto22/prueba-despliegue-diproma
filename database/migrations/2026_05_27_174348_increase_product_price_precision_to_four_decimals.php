@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Aumentar precisión interna de products.sale_price y products.cost_price

@@ -48,7 +48,7 @@ class StatsOverview extends StatsOverviewWidget
 
         return [
             // 1️⃣ Ventas de hoy — con delta vs ayer + sparkline
-            Stat::make('Ventas de Hoy', 'L. ' . number_format($today['total'], 2))
+            Stat::make('Ventas de Hoy', 'L. '.number_format($today['total'], 2))
                 ->description($this->deltaDescription(
                     $today['delta_percent'],
                     $today['previous_total'],
@@ -59,7 +59,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->color($this->deltaColor($today['delta_percent'])),
 
             // 2️⃣ Ventas del mes — con delta vs mes anterior
-            Stat::make('Ventas del Mes', 'L. ' . number_format($month['total'], 2))
+            Stat::make('Ventas del Mes', 'L. '.number_format($month['total'], 2))
                 ->description($this->deltaDescription(
                     $month['delta_percent'],
                     $month['previous_total'],
@@ -89,7 +89,7 @@ class StatsOverview extends StatsOverviewWidget
 
             // 4️⃣ Compras pendientes — con monto total por pagar
             Stat::make('Compras Pendientes', (string) $purchases['count'])
-                ->description('L. ' . number_format($purchases['total'], 2) . ' por pagar')
+                ->description('L. '.number_format($purchases['total'], 2).' por pagar')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color($purchases['count'] > 0 ? 'danger' : 'success'),
         ];
@@ -102,10 +102,11 @@ class StatsOverview extends StatsOverviewWidget
     private function deltaDescription(?float $delta, float $previous, string $suffix): string
     {
         if ($delta === null) {
-            return $previous <= 0 ? "Sin ventas previas" : "{$suffix}";
+            return $previous <= 0 ? 'Sin ventas previas' : "{$suffix}";
         }
 
         $sign = $delta >= 0 ? '+' : '';
+
         return "{$sign}{$delta}% {$suffix}";
     }
 

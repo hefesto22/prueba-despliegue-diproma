@@ -81,11 +81,11 @@ class IsvMonthlyDeclarationObserver
             $cols = implode(', ', $forbidden);
 
             throw new RuntimeException(
-                "No se pueden modificar las columnas fiscales de una declaración ISV ya "
-                . "registrada (ID #{$declaration->id}). Columnas bloqueadas: {$cols}. "
-                . 'El snapshot es inmutable por diseño — para corregir, reabra el período '
-                . 'fiscal y cree una rectificativa (el sistema marcará este registro como '
-                . 'reemplazado automáticamente).'
+                'No se pueden modificar las columnas fiscales de una declaración ISV ya '
+                ."registrada (ID #{$declaration->id}). Columnas bloqueadas: {$cols}. "
+                .'El snapshot es inmutable por diseño — para corregir, reabra el período '
+                .'fiscal y cree una rectificativa (el sistema marcará este registro como '
+                .'reemplazado automáticamente).'
             );
         }
     }
@@ -94,9 +94,9 @@ class IsvMonthlyDeclarationObserver
     {
         throw new RuntimeException(
             "No se puede eliminar una declaración ISV (ID #{$declaration->id}). "
-            . 'Los snapshots de declaraciones son permanentes por diseño fiscal — el '
-            . 'concepto de "borrado" en este dominio es marcar el registro como '
-            . 'reemplazado (superseded_at) vía una rectificativa.'
+            .'Los snapshots de declaraciones son permanentes por diseño fiscal — el '
+            .'concepto de "borrado" en este dominio es marcar el registro como '
+            .'reemplazado (superseded_at) vía una rectificativa.'
         );
     }
 }

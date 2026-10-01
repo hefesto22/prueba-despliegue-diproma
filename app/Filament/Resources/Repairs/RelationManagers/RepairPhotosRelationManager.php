@@ -52,7 +52,7 @@ class RepairPhotosRelationManager extends RelationManager
                 ->helperText('La imagen se convierte automáticamente a WebP optimizado (resize 1920px, calidad 80).')
                 ->image()
                 ->imageEditor()
-                ->directory(fn () => "tmp/repair-photos") // se mueve y convierte en mutateDataUsing
+                ->directory(fn () => 'tmp/repair-photos') // se mueve y convierte en mutateDataUsing
                 ->disk('public')
                 ->maxSize(10240) // 10 MB antes de convertir
                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
@@ -100,7 +100,7 @@ class RepairPhotosRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('file_size')
                     ->label('Tamaño')
-                    ->formatStateUsing(fn ($state) => $state ? round($state / 1024, 1) . ' KB' : '—')
+                    ->formatStateUsing(fn ($state) => $state ? round($state / 1024, 1).' KB' : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
@@ -141,6 +141,7 @@ class RepairPhotosRelationManager extends RelationManager
                             }
                         }
                         $data['uploaded_by'] = Auth::id();
+
                         return $data;
                     }),
             ])

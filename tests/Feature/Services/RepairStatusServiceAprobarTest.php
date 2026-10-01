@@ -26,8 +26,8 @@ use Tests\TestCase;
  */
 class RepairStatusServiceAprobarTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private RepairStatusService $service;
 

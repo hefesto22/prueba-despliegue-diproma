@@ -24,7 +24,7 @@ final class CajaYaAbiertaException extends RuntimeException
     ) {
         parent::__construct(sprintf(
             'Ya existe una sesión de caja abierta (#%d) para la sucursal #%d. '
-            . 'Cerrá la sesión actual antes de abrir una nueva.',
+            .'Cerrá la sesión actual antes de abrir una nueva.',
             $existingSessionId,
             $establishmentId,
         ));

@@ -47,7 +47,7 @@ return new class extends Migration
             ->where('payment_status', 'pagada')
             ->update([
                 'payment_status' => 'pendiente',
-                'updated_at'     => now(),
+                'updated_at' => now(),
             ]);
 
         if ($afectados > 0) {

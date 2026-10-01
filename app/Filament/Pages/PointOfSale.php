@@ -15,6 +15,7 @@ use App\Services\Sales\SaleService;
 use App\Services\Sales\Tax\SaleTaxCalculator;
 use App\Services\Sales\Tax\TaxableLine;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Notifications\Notification;
@@ -22,7 +23,6 @@ use Filament\Pages\Page;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Support\Icons\Heroicon;
-use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -72,10 +72,15 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
     public array $cart = [];
 
     public string $customerName = '';
+
     public string $customerRtn = '';
+
     public string $discountType = '';
+
     public string $discountValue = '';
+
     public string $notes = '';
+
     public bool $withoutCai = false;
 
     /**
@@ -181,7 +186,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
             ->actions([
                 Action::make('addToCart')
                     ->label(fn (Product $record): string => $this->getCartQuantity($record->id) > 0
-                        ? 'En carrito (' . $this->getCartQuantity($record->id) . ')'
+                        ? 'En carrito ('.$this->getCartQuantity($record->id).')'
                         : 'Agregar'
                     )
                     ->icon('heroicon-o-plus-circle')
@@ -303,7 +308,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
             return [];
         }
 
-        $like = '%' . addcslashes($term, '%_\\') . '%';
+        $like = '%'.addcslashes($term, '%_\\').'%';
 
         return Customer::query()
             ->active()
@@ -374,6 +379,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 ->title('Producto sin stock')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -389,6 +395,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                     ->body("Ya tienes {$currentQty} de {$product->stock} disponibles en tu carrito.")
                     ->warning()
                     ->send();
+
                 return;
             }
 
@@ -447,6 +454,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
 
         if ($quantity <= 0) {
             $this->removeFromCart($index);
+
             return;
         }
 
@@ -456,6 +464,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 ->body("Solo hay {$this->cart[$index]['stock']} unidades disponibles.")
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -552,6 +561,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 ->body('Agrega productos antes de procesar la venta.')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -572,7 +582,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                     // tipificación del servicio para auditoría). Sin detalle
                     // o producto físico → null (factura usa nombre catálogo).
                     'description' => ($item['is_service'] ?? false) && filled($item['detail'] ?? '')
-                        ? $item['name'] . ' — ' . $item['detail']
+                        ? $item['name'].' — '.$item['detail']
                         : null,
                 ])->toArray(),
                 paymentMethod: PaymentMethod::from($this->paymentMethod),
@@ -592,7 +602,7 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
 
             Notification::make()
                 ->title('Venta y factura generadas')
-                ->body("Factura {$invoice->display_number} — L " . number_format((float) $sale->total, 2))
+                ->body("Factura {$invoice->display_number} — L ".number_format((float) $sale->total, 2))
                 ->success()
                 ->actions([
                     \Filament\Actions\Action::make('ver_factura')

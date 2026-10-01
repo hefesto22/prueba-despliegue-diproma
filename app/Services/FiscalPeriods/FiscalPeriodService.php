@@ -73,7 +73,7 @@ class FiscalPeriodService
      * Usa invoice_date (fecha fiscal del documento), NO created_at: SAR exige
      * que la factura pertenezca al período de su fecha de emisión legal.
      *
-     * @throws PeriodoFiscalNoConfiguradoException  Si fiscal_period_start no está seteado.
+     * @throws PeriodoFiscalNoConfiguradoException Si fiscal_period_start no está seteado.
      */
     public function forInvoice(Invoice $invoice): FiscalPeriod
     {
@@ -86,7 +86,7 @@ class FiscalPeriodService
      * Lazy-create: si el período de esa fecha aún no existe, se crea como
      * abierto. Esto permite declarar meses pasados sin seed manual.
      *
-     * @throws PeriodoFiscalNoConfiguradoException  Si fiscal_period_start no está seteado.
+     * @throws PeriodoFiscalNoConfiguradoException Si fiscal_period_start no está seteado.
      */
     public function forDate(CarbonInterface $date): FiscalPeriod
     {
@@ -180,17 +180,17 @@ class FiscalPeriodService
      * dominios (Purchase, IsvRetention) siguen usando el gate genérico sin
      * el cutoff.
      *
-     * @throws PeriodoFiscalNoConfiguradoException   Si fiscal_period_start es NULL.
-     * @throws PeriodoFiscalCerradoException         Si la factura es pre-tracking
-     *                                               o el período ya fue declarado.
-     * @throws VentanaAnulacionVencidaException      Si pasamos el cutoff Diproma.
+     * @throws PeriodoFiscalNoConfiguradoException Si fiscal_period_start es NULL.
+     * @throws PeriodoFiscalCerradoException Si la factura es pre-tracking
+     *                                       o el período ya fue declarado.
+     * @throws VentanaAnulacionVencidaException Si pasamos el cutoff Diproma.
      */
     public function assertCanVoidInvoice(Invoice $invoice): void
     {
         $company = CompanySetting::current();
 
         if ($company->fiscal_period_start === null) {
-            throw new PeriodoFiscalNoConfiguradoException();
+            throw new PeriodoFiscalNoConfiguradoException;
         }
 
         $invoiceDate = CarbonImmutable::instance($invoice->invoice_date);
@@ -273,8 +273,8 @@ class FiscalPeriodService
      * usuario con UI explícita; editar una retención es un flujo normal que
      * no debe bloquearse si el módulo fiscal no está habilitado.
      *
-     * @param  int     $year           Año del período.
-     * @param  int     $month          Mes del período (1-12).
+     * @param  int  $year  Año del período.
+     * @param  int  $month  Mes del período (1-12).
      * @param  string  $documentLabel  Descripción human-readable del documento
      *                                 (usada en el mensaje de la excepción).
      *
@@ -588,7 +588,7 @@ class FiscalPeriodService
         $company = CompanySetting::current();
 
         if ($company->fiscal_period_start === null) {
-            throw new PeriodoFiscalNoConfiguradoException();
+            throw new PeriodoFiscalNoConfiguradoException;
         }
     }
 

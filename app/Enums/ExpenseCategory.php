@@ -21,7 +21,7 @@ use Filament\Support\Contracts\HasLabel;
  *
  * Extender el set: agregar un caso acá, agregar label/color/icon, listo.
  */
-enum ExpenseCategory: string implements HasLabel, HasColor, HasIcon
+enum ExpenseCategory: string implements HasColor, HasIcon, HasLabel
 {
     case Combustible = 'combustible';
     case Mensajeria = 'mensajeria';

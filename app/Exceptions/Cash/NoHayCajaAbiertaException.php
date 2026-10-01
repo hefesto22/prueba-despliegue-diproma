@@ -23,7 +23,7 @@ final class NoHayCajaAbiertaException extends RuntimeException
     ) {
         parent::__construct(sprintf(
             'No hay una sesión de caja abierta para la sucursal #%d. '
-            . 'El cajero debe abrir caja antes de registrar movimientos.',
+            .'El cajero debe abrir caja antes de registrar movimientos.',
             $establishmentId,
         ));
     }

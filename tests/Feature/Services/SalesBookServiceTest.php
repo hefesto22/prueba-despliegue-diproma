@@ -57,13 +57,13 @@ class SalesBookServiceTest extends TestCase
     {
         return Invoice::factory()->create(array_merge([
             'establishment_id' => $this->matriz->id,
-            'invoice_date'     => '2026-04-15',
-            'subtotal'         => 1000.00,
-            'taxable_total'    => 1000.00,
-            'exempt_total'     => 0,
-            'isv'              => 150.00,
-            'total'            => 1150.00,
-            'is_void'          => false,
+            'invoice_date' => '2026-04-15',
+            'subtotal' => 1000.00,
+            'taxable_total' => 1000.00,
+            'exempt_total' => 0,
+            'isv' => 150.00,
+            'total' => 1150.00,
+            'is_void' => false,
         ], $overrides));
     }
 
@@ -79,12 +79,12 @@ class SalesBookServiceTest extends TestCase
             ->forInvoice($invoice)
             ->create(array_merge([
                 'credit_note_date' => '2026-04-20',
-                'subtotal'         => 500.00,
-                'taxable_total'    => 500.00,
-                'exempt_total'     => 0,
-                'isv'              => 75.00,
-                'total'            => 575.00,
-                'is_void'          => false,
+                'subtotal' => 500.00,
+                'taxable_total' => 500.00,
+                'exempt_total' => 0,
+                'isv' => 75.00,
+                'total' => 575.00,
+                'is_void' => false,
             ], $overrides));
     }
 
@@ -252,17 +252,17 @@ class SalesBookServiceTest extends TestCase
     {
         $invoice = $this->makeInvoice([
             'taxable_total' => 1000.00,
-            'exempt_total'  => 200.00,
-            'subtotal'      => 1200.00,
-            'isv'           => 150.00,
-            'total'         => 1350.00,
+            'exempt_total' => 200.00,
+            'subtotal' => 1200.00,
+            'isv' => 150.00,
+            'total' => 1350.00,
         ]);
         $this->makeCreditNote($invoice, [
             'taxable_total' => 300.00,
-            'exempt_total'  => 50.00,
-            'subtotal'      => 350.00,
-            'isv'           => 45.00,
-            'total'         => 395.00,
+            'exempt_total' => 50.00,
+            'subtotal' => 350.00,
+            'isv' => 45.00,
+            'total' => 395.00,
         ]);
 
         $book = $this->service->build(2026, 4);
@@ -285,7 +285,7 @@ class SalesBookServiceTest extends TestCase
         $this->makeInvoice(['establishment_id' => $sucursal->id]);
 
         $librComp = $this->service->build(2026, 4);
-        $librMatriz   = $this->service->build(2026, 4, $this->matriz->id);
+        $librMatriz = $this->service->build(2026, 4, $this->matriz->id);
         $librSucursal = $this->service->build(2026, 4, $sucursal->id);
 
         $this->assertSame(2, $librComp->summary->facturasEmitidasCount);
@@ -314,21 +314,21 @@ class SalesBookServiceTest extends TestCase
         $facturaMatriz1 = $this->makeInvoice(['invoice_number' => '000-001-01-00000001']);
         $this->makeInvoice(['invoice_number' => '000-001-01-00000002']);
         $this->makeCreditNote($facturaMatriz1, [
-            'establishment_id'     => $this->matriz->id,
-            'credit_note_number'   => '000-001-03-00000001',
+            'establishment_id' => $this->matriz->id,
+            'credit_note_number' => '000-001-03-00000001',
         ]);
 
         // Sucursal: 2 facturas + 1 NC sobre la primera
         $facturaSuc1 = $this->makeInvoice([
             'establishment_id' => $sucursal->id,
-            'invoice_number'   => '000-002-01-00000001',
+            'invoice_number' => '000-002-01-00000001',
         ]);
         $this->makeInvoice([
             'establishment_id' => $sucursal->id,
-            'invoice_number'   => '000-002-01-00000002',
+            'invoice_number' => '000-002-01-00000002',
         ]);
         $this->makeCreditNote($facturaSuc1, [
-            'establishment_id'   => $sucursal->id,
+            'establishment_id' => $sucursal->id,
             'credit_note_number' => '000-002-03-00000001',
         ]);
 

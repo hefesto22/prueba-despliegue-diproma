@@ -49,7 +49,7 @@ use Tests\TestCase;
  */
 class DeclaracionIsvMensualTest extends TestCase
 {
-    use RefreshDatabase, CreatesMatriz;
+    use CreatesMatriz, RefreshDatabase;
 
     private User $admin;
 

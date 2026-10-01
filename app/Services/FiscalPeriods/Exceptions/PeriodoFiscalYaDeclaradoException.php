@@ -16,13 +16,13 @@ class PeriodoFiscalYaDeclaradoException extends FiscalPeriodException
         public readonly int $periodMonth,
         public readonly CarbonInterface $declaredAt,
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         parent::__construct(
             "El período fiscal {$periodo} ya fue declarado el "
-            . "{$declaredAt->format('d/m/Y H:i')}. "
-            . 'Si necesita modificarlo, solicite a un administrador reabrir el período '
-            . 'y luego presentar declaración rectificativa.'
+            ."{$declaredAt->format('d/m/Y H:i')}. "
+            .'Si necesita modificarlo, solicite a un administrador reabrir el período '
+            .'y luego presentar declaración rectificativa.'
         );
     }
 }

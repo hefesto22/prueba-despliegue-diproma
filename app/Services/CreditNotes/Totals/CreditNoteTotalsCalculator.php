@@ -82,10 +82,10 @@ final class CreditNoteTotalsCalculator
      * @param  Collection<int, SaleItem>  $saleItems  SaleItems de la venta origen,
      *                                                indexados por id.
      *
-     * @throws \InvalidArgumentException  Si algún `saleItemId` del input no está presente
-     *                                     en `$saleItems`. Blindaje defensivo: en el flujo
-     *                                     real el service ya validó esto con
-     *                                     `assertCantidadesDisponibles`.
+     * @throws \InvalidArgumentException Si algún `saleItemId` del input no está presente
+     *                                   en `$saleItems`. Blindaje defensivo: en el flujo
+     *                                   real el service ya validó esto con
+     *                                   `assertCantidadesDisponibles`.
      */
     public function calculate(
         Invoice $invoice,
@@ -95,10 +95,10 @@ final class CreditNoteTotalsCalculator
         if ($lineas === []) {
             return new TotalsResult(
                 taxableTotal: 0.0,
-                exemptTotal:  0.0,
-                isv:          0.0,
-                total:        0.0,
-                items:        [],
+                exemptTotal: 0.0,
+                isv: 0.0,
+                total: 0.0,
+                items: [],
             );
         }
 
@@ -112,16 +112,16 @@ final class CreditNoteTotalsCalculator
             if ($saleItem === null) {
                 throw new \InvalidArgumentException(
                     "CreditNoteTotalsCalculator: sale_item_id {$linea->saleItemId} "
-                    . 'no está presente en la Collection de SaleItems — el service debe '
-                    . 'cargarlos antes de invocar el calculador.'
+                    .'no está presente en la Collection de SaleItems — el service debe '
+                    .'cargarlos antes de invocar el calculador.'
                 );
             }
 
             $taxLines[] = new TaxableLine(
                 unitPrice: (float) $saleItem->unit_price,
-                quantity:  $linea->quantity,
-                taxType:   $saleItem->tax_type,
-                identity:  $saleItem->id,
+                quantity: $linea->quantity,
+                taxType: $saleItem->tax_type,
+                identity: $saleItem->id,
             );
         }
 
@@ -136,58 +136,58 @@ final class CreditNoteTotalsCalculator
         //    exempt_total aunque SaleTaxCalculator los sume en un solo
         //    subtotal) y construir items[] en la misma pasada.
         $taxable = 0.0;
-        $exempt  = 0.0;
-        $isv     = 0.0;
-        $items   = [];
+        $exempt = 0.0;
+        $isv = 0.0;
+        $items = [];
 
         foreach ($lineas as $i => $linea) {
             /** @var SaleItem $saleItem */
             $saleItem = $saleItems[$linea->saleItemId];
-            $line     = $breakdown->lines[$i];
+            $line = $breakdown->lines[$i];
 
             if ($saleItem->tax_type === TaxType::Gravado15) {
                 $taxable += $line->subtotal;
-                $isv     += $line->isv;
+                $isv += $line->isv;
             } else {
-                $exempt  += $line->subtotal;
+                $exempt += $line->subtotal;
             }
 
             $items[] = [
                 'sale_item_id' => $saleItem->id,
-                'product_id'   => $saleItem->product_id,
-                'quantity'     => $linea->quantity,
-                'unit_price'   => $saleItem->unit_price,
-                'tax_type'     => $saleItem->tax_type,
-                'subtotal'     => $line->subtotal,
-                'isv_amount'   => $line->isv,
-                'total'        => $line->total,
+                'product_id' => $saleItem->product_id,
+                'quantity' => $linea->quantity,
+                'unit_price' => $saleItem->unit_price,
+                'tax_type' => $saleItem->tax_type,
+                'subtotal' => $line->subtotal,
+                'isv_amount' => $line->isv,
+                'total' => $line->total,
             ];
         }
 
         // 4. Ratio de descuento de la factura origen. Gross derivado de los
         //    campos persistidos sin ambigüedad (ver PHPDoc de clase).
-        $discount     = (float) $invoice->discount;
+        $discount = (float) $invoice->discount;
         $invoiceGross = (float) $invoice->total + $discount;
-        $ratio        = ($invoiceGross > 0 && $discount > 0) ? $discount / $invoiceGross : 0.0;
+        $ratio = ($invoiceGross > 0 && $discount > 0) ? $discount / $invoiceGross : 0.0;
 
         if ($ratio > 0) {
             $taxable = round($taxable * (1 - $ratio), 2);
-            $exempt  = round($exempt  * (1 - $ratio), 2);
-            $isv     = round($isv     * (1 - $ratio), 2);
+            $exempt = round($exempt * (1 - $ratio), 2);
+            $isv = round($isv * (1 - $ratio), 2);
         } else {
             // Normalización defensiva contra drift del accumulator
             // (suma de lineBases ya redondeados puede terminar en 0.00000001).
             $taxable = round($taxable, 2);
-            $exempt  = round($exempt, 2);
-            $isv     = round($isv, 2);
+            $exempt = round($exempt, 2);
+            $isv = round($isv, 2);
         }
 
         return new TotalsResult(
             taxableTotal: $taxable,
-            exemptTotal:  $exempt,
-            isv:          $isv,
-            total:        round($taxable + $exempt + $isv, 2),
-            items:        $items,
+            exemptTotal: $exempt,
+            isv: $isv,
+            total: round($taxable + $exempt + $isv, 2),
+            items: $items,
         );
     }
 }

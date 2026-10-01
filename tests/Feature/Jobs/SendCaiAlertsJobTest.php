@@ -46,7 +46,7 @@ class SendCaiAlertsJobTest extends TestCase
         parent::setUp();
 
         Cache::forget('company_settings');
-        Cache::forget('cai-alerts-sent:' . now()->toDateString());
+        Cache::forget('cai-alerts-sent:'.now()->toDateString());
 
         $this->company = CompanySetting::factory()->create(['rtn' => '08011999123456']);
         Cache::put('company_settings', $this->company, 60 * 60 * 24);
@@ -72,7 +72,7 @@ class SendCaiAlertsJobTest extends TestCase
 
     private function runJob(): void
     {
-        (new SendCaiAlertsJob())->handle(
+        (new SendCaiAlertsJob)->handle(
             app(CaiExpirationChecker::class),
             app(CaiRangeExhaustionChecker::class),
             app(CaiAlertRecipientResolver::class),

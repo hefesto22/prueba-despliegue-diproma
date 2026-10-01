@@ -70,7 +70,7 @@ return new class extends Migration
         DB::unprepared('DROP TRIGGER IF EXISTS cai_ranges_sync_active_lookup_before_update');
 
         // 4. TRIGGER BEFORE INSERT: calcula active_lookup para filas nuevas.
-        DB::unprepared(<<<SQL
+        DB::unprepared(<<<'SQL'
             CREATE TRIGGER cai_ranges_sync_active_lookup_before_insert
             BEFORE INSERT ON cai_ranges
             FOR EACH ROW
@@ -85,7 +85,7 @@ return new class extends Migration
 
         // 5. TRIGGER BEFORE UPDATE: recalcula active_lookup cuando cambia
         //    is_active, document_type o establishment_id.
-        DB::unprepared(<<<SQL
+        DB::unprepared(<<<'SQL'
             CREATE TRIGGER cai_ranges_sync_active_lookup_before_update
             BEFORE UPDATE ON cai_ranges
             FOR EACH ROW

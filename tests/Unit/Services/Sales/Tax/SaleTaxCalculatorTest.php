@@ -4,8 +4,8 @@ namespace Tests\Unit\Services\Sales\Tax;
 
 use App\Enums\TaxType;
 use App\Services\Sales\Tax\SaleTaxCalculator;
-use App\Services\Sales\Tax\TaxBreakdown;
 use App\Services\Sales\Tax\TaxableLine;
+use App\Services\Sales\Tax\TaxBreakdown;
 use Tests\TestCase;
 
 /**
@@ -154,7 +154,7 @@ class SaleTaxCalculatorTest extends TestCase
         $this->assertEquals(0.00, $result->discountAmount);
     }
 
-    public function test_descuento_mayor_al_total_se_clampa_al_grossTotal(): void
+    public function test_descuento_mayor_al_total_se_clampa_al_gross_total(): void
     {
         $lines = [
             new TaxableLine(unitPrice: 115.00, quantity: 1, taxType: TaxType::Gravado15),
@@ -208,7 +208,7 @@ class SaleTaxCalculatorTest extends TestCase
         $this->assertEquals(0.00, $result->discountAmount); // clampeado a 0
     }
 
-    public function test_grossTotal_helper_suma_lineas_sin_descomponer(): void
+    public function test_gross_total_helper_suma_lineas_sin_descomponer(): void
     {
         $lines = [
             new TaxableLine(unitPrice: 115.00, quantity: 2, taxType: TaxType::Gravado15),
@@ -219,7 +219,7 @@ class SaleTaxCalculatorTest extends TestCase
         $this->assertEquals(380.00, $this->calculator->grossTotal($lines));
     }
 
-    public function test_grossTotal_helper_retorna_cero_en_lista_vacia(): void
+    public function test_gross_total_helper_retorna_cero_en_lista_vacia(): void
     {
         $this->assertEquals(0.00, $this->calculator->grossTotal([]));
     }

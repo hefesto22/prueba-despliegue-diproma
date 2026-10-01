@@ -28,7 +28,7 @@ return [
     */
     'auto_close' => [
         'enabled' => env('CASH_AUTO_CLOSE_ENABLED', true),
-        'hour'    => env('CASH_AUTO_CLOSE_HOUR', '21:00'),
+        'hour' => env('CASH_AUTO_CLOSE_HOUR', '21:00'),
     ],
 
     /*

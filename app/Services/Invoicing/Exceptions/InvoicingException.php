@@ -9,6 +9,4 @@ use RuntimeException;
  * Permite capturar selectivamente cualquier fallo del dominio sin atrapar
  * excepciones genéricas del framework.
  */
-abstract class InvoicingException extends RuntimeException
-{
-}
+abstract class InvoicingException extends RuntimeException {}

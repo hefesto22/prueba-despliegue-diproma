@@ -25,6 +25,7 @@ class CreditNote extends Model
 {
     /** @use HasFactory<\Database\Factories\CreditNoteFactory> */
     use HasFactory;
+
     use LocksFiscalFieldsAfterEmission;
 
     protected $fillable = [
@@ -81,18 +82,18 @@ class CreditNote extends Model
     protected function casts(): array
     {
         return [
-            'credit_note_date'       => 'date',
-            'cai_expiration_date'    => 'date',
-            'original_invoice_date'  => 'date',
-            'emitted_at'             => 'datetime',
-            'reason'                 => CreditNoteReason::class,
-            'subtotal'               => 'decimal:2',
-            'exempt_total'           => 'decimal:2',
-            'taxable_total'          => 'decimal:2',
-            'isv'                    => 'decimal:2',
-            'total'                  => 'decimal:2',
-            'is_void'                => 'boolean',
-            'without_cai'            => 'boolean',
+            'credit_note_date' => 'date',
+            'cai_expiration_date' => 'date',
+            'original_invoice_date' => 'date',
+            'emitted_at' => 'datetime',
+            'reason' => CreditNoteReason::class,
+            'subtotal' => 'decimal:2',
+            'exempt_total' => 'decimal:2',
+            'taxable_total' => 'decimal:2',
+            'isv' => 'decimal:2',
+            'total' => 'decimal:2',
+            'is_void' => 'boolean',
+            'without_cai' => 'boolean',
         ];
     }
 

@@ -53,7 +53,7 @@ trait LocksFiscalFieldsAfterEmission
             }
 
             /** @var string[] $dirty */
-            $dirty   = array_keys($model->getDirty());
+            $dirty = array_keys($model->getDirty());
             /** @var string[] $allowed */
             $allowed = $model->mutableFiscalFields();
             /** @var string[] $blocked */
@@ -65,8 +65,8 @@ trait LocksFiscalFieldsAfterEmission
 
             throw new DocumentoFiscalInmutableException(
                 documentType: class_basename($model),
-                documentId:   $model->getKey(),
-                dirtyFields:  $blocked,
+                documentId: $model->getKey(),
+                dirtyFields: $blocked,
             );
         });
     }

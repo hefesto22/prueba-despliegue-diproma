@@ -15,7 +15,7 @@ use Filament\Support\Contracts\HasLabel;
  * Las fotos se borran automáticamente 7 días después de la entrega
  * (Job programado en F-R6) para liberar espacio en hosting compartido.
  */
-enum RepairPhotoPurpose: string implements HasLabel, HasColor
+enum RepairPhotoPurpose: string implements HasColor, HasLabel
 {
     case Recepcion = 'recepcion';
     case Diagnostico = 'diagnostico';

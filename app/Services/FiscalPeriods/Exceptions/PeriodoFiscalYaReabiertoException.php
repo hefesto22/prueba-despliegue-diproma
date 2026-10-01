@@ -19,7 +19,7 @@ class PeriodoFiscalYaReabiertoException extends FiscalPeriodException
         public readonly int $periodMonth,
         public readonly ?CarbonInterface $reopenedAt = null,
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         $detalle = $reopenedAt
             ? "ya fue reabierto el {$reopenedAt->format('d/m/Y H:i')} y aún no se ha vuelto a declarar"
@@ -27,7 +27,7 @@ class PeriodoFiscalYaReabiertoException extends FiscalPeriodException
 
         parent::__construct(
             "No se puede reabrir el período fiscal {$periodo}: {$detalle}. "
-            . 'Un período abierto ya admite anulaciones y correcciones de facturas directamente.'
+            .'Un período abierto ya admite anulaciones y correcciones de facturas directamente.'
         );
     }
 }

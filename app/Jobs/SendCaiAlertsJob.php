@@ -58,11 +58,12 @@ class SendCaiAlertsJob implements ShouldQueue
         CaiAlertRecipientResolver $recipientResolver,
     ): void {
         // Guard idempotencia: una ejecución efectiva por día.
-        $cacheKey = 'cai-alerts-sent:' . now()->toDateString();
+        $cacheKey = 'cai-alerts-sent:'.now()->toDateString();
         $firstRunToday = Cache::add($cacheKey, true, now()->endOfDay());
 
         if (! $firstRunToday) {
             Log::info('SendCaiAlertsJob skipped: already ran today.');
+
             return;
         }
 
@@ -71,16 +72,18 @@ class SendCaiAlertsJob implements ShouldQueue
 
         if ($expirationAlerts->isEmpty() && $exhaustionAlerts->isEmpty()) {
             Log::info('SendCaiAlertsJob: sin alertas de CAI pendientes, no se envía nada.');
+
             return;
         }
 
         $recipients = $recipientResolver->resolve();
 
         if ($recipients->isEmpty()) {
-            Log::warning('SendCaiAlertsJob: hay alertas CAI pero ningún usuario activo con permiso ' . CustomPermission::ManageCai->value . '.', [
+            Log::warning('SendCaiAlertsJob: hay alertas CAI pero ningún usuario activo con permiso '.CustomPermission::ManageCai->value.'.', [
                 'expiration_count' => $expirationAlerts->count(),
                 'exhaustion_count' => $exhaustionAlerts->count(),
             ]);
+
             return;
         }
 

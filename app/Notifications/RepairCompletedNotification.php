@@ -6,7 +6,6 @@ use App\Models\Repair;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\DatabaseMessage;
 use Illuminate\Notifications\Notification;
 
 /**

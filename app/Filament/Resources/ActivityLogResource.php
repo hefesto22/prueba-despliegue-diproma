@@ -2,22 +2,22 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Resources\Resource;
-use Filament\Schemas\Schema;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\DatePicker;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
-use Filament\Support\Icons\Heroicon;
-use Spatie\Activitylog\Models\Activity;
 use BackedEnum;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
+use Spatie\Activitylog\Models\Activity;
 
 class ActivityLogResource extends Resource
 {
@@ -107,8 +107,9 @@ class ActivityLogResource extends Resource
                 Filter::make('created_at')
                     ->indicateUsing(function (array $data): ?string {
                         if ($data['from'] ?? null) {
-                            return 'Desde: ' . $data['from'];
+                            return 'Desde: '.$data['from'];
                         }
+
                         return null;
                     })
                     ->schema([

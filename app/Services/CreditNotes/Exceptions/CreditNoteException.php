@@ -9,6 +9,4 @@ use RuntimeException;
  * Permite capturar selectivamente cualquier fallo del dominio sin atrapar
  * excepciones genéricas del framework.
  */
-abstract class CreditNoteException extends RuntimeException
-{
-}
+abstract class CreditNoteException extends RuntimeException {}

@@ -14,7 +14,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Category extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -47,7 +47,7 @@ class Category extends Model
         });
 
         static::updating(function (Category $category) {
-            if ($category->isDirty('name') && !$category->isDirty('slug')) {
+            if ($category->isDirty('name') && ! $category->isDirty('slug')) {
                 $category->slug = Str::slug($category->name);
             }
         });

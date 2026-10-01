@@ -9,6 +9,4 @@ use RuntimeException;
  * Permite capturar selectivamente cualquier fallo del dominio sin atrapar
  * excepciones genéricas del framework.
  */
-abstract class FiscalPeriodException extends RuntimeException
-{
-}
+abstract class FiscalPeriodException extends RuntimeException {}

@@ -107,14 +107,14 @@ class IsvMonthlyDeclarationService
         );
 
         return IsvDeclarationTotals::calculate(
-            ventasGravadas:          $salesBook->summary->gravadoNeto(),
-            ventasExentas:           $salesBook->summary->exentoNeto(),
-            comprasGravadas:         $purchaseBook->summary->gravadoNeto(),
-            comprasExentas:          $purchaseBook->summary->exentoNeto(),
-            isvDebitoFiscal:         $salesBook->summary->isvNeto(),
-            isvCreditoFiscal:        $purchaseBook->summary->creditoFiscalNeto(),
+            ventasGravadas: $salesBook->summary->gravadoNeto(),
+            ventasExentas: $salesBook->summary->exentoNeto(),
+            comprasGravadas: $purchaseBook->summary->gravadoNeto(),
+            comprasExentas: $purchaseBook->summary->exentoNeto(),
+            isvDebitoFiscal: $salesBook->summary->isvNeto(),
+            isvCreditoFiscal: $purchaseBook->summary->creditoFiscalNeto(),
             isvRetencionesRecibidas: $retencionesRecibidas,
-            saldoAFavorAnterior:     $saldoAFavorAnterior,
+            saldoAFavorAnterior: $saldoAFavorAnterior,
         );
     }
 
@@ -206,8 +206,8 @@ class IsvMonthlyDeclarationService
      *   6. Re-cerrar el período (FiscalPeriodService::declare actualiza
      *      declared_at > reopened_at, pasando el período a estado "cerrado").
      *
-     * @throws PeriodoFiscalNoReabiertoException  Si el período no fue reabierto.
-     * @throws SnapshotActivoNoExisteException    Si no hay snapshot activo previo.
+     * @throws PeriodoFiscalNoReabiertoException Si el período no fue reabierto.
+     * @throws SnapshotActivoNoExisteException Si no hay snapshot activo previo.
      */
     public function redeclare(
         FiscalPeriod $period,

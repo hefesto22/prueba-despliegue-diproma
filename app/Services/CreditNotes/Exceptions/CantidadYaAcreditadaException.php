@@ -24,8 +24,8 @@ class CantidadYaAcreditadaException extends CreditNoteException
     ) {
         parent::__construct(
             "Cantidad solicitada ({$solicitada}) excede el saldo acreditable "
-            . "({$disponible}) de la línea #{$saleItemId} del producto #{$productId}. "
-            . "Ya se acreditaron {$yaAcreditada} unidades en notas de crédito previas."
+            ."({$disponible}) de la línea #{$saleItemId} del producto #{$productId}. "
+            ."Ya se acreditaron {$yaAcreditada} unidades en notas de crédito previas."
         );
     }
 }

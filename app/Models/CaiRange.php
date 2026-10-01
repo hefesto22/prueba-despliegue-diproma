@@ -103,8 +103,8 @@ class CaiRange extends Model
      */
     public function getFormattedRangeAttribute(): string
     {
-        $start = $this->prefix . '-' . str_pad((string) $this->range_start, 8, '0', STR_PAD_LEFT);
-        $end = $this->prefix . '-' . str_pad((string) $this->range_end, 8, '0', STR_PAD_LEFT);
+        $start = $this->prefix.'-'.str_pad((string) $this->range_start, 8, '0', STR_PAD_LEFT);
+        $end = $this->prefix.'-'.str_pad((string) $this->range_end, 8, '0', STR_PAD_LEFT);
 
         return "{$start} a {$end}";
     }

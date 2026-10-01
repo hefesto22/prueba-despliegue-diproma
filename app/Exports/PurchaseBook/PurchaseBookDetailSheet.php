@@ -28,7 +28,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * no son emitidas por Diproma) pero se muestran para trazabilidad operativa.
  * NO suman en los totales del resumen.
  */
-class PurchaseBookDetailSheet implements FromCollection, WithHeadings, WithMapping, WithTitle, WithStyles, ShouldAutoSize
+class PurchaseBookDetailSheet implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     private int $rowCounter = 0;
 
@@ -88,7 +88,7 @@ class PurchaseBookDetailSheet implements FromCollection, WithHeadings, WithMappi
 
     public function title(): string
     {
-        return 'Detalle ' . $this->book->summary->periodSlug();
+        return 'Detalle '.$this->book->summary->periodSlug();
     }
 
     public function styles(Worksheet $sheet): array

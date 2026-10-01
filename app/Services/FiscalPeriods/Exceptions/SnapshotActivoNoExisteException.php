@@ -27,19 +27,19 @@ namespace App\Services\FiscalPeriods\Exceptions;
 class SnapshotActivoNoExisteException extends FiscalPeriodException
 {
     /**
-     * @param  int  $periodYear   Año del período sin snapshot activo previo.
+     * @param  int  $periodYear  Año del período sin snapshot activo previo.
      * @param  int  $periodMonth  Mes del período sin snapshot activo previo.
      */
     public function __construct(
         public readonly int $periodYear,
         public readonly int $periodMonth,
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         parent::__construct(
             "No se puede emitir una declaración rectificativa para el período {$periodo} "
-            . 'porque no existe una declaración activa previa que reemplazar. '
-            . 'Si es la primera declaración del período, use declare() en lugar de redeclare().'
+            .'porque no existe una declaración activa previa que reemplazar. '
+            .'Si es la primera declaración del período, use declare() en lugar de redeclare().'
         );
     }
 }

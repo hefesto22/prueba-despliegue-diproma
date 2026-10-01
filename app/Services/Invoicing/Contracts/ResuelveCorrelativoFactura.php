@@ -25,14 +25,14 @@ use App\Services\Invoicing\Exceptions\RangoCaiAgotadoException;
 interface ResuelveCorrelativoFactura
 {
     /**
-     * @param  DocumentType $documentType     Tipo SAR — fuente única de verdad (Acuerdo 481-2017).
-     *                                        Factura='01', NotaCredito='03', NotaDebito='04'.
-     * @param  int|null     $establishmentId  Contexto de establecimiento. Obligatorio en modo por_sucursal,
-     *                                        opcional en modo centralizado (se resuelve a matriz si es null).
+     * @param  DocumentType  $documentType  Tipo SAR — fuente única de verdad (Acuerdo 481-2017).
+     *                                      Factura='01', NotaCredito='03', NotaDebito='04'.
+     * @param  int|null  $establishmentId  Contexto de establecimiento. Obligatorio en modo por_sucursal,
+     *                                     opcional en modo centralizado (se resuelve a matriz si es null).
      *
-     * @throws NoHayCaiActivoException   Si no hay CAI activo para el contexto dado.
-     * @throws RangoCaiAgotadoException  Si el CAI activo ya usó todos sus folios.
-     * @throws CaiVencidoException       Si el CAI activo expiró por fecha.
+     * @throws NoHayCaiActivoException Si no hay CAI activo para el contexto dado.
+     * @throws RangoCaiAgotadoException Si el CAI activo ya usó todos sus folios.
+     * @throws CaiVencidoException Si el CAI activo expiró por fecha.
      */
     public function siguiente(
         DocumentType $documentType = DocumentType::Factura,

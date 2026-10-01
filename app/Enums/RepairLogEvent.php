@@ -26,7 +26,7 @@ use Filament\Support\Contracts\HasLabel;
  * Diseño: el log es WORM (write-once-read-many). NUNCA se actualizan
  * registros existentes; cada evento es una fila nueva.
  */
-enum RepairLogEvent: string implements HasLabel, HasColor, HasIcon
+enum RepairLogEvent: string implements HasColor, HasIcon, HasLabel
 {
     case StatusChange = 'status_change';
     case ItemsAdded = 'items_added';

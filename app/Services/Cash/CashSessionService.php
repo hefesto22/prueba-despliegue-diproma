@@ -113,11 +113,11 @@ class CashSessionService
     /**
      * Cerrar una sesión de caja.
      *
-     * @param  CashSession  $session              Sesión a cerrar (debe estar abierta).
-     * @param  User         $closedBy             Quien cierra.
-     * @param  float        $actualClosingAmount  Monto físico contado por el cajero.
-     * @param  string|null  $notes                Observación obligatoria si hay descuadre.
-     * @param  User|null    $authorizedBy         Requerido si |descuadre| > tolerancia.
+     * @param  CashSession  $session  Sesión a cerrar (debe estar abierta).
+     * @param  User  $closedBy  Quien cierra.
+     * @param  float  $actualClosingAmount  Monto físico contado por el cajero.
+     * @param  string|null  $notes  Observación obligatoria si hay descuadre.
+     * @param  User|null  $authorizedBy  Requerido si |descuadre| > tolerancia.
      *
      * @throws DescuadreExcedeTolerancianException si descuadre supera tolerancia y falta autorización.
      */
@@ -221,8 +221,8 @@ class CashSessionService
             $now = now();
 
             $locked->update([
-                'closed_at'               => $now,
-                'closed_by_system_at'     => $now,
+                'closed_at' => $now,
+                'closed_by_system_at' => $now,
                 'requires_reconciliation' => true,
                 'expected_closing_amount' => $expected,
                 // actual_closing_amount, discrepancy, closed_by_user_id quedan NULL.
@@ -237,12 +237,12 @@ class CashSessionService
                 // job dispatchee notificaciones por movimiento, evitaría notificar
                 // a un humano por una acción que no ejecutó. El system user es
                 // un actor técnico reservado, creado por SystemUserSeeder.
-                'user_id'         => User::system()->id,
-                'type'            => CashMovementType::ClosingBalance,
-                'payment_method'  => PaymentMethod::Efectivo,
-                'amount'          => $expected, // sin conteo físico, registramos el esperado
-                'description'     => 'Cierre automático del sistema',
-                'occurred_at'     => $now,
+                'user_id' => User::system()->id,
+                'type' => CashMovementType::ClosingBalance,
+                'payment_method' => PaymentMethod::Efectivo,
+                'amount' => $expected, // sin conteo físico, registramos el esperado
+                'description' => 'Cierre automático del sistema',
+                'occurred_at' => $now,
             ]);
 
             return $locked->fresh();
@@ -271,7 +271,7 @@ class CashSessionService
      * que quedaron NULL en la sesión, no agrega nuevos movimientos al kardex.
      *
      * @throws MovimientoEnSesionCerradaException si la sesión no estaba cerrada
-     *         (no se puede conciliar lo que no está cerrado) o ya fue conciliada.
+     *                                            (no se puede conciliar lo que no está cerrado) o ya fue conciliada.
      * @throws DescuadreExcedeTolerancianException si descuadre > tolerancia y falta autorización.
      */
     public function reconcile(
@@ -309,12 +309,12 @@ class CashSessionService
             }
 
             $locked->update([
-                'closed_by_user_id'       => $reconciledBy->id,
+                'closed_by_user_id' => $reconciledBy->id,
                 'expected_closing_amount' => $expected,
-                'actual_closing_amount'   => $actualClosingAmount,
-                'discrepancy'             => $discrepancy,
-                'authorized_by_user_id'   => $authorizedBy?->id,
-                'notes'                   => $notes,
+                'actual_closing_amount' => $actualClosingAmount,
+                'discrepancy' => $discrepancy,
+                'authorized_by_user_id' => $authorizedBy?->id,
+                'notes' => $notes,
                 'requires_reconciliation' => false,
             ]);
 

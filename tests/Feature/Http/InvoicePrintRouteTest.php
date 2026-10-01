@@ -32,6 +32,7 @@ class InvoicePrintRouteTest extends TestCase
     use RefreshDatabase;
 
     private Invoice $invoice;
+
     private Product $product;
 
     protected function setUp(): void
@@ -43,26 +44,26 @@ class InvoicePrintRouteTest extends TestCase
         $company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, SPS',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, SPS',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $company, 60 * 60 * 24);
 
         Establishment::factory()->for($company, 'companySetting')->main()->create();
 
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         $sale = Sale::factory()->completada()->create([
-            'subtotal'        => 1000,
-            'isv'             => 150,
-            'total'           => 1150,
+            'subtotal' => 1000,
+            'isv' => 150,
+            'total' => 1150,
             'discount_amount' => 0,
         ]);
         // Product::booted() autogenera el name desde type+brand+model, por lo que
@@ -80,9 +81,9 @@ class InvoicePrintRouteTest extends TestCase
             ->forSale($sale)
             ->forProduct($this->product)
             ->create([
-                'quantity'   => 1,
+                'quantity' => 1,
                 'unit_price' => 1150,
-                'tax_type'   => TaxType::Gravado15,
+                'tax_type' => TaxType::Gravado15,
             ]);
 
         $this->invoice = app(InvoiceService::class)->generateFromSale($sale->fresh());

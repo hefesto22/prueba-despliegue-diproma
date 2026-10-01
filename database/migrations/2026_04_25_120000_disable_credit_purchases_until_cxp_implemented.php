@@ -47,10 +47,10 @@ return new class extends Migration
         $affected = DB::table('purchases')
             ->where('credit_days', '>', 0)
             ->update([
-                'credit_days'    => 0,
-                'due_date'       => null,
+                'credit_days' => 0,
+                'due_date' => null,
                 'payment_status' => 'pagada',
-                'updated_at'     => now(),
+                'updated_at' => now(),
             ]);
 
         if ($affected > 0) {

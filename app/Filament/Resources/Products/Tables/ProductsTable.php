@@ -3,25 +3,24 @@
 namespace App\Filament\Resources\Products\Tables;
 
 use App\Enums\ProductCondition;
-use App\Enums\ProductType;
-use App\Models\SpecOption;
 use App\Enums\TaxType;
+use App\Models\SpecOption;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -56,8 +55,7 @@ class ProductsTable
                 TextColumn::make('condition')
                     ->label('Condición')
                     ->badge()
-                    ->color(fn ($state, $record) =>
-                        $record->is_service
+                    ->color(fn ($state, $record) => $record->is_service
                             ? 'gray'
                             : ($state === ProductCondition::New ? 'success' : 'warning')
                     )
@@ -68,6 +66,7 @@ class ProductsTable
                         if ($record->is_service) {
                             return '—';
                         }
+
                         return $state instanceof ProductCondition
                             ? $state->getLabel()
                             : $state;
@@ -93,6 +92,7 @@ class ProductsTable
                         if ($record->is_service) {
                             return '∞';
                         }
+
                         return (string) $state;
                     }),
                 ToggleColumn::make('is_active')

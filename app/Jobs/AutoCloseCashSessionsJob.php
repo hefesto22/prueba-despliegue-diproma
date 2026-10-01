@@ -75,6 +75,7 @@ class AutoCloseCashSessionsJob implements ShouldQueue
     {
         if (! (bool) config('cash.auto_close.enabled', true)) {
             Log::info('AutoCloseCashSessionsJob: auto-cierre deshabilitado por config.');
+
             return;
         }
 
@@ -88,6 +89,7 @@ class AutoCloseCashSessionsJob implements ShouldQueue
 
         if ($openSessions->isEmpty()) {
             Log::info('AutoCloseCashSessionsJob: no había sesiones abiertas, nada que cerrar.');
+
             return;
         }
 
@@ -116,19 +118,19 @@ class AutoCloseCashSessionsJob implements ShouldQueue
                 // el job entero. Loguear con contexto suficiente para investigar.
                 $errors++;
                 Log::error('AutoCloseCashSessionsJob: error cerrando sesión.', [
-                    'session_id'      => $session->id,
-                    'establishment_id'=> $session->establishment_id,
-                    'exception'       => $e::class,
-                    'message'         => $e->getMessage(),
+                    'session_id' => $session->id,
+                    'establishment_id' => $session->establishment_id,
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
                 ]);
             }
         }
 
         Log::info('AutoCloseCashSessionsJob: ejecución completada.', [
-            'total_open'      => $openSessions->count(),
-            'closed'          => $closed,
-            'already_closed'  => $alreadyClosed,
-            'errors'          => $errors,
+            'total_open' => $openSessions->count(),
+            'closed' => $closed,
+            'already_closed' => $alreadyClosed,
+            'errors' => $errors,
         ]);
     }
 
@@ -162,7 +164,7 @@ class AutoCloseCashSessionsJob implements ShouldQueue
             $cashier->notify($notification);
         } else {
             Log::warning('AutoCloseCashSessionsJob: sesión sin openedBy resolvible.', [
-                'session_id'        => $originalSession->id,
+                'session_id' => $originalSession->id,
                 'opened_by_user_id' => $originalSession->opened_by_user_id,
             ]);
         }

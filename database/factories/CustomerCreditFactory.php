@@ -35,6 +35,7 @@ class CustomerCreditFactory extends Factory
     {
         return $this->state(function (array $attrs) use ($usedAmount) {
             $newBalance = max(0, (float) $attrs['amount'] - $usedAmount);
+
             return [
                 'balance' => $newBalance,
                 'fully_used_at' => $newBalance == 0 ? now() : null,

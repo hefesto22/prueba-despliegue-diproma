@@ -24,7 +24,7 @@ class MontoExcedeFacturaOriginalException extends CreditNoteException
 
         parent::__construct(
             "El total de la nota de crédito ({$solicitado}) excede el saldo acreditable "
-            . "({$saldo}) de la factura #{$invoiceNumber} (id {$invoiceId})."
+            ."({$saldo}) de la factura #{$invoiceNumber} (id {$invoiceId})."
         );
     }
 }

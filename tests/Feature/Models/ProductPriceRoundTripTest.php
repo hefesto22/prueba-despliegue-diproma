@@ -2,9 +2,7 @@
 
 namespace Tests\Feature\Models;
 
-use App\Enums\ProductCondition;
 use App\Enums\ProductType;
-use App\Enums\TaxType;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;

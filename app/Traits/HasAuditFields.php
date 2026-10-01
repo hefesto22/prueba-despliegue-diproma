@@ -36,7 +36,7 @@ trait HasAuditFields
         // Only register soft delete event if the model uses SoftDeletes
         if (method_exists(static::class, 'bootSoftDeletes')) {
             static::deleting(function ($model) {
-                if (Auth::check() && !$model->isForceDeleting()) {
+                if (Auth::check() && ! $model->isForceDeleting()) {
                     $model->deleted_by = Auth::id();
                     $model->saveQuietly();
                 }

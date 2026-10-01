@@ -19,8 +19,8 @@ class FacturaWithoutCaiNoAcreditableException extends CreditNoteException
     ) {
         parent::__construct(
             "La factura #{$invoiceNumber} (id {$invoiceId}) fue emitida sin CAI y no puede "
-            . "acreditarse. Para revertirla anule la venta directamente desde el módulo de "
-            . "ventas."
+            .'acreditarse. Para revertirla anule la venta directamente desde el módulo de '
+            .'ventas.'
         );
     }
 }

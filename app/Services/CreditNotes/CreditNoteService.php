@@ -93,48 +93,48 @@ class CreditNoteService
             // 6. Crear CreditNote + items
             $company = CompanySetting::current();
             $creditNote = CreditNote::create([
-                'invoice_id'           => $invoice->id,
-                'cai_range_id'         => $correlativo->caiRangeId,
-                'establishment_id'     => $correlativo->establishmentId,
+                'invoice_id' => $invoice->id,
+                'cai_range_id' => $correlativo->caiRangeId,
+                'establishment_id' => $correlativo->establishmentId,
 
-                'credit_note_number'   => $correlativo->documentNumber,
-                'cai'                  => $correlativo->cai,
-                'emission_point'       => $correlativo->emissionPoint,
-                'credit_note_date'     => now()->toDateString(),
-                'cai_expiration_date'  => $correlativo->caiExpirationDate,
+                'credit_note_number' => $correlativo->documentNumber,
+                'cai' => $correlativo->cai,
+                'emission_point' => $correlativo->emissionPoint,
+                'credit_note_date' => now()->toDateString(),
+                'cai_expiration_date' => $correlativo->caiExpirationDate,
 
-                'reason'               => $input->reason,
-                'reason_notes'         => $input->reasonNotes,
+                'reason' => $input->reason,
+                'reason_notes' => $input->reasonNotes,
 
                 // Snapshot emisor
-                'company_name'         => $company->display_name,
-                'company_rtn'          => $company->rtn,
-                'company_address'      => $company->full_address,
-                'company_phone'        => $company->phone,
-                'company_email'        => $company->email,
+                'company_name' => $company->display_name,
+                'company_rtn' => $company->rtn,
+                'company_address' => $company->full_address,
+                'company_phone' => $company->phone,
+                'company_email' => $company->email,
 
                 // Snapshot receptor (desde la factura, NO del cliente actual —
                 // el receptor legal de la NC es quien aparece en la factura).
-                'customer_name'        => $invoice->customer_name,
-                'customer_rtn'         => $invoice->customer_rtn,
+                'customer_name' => $invoice->customer_name,
+                'customer_rtn' => $invoice->customer_rtn,
 
                 // Snapshot factura origen
                 'original_invoice_number' => $invoice->invoice_number,
-                'original_invoice_cai'    => $invoice->cai,
-                'original_invoice_date'   => $invoice->invoice_date,
+                'original_invoice_cai' => $invoice->cai,
+                'original_invoice_date' => $invoice->invoice_date,
 
                 // Totales (positivos; el "crédito" es implícito por tipo doc).
                 // `subtotal` mapea a la base gravada post-descuento por
                 // convención del schema de NC (mismo patrón que Invoice).
-                'subtotal'             => $totales->taxableTotal,
-                'exempt_total'         => $totales->exemptTotal,
-                'taxable_total'        => $totales->taxableTotal,
-                'isv'                  => $totales->isv,
-                'total'                => $totales->total,
+                'subtotal' => $totales->taxableTotal,
+                'exempt_total' => $totales->exemptTotal,
+                'taxable_total' => $totales->taxableTotal,
+                'isv' => $totales->isv,
+                'total' => $totales->total,
 
-                'is_void'              => false,
-                'without_cai'          => false,
-                'created_by'           => auth()->id(),
+                'is_void' => false,
+                'without_cai' => false,
+                'created_by' => auth()->id(),
             ]);
 
             foreach ($totales->items as $itemData) {
@@ -149,17 +149,17 @@ class CreditNoteService
             //    SalidaVenta original).
             if ($input->reason->returnsToInventory()) {
                 $this->inventoryProcessor->registerReturn(
-                    invoice:    $invoice,
+                    invoice: $invoice,
                     creditNote: $creditNote,
-                    lineas:     $input->lineas,
-                    saleItems:  $saleItems,
+                    lineas: $input->lineas,
+                    saleItems: $saleItems,
                 );
             }
 
             // 8. Sellado fiscal. El trait LocksFiscalFieldsAfterEmission permite
             //    este primer sellado porque getOriginal('emitted_at') es null
             //    (la fila fue recién creada en el paso 6).
-            $creditNote->emitted_at     = now();
+            $creditNote->emitted_at = now();
             $creditNote->integrity_hash = $this->calculateIntegrityHash($creditNote);
             $creditNote->save();
 
@@ -192,11 +192,11 @@ class CreditNoteService
      *
      * Command (CQRS): no retorna datos.
      *
-     * @throws NotaCreditoYaAnuladaException             Si la NC ya fue anulada.
-     * @throws StockInsuficienteParaAnularNCException    Si la mercadería devuelta
-     *                                                    ya fue revendida y el
-     *                                                    stock actual no alcanza
-     *                                                    para revertir la entrada.
+     * @throws NotaCreditoYaAnuladaException Si la NC ya fue anulada.
+     * @throws StockInsuficienteParaAnularNCException Si la mercadería devuelta
+     *                                                ya fue revendida y el
+     *                                                stock actual no alcanza
+     *                                                para revertir la entrada.
      */
     public function voidNotaCredito(CreditNote $creditNote): void
     {
@@ -211,7 +211,7 @@ class CreditNoteService
             //    aquí veremos is_void=true y abortamos antes de tocar kardex.
             if ($locked->is_void) {
                 throw new NotaCreditoYaAnuladaException(
-                    creditNoteId:     $locked->id,
+                    creditNoteId: $locked->id,
                     creditNoteNumber: $locked->credit_note_number,
                 );
             }
@@ -235,14 +235,14 @@ class CreditNoteService
     {
         if ($invoice->is_void) {
             throw new FacturaAnuladaNoAcreditableException(
-                invoiceId:     $invoice->id,
+                invoiceId: $invoice->id,
                 invoiceNumber: $invoice->invoice_number,
             );
         }
 
         if ($invoice->without_cai) {
             throw new FacturaWithoutCaiNoAcreditableException(
-                invoiceId:     $invoice->id,
+                invoiceId: $invoice->id,
                 invoiceNumber: $invoice->invoice_number,
             );
         }
@@ -253,7 +253,7 @@ class CreditNoteService
      * misma venta de la factura origen. Rechaza cualquier id ajeno.
      *
      * @param  list<\App\Services\CreditNotes\DTOs\LineaAcreditarInput>  $lineas
-     * @return Collection<int, SaleItem>  Indexada por SaleItem::id
+     * @return Collection<int, SaleItem> Indexada por SaleItem::id
      */
     private function loadSaleItems(Invoice $invoice, array $lineas): Collection
     {
@@ -268,7 +268,7 @@ class CreditNoteService
         if ($faltantes !== []) {
             throw new InvalidArgumentException(
                 'sale_item_id(s) no pertenecen a la factura '
-                . "{$invoice->invoice_number}: " . implode(', ', $faltantes)
+                ."{$invoice->invoice_number}: ".implode(', ', $faltantes)
             );
         }
 
@@ -283,7 +283,7 @@ class CreditNoteService
      * Lee en una sola query el acumulado previo por sale_item_id.
      *
      * @param  list<\App\Services\CreditNotes\DTOs\LineaAcreditarInput>  $lineas
-     * @param  Collection<int, SaleItem>                                  $saleItems
+     * @param  Collection<int, SaleItem>  $saleItems
      */
     private function assertCantidadesDisponibles(
         Invoice $invoice,
@@ -308,15 +308,15 @@ class CreditNoteService
             /** @var SaleItem $saleItem */
             $saleItem = $saleItems[$linea->saleItemId];
 
-            $yaAcredit  = $yaAcreditado[$linea->saleItemId] ?? 0;
+            $yaAcredit = $yaAcreditado[$linea->saleItemId] ?? 0;
             $disponible = (int) $saleItem->quantity - $yaAcredit;
 
             if ($linea->quantity > $disponible) {
                 throw new CantidadYaAcreditadaException(
-                    saleItemId:   $linea->saleItemId,
-                    productId:    $saleItem->product_id,
-                    solicitada:   $linea->quantity,
-                    disponible:   max(0, $disponible),
+                    saleItemId: $linea->saleItemId,
+                    productId: $saleItem->product_id,
+                    solicitada: $linea->quantity,
+                    disponible: max(0, $disponible),
                     yaAcreditada: $yaAcredit,
                 );
             }
@@ -334,13 +334,13 @@ class CreditNoteService
     private function calculateIntegrityHash(CreditNote $creditNote): string
     {
         return hash('sha256', (string) json_encode([
-            'id'                      => $creditNote->id,
-            'credit_note_number'      => $creditNote->credit_note_number,
-            'cai'                     => $creditNote->cai,
-            'company_rtn'             => $creditNote->company_rtn,
-            'customer_rtn'            => $creditNote->customer_rtn,
-            'total'                   => (string) $creditNote->total,
-            'credit_note_date'        => $creditNote->credit_note_date?->toDateString(),
+            'id' => $creditNote->id,
+            'credit_note_number' => $creditNote->credit_note_number,
+            'cai' => $creditNote->cai,
+            'company_rtn' => $creditNote->company_rtn,
+            'customer_rtn' => $creditNote->customer_rtn,
+            'total' => (string) $creditNote->total,
+            'credit_note_date' => $creditNote->credit_note_date?->toDateString(),
             'original_invoice_number' => $creditNote->original_invoice_number,
         ]));
     }

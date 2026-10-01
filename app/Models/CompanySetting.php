@@ -244,7 +244,7 @@ class CompanySetting extends Model
         $clean = preg_replace('/\D/', '', $this->rtn);
 
         if (strlen($clean) === 14) {
-            return substr($clean, 0, 4) . '-' . substr($clean, 4, 4) . '-' . substr($clean, 8, 6);
+            return substr($clean, 0, 4).'-'.substr($clean, 4, 4).'-'.substr($clean, 8, 6);
         }
 
         return $this->rtn;

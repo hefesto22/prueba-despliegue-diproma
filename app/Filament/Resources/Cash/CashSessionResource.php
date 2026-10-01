@@ -98,7 +98,7 @@ class CashSessionResource extends Resource
     {
         return [
             'index' => ListCashSessions::route('/'),
-            'view'  => ViewCashSession::route('/{record}'),
+            'view' => ViewCashSession::route('/{record}'),
             // Hoja de cierre / corte parcial embebida — el iframe interno carga
             // la ruta web `cash-sessions.print` que es la misma vista PDF que
             // se imprime. Mantener el sidebar/navbar visibles fue requisito UX.

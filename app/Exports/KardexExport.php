@@ -10,7 +10,6 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -22,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  *
  * Para volúmenes grandes (>5000 filas) cambiar a ShouldQueue + WithChunkReading.
  */
-class KardexExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithTitle, WithStyles
+class KardexExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     public function __construct(
         private readonly Builder|EloquentBuilder $baseQuery,
@@ -71,7 +70,7 @@ class KardexExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSi
 
     public function title(): string
     {
-        return 'Kardex' . ($this->titleSuffix ? ' - ' . substr($this->titleSuffix, 0, 20) : '');
+        return 'Kardex'.($this->titleSuffix ? ' - '.substr($this->titleSuffix, 0, 20) : '');
     }
 
     public function styles(Worksheet $sheet): array

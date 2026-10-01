@@ -47,11 +47,12 @@ class SendFiscalPeriodAlertsJob implements ShouldQueue
     public function handle(FiscalPeriodService $service): void
     {
         // Guard idempotencia: una ejecución efectiva por día.
-        $cacheKey = 'fiscal-period-alerts-sent:' . now()->toDateString();
+        $cacheKey = 'fiscal-period-alerts-sent:'.now()->toDateString();
         $firstRunToday = Cache::add($cacheKey, true, now()->endOfDay());
 
         if (! $firstRunToday) {
             Log::info('SendFiscalPeriodAlertsJob skipped: already ran today.');
+
             return;
         }
 
@@ -67,15 +68,17 @@ class SendFiscalPeriodAlertsJob implements ShouldQueue
 
         if ($pendientes->isEmpty()) {
             Log::info('SendFiscalPeriodAlertsJob: sin períodos pendientes, no se envía nada.');
+
             return;
         }
 
         $recipients = $this->resolveRecipients();
 
         if ($recipients->isEmpty()) {
-            Log::warning('SendFiscalPeriodAlertsJob: hay períodos pendientes pero ningún usuario activo con permiso ' . CustomPermission::DeclareFiscalPeriod->value . '.', [
+            Log::warning('SendFiscalPeriodAlertsJob: hay períodos pendientes pero ningún usuario activo con permiso '.CustomPermission::DeclareFiscalPeriod->value.'.', [
                 'pending_count' => $pendientes->count(),
             ]);
+
             return;
         }
 
@@ -110,6 +113,7 @@ class SendFiscalPeriodAlertsJob implements ShouldQueue
 
         if ($permission === null) {
             Log::warning("SendFiscalPeriodAlertsJob: permiso {$permissionName} no existe. Correr CustomPermissionsSeeder.");
+
             return collect();
         }
 

@@ -23,8 +23,8 @@ final class MovimientoEnSesionCerradaException extends RuntimeException
     ) {
         parent::__construct(sprintf(
             'La sesión de caja #%d ya está cerrada. No se pueden registrar '
-            . 'movimientos en sesiones cerradas. Abrí una nueva sesión y '
-            . 'registrá un ajuste con la justificación correspondiente.',
+            .'movimientos en sesiones cerradas. Abrí una nueva sesión y '
+            .'registrá un ajuste con la justificación correspondiente.',
             $sessionId,
         ));
     }

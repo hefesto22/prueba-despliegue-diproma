@@ -38,6 +38,7 @@ class CreditNotePrintRouteTest extends TestCase
     use RefreshDatabase;
 
     private CreditNote $creditNote;
+
     private Product $product;
 
     protected function setUp(): void
@@ -49,10 +50,10 @@ class CreditNotePrintRouteTest extends TestCase
         $company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, SPS',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, SPS',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $company, 60 * 60 * 24);
 
@@ -72,19 +73,19 @@ class CreditNotePrintRouteTest extends TestCase
 
         // CAI para facturas (document_type '01')
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-01',
-            'document_type'  => '01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-01',
+            'document_type' => '01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         // CAI para notas de credito (document_type '03')
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-03',
-            'document_type'  => '03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-03',
+            'document_type' => '03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
@@ -92,22 +93,22 @@ class CreditNotePrintRouteTest extends TestCase
         // Product::booted() autogenera 'name' desde type+brand+model,
         // por lo que usamos el SKU estable para las aserciones de HTML.
         $this->product = Product::factory()->create([
-            'stock'      => 10,
+            'stock' => 10,
             'cost_price' => 50.00,
-            'tax_type'   => TaxType::Gravado15,
+            'tax_type' => TaxType::Gravado15,
         ]);
 
         // Venta real via SaleService → genera SalidaVenta en kardex
         $sale = app(SaleService::class)->processSale(
             cartItems: [[
                 'product_id' => $this->product->id,
-                'quantity'   => 2,
+                'quantity' => 2,
                 'unit_price' => 115.00,
-                'tax_type'   => TaxType::Gravado15->value,
+                'tax_type' => TaxType::Gravado15->value,
             ]],
             paymentMethod: PaymentMethod::Efectivo,
             customerName: 'Cliente Prueba',
-            customerRtn:  '08011999000999',
+            customerRtn: '08011999000999',
         );
 
         $invoice = app(InvoiceService::class)->generateFromSale($sale->fresh(['items']));
@@ -117,8 +118,8 @@ class CreditNotePrintRouteTest extends TestCase
         $this->creditNote = app(CreditNoteService::class)->generateFromInvoice(
             new EmitirNotaCreditoInput(
                 invoice: $invoice->fresh(['sale.items']),
-                reason:  CreditNoteReason::DevolucionFisica,
-                lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+                reason: CreditNoteReason::DevolucionFisica,
+                lineas: [new LineaAcreditarInput($saleItem->id, 1)],
             )
         );
 

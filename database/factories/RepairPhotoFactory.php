@@ -19,7 +19,7 @@ class RepairPhotoFactory extends Factory
     {
         return [
             'repair_id' => Repair::factory(),
-            'photo_path' => 'repairs/test/' . fake()->uuid() . '.jpg',
+            'photo_path' => 'repairs/test/'.fake()->uuid().'.jpg',
             'purpose' => RepairPhotoPurpose::Recepcion,
             'caption' => fake()->optional()->sentence(4),
             'file_size' => fake()->numberBetween(50_000, 2_500_000),

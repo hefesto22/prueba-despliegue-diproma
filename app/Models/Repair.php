@@ -21,29 +21,29 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * en RepairService. Este modelo solo expone relaciones, casts, scopes y
  * accessors. NO contiene lógica de negocio.
  *
- * @property int                 $id
- * @property string              $repair_number
- * @property string              $qr_token
- * @property RepairStatus        $status
- * @property string              $customer_name
- * @property string              $customer_phone
- * @property string|null         $customer_rtn
- * @property string              $device_brand
- * @property string|null         $device_model
- * @property string              $reported_issue
- * @property string|null         $diagnosis
- * @property string|null         $device_password
+ * @property int $id
+ * @property string $repair_number
+ * @property string $qr_token
+ * @property RepairStatus $status
+ * @property string $customer_name
+ * @property string $customer_phone
+ * @property string|null $customer_rtn
+ * @property string $device_brand
+ * @property string|null $device_model
+ * @property string $reported_issue
+ * @property string|null $diagnosis
+ * @property string|null $device_password
  * @property \Illuminate\Support\Carbon $received_at
- * @property string              $subtotal
- * @property string              $exempt_total
- * @property string              $taxable_total
- * @property string              $isv
- * @property string              $total
- * @property string              $advance_payment
+ * @property string $subtotal
+ * @property string $exempt_total
+ * @property string $taxable_total
+ * @property string $isv
+ * @property string $total
+ * @property string $advance_payment
  */
 class Repair extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'repair_number',
@@ -149,7 +149,7 @@ class Repair extends Model
 
         $sequence = $last ? ((int) substr($last, -5) + 1) : 1;
 
-        return $prefix . str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
     }
 
     // ─── Activity Log ────────────────────────────────────────
@@ -304,6 +304,7 @@ class Repair extends Model
         if ($this->customer_credit_id !== null) {
             return false;
         }
+
         return ! $this->statusLogs()
             ->where('event_type', \App\Enums\RepairLogEvent::AdvanceRefunded->value)
             ->exists();

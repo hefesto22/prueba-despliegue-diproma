@@ -76,7 +76,7 @@ class UserHierarchyService
      */
     private function queryDescendants(int $userId): array
     {
-        $results = DB::select("
+        $results = DB::select('
             WITH RECURSIVE descendants AS (
                 SELECT id FROM users WHERE created_by = ? AND deleted_at IS NULL
                 UNION ALL
@@ -85,7 +85,7 @@ class UserHierarchyService
                 WHERE u.deleted_at IS NULL
             )
             SELECT id FROM descendants
-        ", [$userId]);
+        ', [$userId]);
 
         return array_map(fn ($row) => (int) $row->id, $results);
     }
@@ -95,6 +95,6 @@ class UserHierarchyService
      */
     private function cacheKey(int $userId): string
     {
-        return self::CACHE_PREFIX . $userId;
+        return self::CACHE_PREFIX.$userId;
     }
 }

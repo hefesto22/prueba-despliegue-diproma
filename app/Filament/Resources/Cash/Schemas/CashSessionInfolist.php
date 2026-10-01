@@ -293,8 +293,8 @@ class CashSessionInfolist
 
         return match (true) {
             $discrepancy === 0.0 => 'Caja cuadrada exactamente',
-            $discrepancy > 0     => 'Sobra dinero en caja',
-            default              => 'Faltante en caja',
+            $discrepancy > 0 => 'Sobra dinero en caja',
+            default => 'Faltante en caja',
         };
     }
 
@@ -303,7 +303,7 @@ class CashSessionInfolist
         $sucursal = $record->establishment?->name ?? 'Sucursal desconocida';
 
         if ($record->isOpen()) {
-            return "{$sucursal} · Abierta el " . $record->opened_at->format('d/m/Y H:i');
+            return "{$sucursal} · Abierta el ".$record->opened_at->format('d/m/Y H:i');
         }
 
         $closedAt = $record->closed_at?->format('d/m/Y H:i') ?? '—';
@@ -321,8 +321,8 @@ class CashSessionInfolist
 
         return match (true) {
             $discrepancy === 0.0 => 'heroicon-o-check-badge',
-            $discrepancy > 0     => 'heroicon-o-exclamation-triangle',
-            default              => 'heroicon-o-x-circle',
+            $discrepancy > 0 => 'heroicon-o-exclamation-triangle',
+            default => 'heroicon-o-x-circle',
         };
     }
 
@@ -341,8 +341,8 @@ class CashSessionInfolist
 
         return match (true) {
             $discrepancy === 0.0 => 'success',
-            $discrepancy > 0     => 'warning',
-            default              => 'danger',
+            $discrepancy > 0 => 'warning',
+            default => 'danger',
         };
     }
 
@@ -367,8 +367,8 @@ class CashSessionInfolist
 
         return match (true) {
             $discrepancy === 0.0 => 'de descuadre — cuadre exacto',
-            $discrepancy > 0     => 'de sobrante',
-            default              => 'de faltante',
+            $discrepancy > 0 => 'de sobrante',
+            default => 'de faltante',
         };
     }
 
@@ -381,6 +381,6 @@ class CashSessionInfolist
 
     private static function formatMoney(float $amount): string
     {
-        return 'L ' . number_format($amount, 2, '.', ',');
+        return 'L '.number_format($amount, 2, '.', ',');
     }
 }

@@ -13,7 +13,7 @@ class CaiVencidoException extends InvoicingException
     ) {
         parent::__construct(
             "El CAI {$cai} (ID {$caiRangeId}) venció el {$expirationDate->format('d/m/Y')}. "
-            . "Solicite y registre un nuevo CAI ante SAR antes de continuar emitiendo."
+            .'Solicite y registre un nuevo CAI ante SAR antes de continuar emitiendo.'
         );
     }
 }

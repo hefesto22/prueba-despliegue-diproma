@@ -16,7 +16,7 @@ class TransaccionRequeridaException extends LogicException
     {
         parent::__construct(
             'El resolvedor de correlativo debe ejecutarse dentro de una transacción activa '
-            . '(DB::transaction). Abra la transacción en el llamador antes de invocar siguiente().'
+            .'(DB::transaction). Abra la transacción en el llamador antes de invocar siguiente().'
         );
     }
 }

@@ -4,8 +4,8 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class UserInfolist
@@ -21,7 +21,7 @@ class UserInfolist
                             ImageEntry::make('avatar_url')
                                 ->label('Foto de perfil')
                                 ->circular()
-                                ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name=' . urlencode($record->name) . '&color=FFFFFF&background=F59E0B'),
+                                ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->name).'&color=FFFFFF&background=F59E0B'),
                             TextEntry::make('name')
                                 ->label('Nombre completo'),
                             TextEntry::make('email')

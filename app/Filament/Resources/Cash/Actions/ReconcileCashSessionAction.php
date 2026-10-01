@@ -113,9 +113,9 @@ final class ReconcileCashSessionAction
                 ->label('Sesión a conciliar')
                 ->content(new HtmlString(sprintf(
                     '<div class="text-sm">'
-                    . 'Sesión <strong>#%d</strong> · %s · abierta por <strong>%s</strong> el %s'
-                    . '<br><span class="text-xs text-gray-500">Auto-cerrada por el sistema el %s</span>'
-                    . '</div>',
+                    .'Sesión <strong>#%d</strong> · %s · abierta por <strong>%s</strong> el %s'
+                    .'<br><span class="text-xs text-gray-500">Auto-cerrada por el sistema el %s</span>'
+                    .'</div>',
                     $session->id,
                     e($session->establishment->name ?? '—'),
                     e($session->openedBy->name ?? '—'),
@@ -127,7 +127,7 @@ final class ReconcileCashSessionAction
                 ->label('Efectivo esperado al cierre')
                 ->content(new HtmlString(sprintf(
                     '<div class="text-lg font-bold text-gray-900 dark:text-white">L. %s</div>'
-                    . '<div class="text-xs text-gray-500">Calculado por el sistema al auto-cerrar (apertura + ingresos efectivo − egresos efectivo)</div>',
+                    .'<div class="text-xs text-gray-500">Calculado por el sistema al auto-cerrar (apertura + ingresos efectivo − egresos efectivo)</div>',
                     number_format($expected, 2),
                 ))),
 
@@ -198,11 +198,11 @@ final class ReconcileCashSessionAction
 
         try {
             $reconciled = $cashSessions->reconcile(
-                session:             $session,
-                reconciledBy:        auth()->user(),
+                session: $session,
+                reconciledBy: auth()->user(),
                 actualClosingAmount: (float) $data['actual_amount'],
-                notes:               $data['notes'] ?? null,
-                authorizedBy:        $authorizedBy,
+                notes: $data['notes'] ?? null,
+                authorizedBy: $authorizedBy,
             );
 
             $discrepancy = (float) $reconciled->discrepancy;
@@ -268,7 +268,7 @@ final class ReconcileCashSessionAction
         if ($discrepancy === 0.0) {
             return new HtmlString(
                 '<div class="text-lg font-bold text-success-600 dark:text-success-400">'
-                . 'L. 0.00 · Cuadre exacto</div>'
+                .'L. 0.00 · Cuadre exacto</div>'
             );
         }
 
@@ -279,8 +279,8 @@ final class ReconcileCashSessionAction
         $toleranceMsg = $exceedsTolerance
             ? sprintf(
                 '<div class="text-xs text-danger-600 mt-1">'
-                . 'Supera la tolerancia de L. %s — se requiere autorización de un administrador.'
-                . '</div>',
+                .'Supera la tolerancia de L. %s — se requiere autorización de un administrador.'
+                .'</div>',
                 number_format($tolerance, 2),
             )
             : '';
@@ -311,7 +311,7 @@ final class ReconcileCashSessionAction
      * tolerancia. Misma regla que `CloseCashSessionAction::authorizerOptions()`:
      * `admin` y `super_admin`, excluyendo al user actual.
      *
-     * @return array<int, string>  Map [user_id => "Nombre"]
+     * @return array<int, string> Map [user_id => "Nombre"]
      */
     private static function authorizerOptions(): array
     {

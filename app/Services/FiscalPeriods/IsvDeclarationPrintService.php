@@ -55,15 +55,15 @@ class IsvDeclarationPrintService
         ]);
 
         return [
-            'declaration'  => $declaration,
-            'period'       => $this->buildPeriodBlock($declaration),
-            'company'      => $this->buildCompanyBlock(CompanySetting::current()),
-            'status'       => $this->buildStatusBlock($declaration),
-            'sections'     => $this->buildSectionsBlock($declaration),
-            'siisarAcuse'  => $declaration->siisar_acuse_number,
-            'notes'        => $declaration->notes,
-            'signatures'   => $this->buildSignaturesBlock($declaration),
-            'meta'         => $this->buildMetaBlock(),
+            'declaration' => $declaration,
+            'period' => $this->buildPeriodBlock($declaration),
+            'company' => $this->buildCompanyBlock(CompanySetting::current()),
+            'status' => $this->buildStatusBlock($declaration),
+            'sections' => $this->buildSectionsBlock($declaration),
+            'siisarAcuse' => $declaration->siisar_acuse_number,
+            'notes' => $declaration->notes,
+            'signatures' => $this->buildSignaturesBlock($declaration),
+            'meta' => $this->buildMetaBlock(),
         ];
     }
 
@@ -81,7 +81,7 @@ class IsvDeclarationPrintService
         // la primera letra del mes ("Marzo 2026"). Se hace aquí y no en el
         // modelo para no alterar el comportamiento usado por otros módulos.
         return [
-            'year'  => $period->period_year,
+            'year' => $period->period_year,
             'month' => $period->period_month,
             'label' => Str::ucfirst($period->period_label),
         ];
@@ -97,20 +97,20 @@ class IsvDeclarationPrintService
     {
         if ($company === null) {
             return [
-                'name'    => 'Empresa',
-                'rtn'     => '',
+                'name' => 'Empresa',
+                'rtn' => '',
                 'address' => '',
-                'phone'   => '',
-                'email'   => '',
+                'phone' => '',
+                'email' => '',
             ];
         }
 
         return [
-            'name'    => (string) ($company->trade_name ?: $company->legal_name),
-            'rtn'     => (string) ($company->formatted_rtn ?? $company->rtn),
+            'name' => (string) ($company->trade_name ?: $company->legal_name),
+            'rtn' => (string) ($company->formatted_rtn ?? $company->rtn),
             'address' => (string) ($company->full_address ?? $company->address),
-            'phone'   => (string) $company->phone,
-            'email'   => (string) $company->email,
+            'phone' => (string) $company->phone,
+            'email' => (string) $company->email,
         ];
     }
 
@@ -137,13 +137,13 @@ class IsvDeclarationPrintService
         $isSuperseded = $declaration->isSuperseded();
 
         return [
-            'is_active'             => ! $isSuperseded,
-            'is_superseded'         => $isSuperseded,
-            'label'                 => $isSuperseded
+            'is_active' => ! $isSuperseded,
+            'is_superseded' => $isSuperseded,
+            'label' => $isSuperseded
                 ? 'DECLARACIÓN REEMPLAZADA'
                 : 'DECLARACIÓN VIGENTE',
-            'rectificativa_number'  => $rectificativaNumber,
-            'is_original'           => $rectificativaNumber === 1,
+            'rectificativa_number' => $rectificativaNumber,
+            'is_original' => $rectificativaNumber === 1,
         ];
     }
 
@@ -157,20 +157,20 @@ class IsvDeclarationPrintService
         return [
             'ventas' => [
                 'gravadas' => $this->formatMoney((float) $declaration->ventas_gravadas),
-                'exentas'  => $this->formatMoney((float) $declaration->ventas_exentas),
-                'totales'  => $this->formatMoney((float) $declaration->ventas_totales),
+                'exentas' => $this->formatMoney((float) $declaration->ventas_exentas),
+                'totales' => $this->formatMoney((float) $declaration->ventas_totales),
             ],
             'compras' => [
                 'gravadas' => $this->formatMoney((float) $declaration->compras_gravadas),
-                'exentas'  => $this->formatMoney((float) $declaration->compras_exentas),
-                'totales'  => $this->formatMoney((float) $declaration->compras_totales),
+                'exentas' => $this->formatMoney((float) $declaration->compras_exentas),
+                'totales' => $this->formatMoney((float) $declaration->compras_totales),
             ],
             'isv' => [
-                'debito_fiscal'           => $this->formatMoney((float) $declaration->isv_debito_fiscal),
-                'credito_fiscal'          => $this->formatMoney((float) $declaration->isv_credito_fiscal),
-                'retenciones_recibidas'   => $this->formatMoney((float) $declaration->isv_retenciones_recibidas),
-                'saldo_a_favor_anterior'  => $this->formatMoney((float) $declaration->saldo_a_favor_anterior),
-                'isv_a_pagar'             => $this->formatMoney((float) $declaration->isv_a_pagar),
+                'debito_fiscal' => $this->formatMoney((float) $declaration->isv_debito_fiscal),
+                'credito_fiscal' => $this->formatMoney((float) $declaration->isv_credito_fiscal),
+                'retenciones_recibidas' => $this->formatMoney((float) $declaration->isv_retenciones_recibidas),
+                'saldo_a_favor_anterior' => $this->formatMoney((float) $declaration->saldo_a_favor_anterior),
+                'isv_a_pagar' => $this->formatMoney((float) $declaration->isv_a_pagar),
                 'saldo_a_favor_siguiente' => $this->formatMoney((float) $declaration->saldo_a_favor_siguiente),
             ],
         ];
@@ -189,12 +189,12 @@ class IsvDeclarationPrintService
         return [
             'declared_by' => [
                 'name' => $declaration->declaredByUser?->name ?? '—',
-                'at'   => $declaration->declared_at?->format('d/m/Y H:i'),
+                'at' => $declaration->declared_at?->format('d/m/Y H:i'),
             ],
             'superseded_by' => $declaration->isSuperseded()
                 ? [
                     'name' => $declaration->supersededByUser?->name ?? '—',
-                    'at'   => $declaration->superseded_at?->format('d/m/Y H:i'),
+                    'at' => $declaration->superseded_at?->format('d/m/Y H:i'),
                 ]
                 : null,
         ];

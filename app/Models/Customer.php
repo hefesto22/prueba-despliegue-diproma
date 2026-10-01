@@ -13,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -115,7 +115,7 @@ class Customer extends Model
         $rtn = preg_replace('/\D/', '', $this->rtn);
 
         if (strlen($rtn) === 14) {
-            return substr($rtn, 0, 4) . '-' . substr($rtn, 4, 4) . '-' . substr($rtn, 8, 6);
+            return substr($rtn, 0, 4).'-'.substr($rtn, 4, 4).'-'.substr($rtn, 8, 6);
         }
 
         return $this->rtn;

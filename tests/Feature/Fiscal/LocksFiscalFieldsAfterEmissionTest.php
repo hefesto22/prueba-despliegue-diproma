@@ -30,7 +30,7 @@ class LocksFiscalFieldsAfterEmissionTest extends TestCase
 
         // No debe lanzar: el documento aún no está sellado.
         $invoice->update([
-            'total'    => 9999.99,
+            'total' => 9999.99,
             'subtotal' => 8000.00,
         ]);
 
@@ -54,7 +54,7 @@ class LocksFiscalFieldsAfterEmissionTest extends TestCase
 
         $invoice->update([
             'invoice_number' => '999-999-01-00000000',
-            'cai'            => 'ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ',
+            'cai' => 'ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ',
         ]);
     }
 
@@ -92,7 +92,7 @@ class LocksFiscalFieldsAfterEmissionTest extends TestCase
         // Simula el flujo real de InvoiceService: crea sin emitted_at, luego sella.
         $invoice = Invoice::factory()->create(['emitted_at' => null]);
 
-        $invoice->emitted_at     = now();
+        $invoice->emitted_at = now();
         $invoice->integrity_hash = hash('sha256', 'test');
         $invoice->save();
 

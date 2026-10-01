@@ -76,19 +76,19 @@ class CashSessionAutoClosedNotification extends Notification
     {
         $expected = number_format((float) $this->session->expected_closing_amount, 2);
 
-        return (new MailMessage())
+        return (new MailMessage)
             ->subject("Sistema Diproma · Caja auto-cerrada — sucursal {$this->establishmentName}")
             ->greeting("Hola {$notifiable->name},")
             ->line('El sistema cerró automáticamente tu sesión de caja porque quedó abierta '
-                . 'al final del día. Esto es una protección operativa — no afecta los movimientos '
-                . 'ya registrados.')
+                .'al final del día. Esto es una protección operativa — no afecta los movimientos '
+                .'ya registrados.')
             ->line("Sucursal: {$this->establishmentName}")
             ->line("Sesión #{$this->session->id} · abierta el "
-                . $this->session->opened_at->format('d/m/Y H:i'))
+                .$this->session->opened_at->format('d/m/Y H:i'))
             ->line("Saldo esperado al cierre (calculado): L. {$expected}")
             ->line('Cuando regreses, ingresá el conteo físico real del cajón para conciliar la sesión '
-                . 'y poder abrir una nueva. Tenés 7 días antes de que el sistema bloquee abrir caja '
-                . 'nueva en esta sucursal.')
+                .'y poder abrir una nueva. Tenés 7 días antes de que el sistema bloquee abrir caja '
+                .'nueva en esta sucursal.')
             ->action('Ir a la sesión', CashSessionResource::getUrl('view', ['record' => $this->session->id], panel: 'admin'))
             ->line('Si pensás que esto fue un error, contactá al administrador.');
     }
@@ -101,6 +101,6 @@ class CashSessionAutoClosedNotification extends Notification
         $expected = number_format((float) $this->session->expected_closing_amount, 2);
 
         return "Sucursal {$this->establishmentName} · Esperado L. {$expected} · "
-            . 'Conciliá apenas regreses (tenés 7 días antes de que se bloquee abrir caja nueva).';
+            .'Conciliá apenas regreses (tenés 7 días antes de que se bloquee abrir caja nueva).';
     }
 }

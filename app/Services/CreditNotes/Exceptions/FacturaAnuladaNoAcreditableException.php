@@ -17,8 +17,8 @@ class FacturaAnuladaNoAcreditableException extends CreditNoteException
     ) {
         parent::__construct(
             "La factura #{$invoiceNumber} (id {$invoiceId}) está anulada y no admite "
-            . "la emisión de una nota de crédito. Si necesita corregir la venta original, "
-            . "emita una nueva factura."
+            .'la emisión de una nota de crédito. Si necesita corregir la venta original, '
+            .'emita una nueva factura.'
         );
     }
 }

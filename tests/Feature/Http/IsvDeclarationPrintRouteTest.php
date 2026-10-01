@@ -55,10 +55,10 @@ class IsvDeclarationPrintRouteTest extends TestCase
         $this->company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, SPS',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, SPS',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $this->company, 60 * 60 * 24);
 
@@ -81,20 +81,20 @@ class IsvDeclarationPrintRouteTest extends TestCase
         return IsvMonthlyDeclaration::factory()
             ->forFiscalPeriod($period)
             ->create([
-                'ventas_gravadas'           => 100000.00,
-                'ventas_exentas'            =>  10000.00,
-                'ventas_totales'            => 110000.00,
-                'compras_gravadas'          =>  40000.00,
-                'compras_exentas'           =>   2000.00,
-                'compras_totales'           =>  42000.00,
-                'isv_debito_fiscal'         =>  15000.00,
-                'isv_credito_fiscal'        =>   6000.00,
-                'isv_retenciones_recibidas' =>    500.00,
-                'saldo_a_favor_anterior'    =>      0.00,
-                'isv_a_pagar'               =>   8500.00,
-                'saldo_a_favor_siguiente'   =>      0.00,
-                'siisar_acuse_number'       => 'SIISAR-1234567',
-                'notes'                     => 'Cuadratura confirmada con libros SAR.',
+                'ventas_gravadas' => 100000.00,
+                'ventas_exentas' => 10000.00,
+                'ventas_totales' => 110000.00,
+                'compras_gravadas' => 40000.00,
+                'compras_exentas' => 2000.00,
+                'compras_totales' => 42000.00,
+                'isv_debito_fiscal' => 15000.00,
+                'isv_credito_fiscal' => 6000.00,
+                'isv_retenciones_recibidas' => 500.00,
+                'saldo_a_favor_anterior' => 0.00,
+                'isv_a_pagar' => 8500.00,
+                'saldo_a_favor_siguiente' => 0.00,
+                'siisar_acuse_number' => 'SIISAR-1234567',
+                'notes' => 'Cuadratura confirmada con libros SAR.',
             ]);
     }
 
@@ -208,7 +208,7 @@ class IsvDeclarationPrintRouteTest extends TestCase
             ->create(['declared_at' => now()->subDays(5)]);
 
         $original->update([
-            'superseded_at'         => now()->subDays(1),
+            'superseded_at' => now()->subDays(1),
             'superseded_by_user_id' => $this->reader->id,
         ]);
 
@@ -243,7 +243,7 @@ class IsvDeclarationPrintRouteTest extends TestCase
 
         $supervisor = User::factory()->create(['name' => 'Contadora Principal']);
         $original->update([
-            'superseded_at'         => now()->subDays(2),
+            'superseded_at' => now()->subDays(2),
             'superseded_by_user_id' => $supervisor->id,
         ]);
 
@@ -279,7 +279,7 @@ class IsvDeclarationPrintRouteTest extends TestCase
             ->forFiscalPeriod($period)
             ->create([
                 'siisar_acuse_number' => null,
-                'notes'               => null,
+                'notes' => null,
             ]);
 
         $this->reader->givePermissionTo('View:FiscalPeriod');

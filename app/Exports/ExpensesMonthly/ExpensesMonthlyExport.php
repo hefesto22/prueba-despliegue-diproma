@@ -48,6 +48,6 @@ class ExpensesMonthlyExport implements WithMultipleSheets
      */
     public function fileName(): string
     {
-        return 'Reporte-Gastos-' . $this->report->summary->periodSlug() . '.xlsx';
+        return 'Reporte-Gastos-'.$this->report->summary->periodSlug().'.xlsx';
     }
 }

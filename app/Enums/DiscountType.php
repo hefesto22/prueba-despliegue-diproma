@@ -23,8 +23,8 @@ enum DiscountType: string implements HasLabel
     /**
      * Calcular el monto del descuento a partir del valor ingresado y el total bruto.
      *
-     * @param float $value    Valor ingresado (ej: 10 para 10%, o 200 para L200)
-     * @param float $grossTotal  Total bruto antes de descuento
+     * @param  float  $value  Valor ingresado (ej: 10 para 10%, o 200 para L200)
+     * @param  float  $grossTotal  Total bruto antes de descuento
      * @return float Monto del descuento en Lempiras
      */
     public function calculateAmount(float $value, float $grossTotal): float

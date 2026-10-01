@@ -14,7 +14,7 @@ class NoHayCaiActivoException extends InvoicingException
 
         parent::__construct(
             "No hay un CAI activo para el tipo de documento '{$documentType}' en {$contexto}. "
-            . "Registre un nuevo CAI en Administración antes de continuar."
+            .'Registre un nuevo CAI en Administración antes de continuar.'
         );
     }
 }

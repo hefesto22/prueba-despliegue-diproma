@@ -51,30 +51,30 @@ class InvoicePrintService
         ]);
 
         return [
-            'invoice'        => $invoice,
-            'items'          => $this->mapItemsForView($invoice),
-            'totals'         => $this->buildTotals($invoice),
-            'company'        => $this->buildCompanyBlock($invoice),
-            'customer'       => $this->buildCustomerBlock($invoice),
-            'cai'            => $this->buildCaiBlock($invoice),
-            'seller'         => $invoice->creator?->name ?? '',
+            'invoice' => $invoice,
+            'items' => $this->mapItemsForView($invoice),
+            'totals' => $this->buildTotals($invoice),
+            'company' => $this->buildCompanyBlock($invoice),
+            'customer' => $this->buildCustomerBlock($invoice),
+            'cai' => $this->buildCaiBlock($invoice),
+            'seller' => $invoice->creator?->name ?? '',
             // Método de pago: viene de Sale (la factura no lo persiste como
             // snapshot porque no es dato fiscal SAR). Usamos el getLabel()
             // del enum PaymentMethod para obtener "Efectivo", "Tarjeta de
             // crédito", etc. ya localizados. Sale viene eager-loaded arriba,
             // así que esto no agrega query extra.
-            'paymentMethod'  => $invoice->sale?->payment_method?->getLabel() ?? '',
-            'qrSvg'          => $this->qr->generateSvg(
+            'paymentMethod' => $invoice->sale?->payment_method?->getLabel() ?? '',
+            'qrSvg' => $this->qr->generateSvg(
                 $invoice->integrity_hash ?? '',
                 self::VERIFY_PATH_PREFIX,
             ),
-            'verifyUrl'      => $this->qr->buildVerificationUrl(
+            'verifyUrl' => $this->qr->buildVerificationUrl(
                 $invoice->integrity_hash ?? '',
                 self::VERIFY_PATH_PREFIX,
             ),
-            'software'       => $this->buildSoftwareMetadata(),
-            'footerLegend'   => (string) config('fiscal.footer_legend'),
-            'isVoid'         => (bool) $invoice->is_void,
+            'software' => $this->buildSoftwareMetadata(),
+            'footerLegend' => (string) config('fiscal.footer_legend'),
+            'isVoid' => (bool) $invoice->is_void,
         ];
     }
 
@@ -92,7 +92,7 @@ class InvoicePrintService
 
         return $sale->items->map(function ($item) {
             $unitPrice = (float) $item->unit_price;
-            $quantity  = (float) $item->quantity;
+            $quantity = (float) $item->quantity;
             $lineTotal = $unitPrice * $quantity;
 
             return [
@@ -101,12 +101,12 @@ class InvoicePrintService
                 // ("HONORARIO POR ASESORÍA — Se impartió conferencia") y las
                 // entregas de reparación la usan sin product_id. Los productos
                 // físicos siempre la dejan null → cae al nombre del catálogo.
-                'description'    => $item->description ?? $item->product?->name ?? 'Producto',
-                'sku'            => $item->product?->sku,
-                'quantity'       => $this->formatQuantity($quantity),
-                'unit_price'     => $this->formatMoney($unitPrice),
-                'line_total'     => $this->formatMoney($lineTotal),
-                'tax_type'       => $item->tax_type instanceof \App\Enums\TaxType
+                'description' => $item->description ?? $item->product?->name ?? 'Producto',
+                'sku' => $item->product?->sku,
+                'quantity' => $this->formatQuantity($quantity),
+                'unit_price' => $this->formatMoney($unitPrice),
+                'line_total' => $this->formatMoney($lineTotal),
+                'tax_type' => $item->tax_type instanceof \App\Enums\TaxType
                     ? $item->tax_type->value
                     : (string) $item->tax_type,
             ];
@@ -120,15 +120,15 @@ class InvoicePrintService
     private function buildTotals(Invoice $invoice): array
     {
         return [
-            'subtotal'       => $this->formatMoney((float) $invoice->subtotal),
-            'exempt'         => $this->formatMoney((float) $invoice->exempt_total),
-            'taxable'        => $this->formatMoney((float) $invoice->taxable_total),
-            'isv'            => $this->formatMoney((float) $invoice->isv),
-            'discount'       => $this->formatMoney((float) $invoice->discount),
-            'total'          => $this->formatMoney((float) $invoice->total),
+            'subtotal' => $this->formatMoney((float) $invoice->subtotal),
+            'exempt' => $this->formatMoney((float) $invoice->exempt_total),
+            'taxable' => $this->formatMoney((float) $invoice->taxable_total),
+            'isv' => $this->formatMoney((float) $invoice->isv),
+            'discount' => $this->formatMoney((float) $invoice->discount),
+            'total' => $this->formatMoney((float) $invoice->total),
             'total_in_words' => $this->amountToWords((float) $invoice->total),
-            'has_discount'   => (float) $invoice->discount > 0,
-            'has_exempt'     => (float) $invoice->exempt_total > 0,
+            'has_discount' => (float) $invoice->discount > 0,
+            'has_exempt' => (float) $invoice->exempt_total > 0,
         ];
     }
 
@@ -142,7 +142,7 @@ class InvoicePrintService
      */
     private function amountToWords(float $amount): string
     {
-        $integer  = (int) floor($amount);
+        $integer = (int) floor($amount);
         $decimals = (int) round(($amount - $integer) * 100);
 
         $words = $integer === 0
@@ -159,23 +159,23 @@ class InvoicePrintService
     private function integerToSpanishWords(int $n): string
     {
         if ($n < 0) {
-            return 'MENOS ' . $this->integerToSpanishWords(abs($n));
+            return 'MENOS '.$this->integerToSpanishWords(abs($n));
         }
 
         if ($n >= 1_000_000) {
             $millions = intdiv($n, 1_000_000);
-            $rest     = $n % 1_000_000;
-            $prefix   = $millions === 1 ? 'UN MILLON' : $this->integerToSpanishWords($millions) . ' MILLONES';
+            $rest = $n % 1_000_000;
+            $prefix = $millions === 1 ? 'UN MILLON' : $this->integerToSpanishWords($millions).' MILLONES';
 
-            return $rest === 0 ? $prefix : $prefix . ' ' . $this->integerToSpanishWords($rest);
+            return $rest === 0 ? $prefix : $prefix.' '.$this->integerToSpanishWords($rest);
         }
 
         if ($n >= 1_000) {
             $thousands = intdiv($n, 1_000);
-            $rest      = $n % 1_000;
-            $prefix    = $thousands === 1 ? 'MIL' : $this->integerToSpanishWords($thousands) . ' MIL';
+            $rest = $n % 1_000;
+            $prefix = $thousands === 1 ? 'MIL' : $this->integerToSpanishWords($thousands).' MIL';
 
-            return $rest === 0 ? $prefix : $prefix . ' ' . $this->integerToSpanishWords($rest);
+            return $rest === 0 ? $prefix : $prefix.' '.$this->integerToSpanishWords($rest);
         }
 
         return $this->hundredsToWords($n);
@@ -193,7 +193,7 @@ class InvoicePrintService
             0 => '',        1 => 'UNO',        2 => 'DOS',       3 => 'TRES',      4 => 'CUATRO',
             5 => 'CINCO',   6 => 'SEIS',       7 => 'SIETE',     8 => 'OCHO',      9 => 'NUEVE',
             10 => 'DIEZ',   11 => 'ONCE',      12 => 'DOCE',     13 => 'TRECE',    14 => 'CATORCE',
-            15 => 'QUINCE', 16 => 'DIECISEIS', 17 => 'DIECISIETE',18 => 'DIECIOCHO',19 => 'DIECINUEVE',
+            15 => 'QUINCE', 16 => 'DIECISEIS', 17 => 'DIECISIETE', 18 => 'DIECIOCHO', 19 => 'DIECINUEVE',
             20 => 'VEINTE',
         ];
 
@@ -204,7 +204,7 @@ class InvoicePrintService
 
         static $hundreds = [
             1 => 'CIENTO',       2 => 'DOSCIENTOS',    3 => 'TRESCIENTOS',
-            4 => 'CUATROCIENTOS',5 => 'QUINIENTOS',    6 => 'SEISCIENTOS',
+            4 => 'CUATROCIENTOS', 5 => 'QUINIENTOS',    6 => 'SEISCIENTOS',
             7 => 'SETECIENTOS',  8 => 'OCHOCIENTOS',   9 => 'NOVECIENTOS',
         ];
 
@@ -233,9 +233,9 @@ class InvoicePrintService
 
                 if ($t === 2) {
                     // VEINTIUNO, VEINTIDOS, ... (sin espacio)
-                    $parts[] = $u === 0 ? 'VEINTE' : $tens[2] . $units[$u];
+                    $parts[] = $u === 0 ? 'VEINTE' : $tens[2].$units[$u];
                 } else {
-                    $parts[] = $u === 0 ? $tens[$t] : $tens[$t] . ' Y ' . $units[$u];
+                    $parts[] = $u === 0 ? $tens[$t] : $tens[$t].' Y '.$units[$u];
                 }
             }
         }
@@ -262,16 +262,16 @@ class InvoicePrintService
 
         return [
             // Snapshot fiscal (verdad legal inmutable)
-            'name'    => (string) $invoice->company_name,
-            'rtn'     => (string) $invoice->company_rtn,
+            'name' => (string) $invoice->company_name,
+            'rtn' => (string) $invoice->company_rtn,
             'address' => (string) $invoice->company_address,
-            'phone'   => (string) $invoice->company_phone,
-            'email'   => (string) $invoice->company_email,
+            'phone' => (string) $invoice->company_phone,
+            'email' => (string) $invoice->company_email,
             // Branding actual (no requiere snapshot por SAR)
             // Defensa: validamos que el archivo EXISTA en disco antes de
             // devolver la URL. Evita renderizar un <img> roto si el path
             // quedó huérfano (logo borrado, storage:link faltante, etc.).
-            'logo_url'      => $this->resolveLogoUrl($settings->logo_path),
+            'logo_url' => $this->resolveLogoUrl($settings->logo_path),
             'business_type' => (string) ($settings->business_type ?? ''),
         ];
     }
@@ -284,7 +284,7 @@ class InvoicePrintService
     {
         return [
             'name' => $invoice->customer_name ?: 'Consumidor Final',
-            'rtn'  => $invoice->customer_rtn ?: null,
+            'rtn' => $invoice->customer_rtn ?: null,
         ];
     }
 
@@ -301,13 +301,13 @@ class InvoicePrintService
         $caiRange = $invoice->caiRange;
 
         return [
-            'number'          => (string) $invoice->cai,
-            'invoice_number'  => (string) $invoice->invoice_number,
-            'emission_point'  => (string) $invoice->emission_point,
+            'number' => (string) $invoice->cai,
+            'invoice_number' => (string) $invoice->invoice_number,
+            'emission_point' => (string) $invoice->emission_point,
             'expiration_date' => $invoice->cai_expiration_date?->format('d/m/Y'),
-            'range_from'      => $this->formatAuthorizedNumber($caiRange?->prefix, $caiRange?->range_start),
-            'range_to'        => $this->formatAuthorizedNumber($caiRange?->prefix, $caiRange?->range_end),
-            'without_cai'     => (bool) $invoice->without_cai,
+            'range_from' => $this->formatAuthorizedNumber($caiRange?->prefix, $caiRange?->range_start),
+            'range_to' => $this->formatAuthorizedNumber($caiRange?->prefix, $caiRange?->range_end),
+            'without_cai' => (bool) $invoice->without_cai,
         ];
     }
 
@@ -321,7 +321,7 @@ class InvoicePrintService
             return null;
         }
 
-        return $prefix . '-' . str_pad((string) $number, 8, '0', STR_PAD_LEFT);
+        return $prefix.'-'.str_pad((string) $number, 8, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -331,8 +331,8 @@ class InvoicePrintService
     private function buildSoftwareMetadata(): array
     {
         return [
-            'name'      => (string) config('fiscal.software.name'),
-            'version'   => (string) config('fiscal.software.version'),
+            'name' => (string) config('fiscal.software.name'),
+            'version' => (string) config('fiscal.software.version'),
             'developer' => (string) config('fiscal.software.developer'),
             'structure' => (string) config('fiscal.structure'),
         ];

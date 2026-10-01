@@ -109,7 +109,7 @@ class CreditNoteResource extends Resource
     {
         return [
             'index' => ListCreditNotes::route('/'),
-            'view'  => ViewCreditNote::route('/{record}'),
+            'view' => ViewCreditNote::route('/{record}'),
             'print' => PrintCreditNote::route('/{record}/print'),
         ];
     }

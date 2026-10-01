@@ -90,7 +90,7 @@ final class SalesBookSummary
             9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
         ];
 
-        return ($meses[$this->periodMonth] ?? (string) $this->periodMonth) . ' ' . $this->periodYear;
+        return ($meses[$this->periodMonth] ?? (string) $this->periodMonth).' '.$this->periodYear;
     }
 
     /**

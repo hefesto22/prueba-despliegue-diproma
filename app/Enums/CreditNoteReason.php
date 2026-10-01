@@ -20,40 +20,40 @@ use Filament\Support\Contracts\HasLabel;
  * Cuando la razón ≠ devolucion_fisica, el campo `reason_notes` de la NC
  * pasa a ser obligatorio (lo valida el FormRequest / Service).
  */
-enum CreditNoteReason: string implements HasLabel, HasColor, HasIcon
+enum CreditNoteReason: string implements HasColor, HasIcon, HasLabel
 {
-    case DevolucionFisica     = 'devolucion_fisica';
-    case DescuentoPostVenta   = 'descuento_post_venta';
-    case CorreccionError      = 'correccion_error';
-    case AjusteComercial      = 'ajuste_comercial';
+    case DevolucionFisica = 'devolucion_fisica';
+    case DescuentoPostVenta = 'descuento_post_venta';
+    case CorreccionError = 'correccion_error';
+    case AjusteComercial = 'ajuste_comercial';
 
     public function getLabel(): string
     {
         return match ($this) {
-            self::DevolucionFisica   => 'Devolución física',
+            self::DevolucionFisica => 'Devolución física',
             self::DescuentoPostVenta => 'Descuento post-venta',
-            self::CorreccionError    => 'Corrección de error',
-            self::AjusteComercial    => 'Ajuste comercial',
+            self::CorreccionError => 'Corrección de error',
+            self::AjusteComercial => 'Ajuste comercial',
         };
     }
 
     public function getColor(): string
     {
         return match ($this) {
-            self::DevolucionFisica   => 'warning',
+            self::DevolucionFisica => 'warning',
             self::DescuentoPostVenta => 'info',
-            self::CorreccionError    => 'danger',
-            self::AjusteComercial    => 'gray',
+            self::CorreccionError => 'danger',
+            self::AjusteComercial => 'gray',
         };
     }
 
     public function getIcon(): string
     {
         return match ($this) {
-            self::DevolucionFisica   => 'heroicon-o-arrow-uturn-left',
+            self::DevolucionFisica => 'heroicon-o-arrow-uturn-left',
             self::DescuentoPostVenta => 'heroicon-o-banknotes',
-            self::CorreccionError    => 'heroicon-o-exclamation-triangle',
-            self::AjusteComercial    => 'heroicon-o-adjustments-horizontal',
+            self::CorreccionError => 'heroicon-o-exclamation-triangle',
+            self::AjusteComercial => 'heroicon-o-adjustments-horizontal',
         };
     }
 

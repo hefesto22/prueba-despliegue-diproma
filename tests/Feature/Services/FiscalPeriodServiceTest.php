@@ -469,7 +469,7 @@ class FiscalPeriodServiceTest extends TestCase
             $this->assertEquals(11, $e->periodMonth);
         } catch (VentanaAnulacionVencidaException $e) {
             $this->fail('Pre-tracking debe tomar precedencia sobre cutoff. '
-                . 'La excepción correcta es PeriodoFiscalCerrado.');
+                .'La excepción correcta es PeriodoFiscalCerrado.');
         }
     }
 

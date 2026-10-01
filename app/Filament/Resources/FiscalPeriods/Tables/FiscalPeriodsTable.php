@@ -8,10 +8,9 @@ use App\Models\Establishment;
 use App\Models\FiscalPeriod;
 use App\Services\FiscalBooks\PurchaseBookService;
 use App\Services\FiscalBooks\SalesBookService;
-use App\Services\FiscalPeriods\FiscalPeriodService;
 use App\Services\FiscalPeriods\Exceptions\FiscalPeriodException;
+use App\Services\FiscalPeriods\FiscalPeriodService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -54,12 +53,12 @@ class FiscalPeriodsTable
                     ->color(fn (string $state): string => match ($state) {
                         'Declarado' => 'success',
                         'Reabierto' => 'warning',
-                        'Abierto'   => 'gray',
+                        'Abierto' => 'gray',
                     })
                     ->icon(fn (string $state): string => match ($state) {
                         'Declarado' => 'heroicon-o-check-circle',
                         'Reabierto' => 'heroicon-o-arrow-path',
-                        'Abierto'   => 'heroicon-o-clock',
+                        'Abierto' => 'heroicon-o-clock',
                     }),
 
                 TextColumn::make('declared_at')
@@ -139,7 +138,7 @@ class FiscalPeriodsTable
                                 ? (int) $data['establishment_id']
                                 : null;
 
-                            $book   = $service->build(
+                            $book = $service->build(
                                 $record->period_year,
                                 $record->period_month,
                                 $establishmentId,
@@ -203,7 +202,7 @@ class FiscalPeriodsTable
                                 ? (int) $data['establishment_id']
                                 : null;
 
-                            $book   = $service->build(
+                            $book = $service->build(
                                 $record->period_year,
                                 $record->period_month,
                                 $establishmentId,
@@ -236,18 +235,16 @@ class FiscalPeriodsTable
                     ->label('Declarar')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (FiscalPeriod $record): bool =>
-                        $record->isOpen()
+                    ->visible(fn (FiscalPeriod $record): bool => $record->isOpen()
                         && auth()->user()?->can('declare', $record) === true
                     )
                     ->requiresConfirmation()
-                    ->modalHeading(fn (FiscalPeriod $record): string =>
-                        "Declarar período {$record->period_label} al SAR"
+                    ->modalHeading(fn (FiscalPeriod $record): string => "Declarar período {$record->period_label} al SAR"
                     )
                     ->modalDescription(
                         'Al declarar, este período se considera CERRADO: las facturas de este mes '
-                        . 'ya NO se podrán anular, solo corregir por Nota de Crédito. '
-                        . 'Esta acción queda registrada con su usuario y fecha.'
+                        .'ya NO se podrán anular, solo corregir por Nota de Crédito. '
+                        .'Esta acción queda registrada con su usuario y fecha.'
                     )
                     ->modalSubmitActionLabel('Sí, declarar al SAR')
                     ->schema([
@@ -286,18 +283,16 @@ class FiscalPeriodsTable
                     ->label('Reabrir')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
-                    ->visible(fn (FiscalPeriod $record): bool =>
-                        $record->isClosed()
+                    ->visible(fn (FiscalPeriod $record): bool => $record->isClosed()
                         && auth()->user()?->can('reopen', $record) === true
                     )
                     ->requiresConfirmation()
-                    ->modalHeading(fn (FiscalPeriod $record): string =>
-                        "Reabrir período {$record->period_label} (declaración rectificativa)"
+                    ->modalHeading(fn (FiscalPeriod $record): string => "Reabrir período {$record->period_label} (declaración rectificativa)"
                     )
                     ->modalDescription(
                         'Solo use esta acción si debe presentar una declaración rectificativa al SAR '
-                        . '(Acuerdo 189-2014). Quedará registro de quién, cuándo y por qué se reabrió. '
-                        . 'Después de corregir, debe volver a declarar el período.'
+                        .'(Acuerdo 189-2014). Quedará registro de quién, cuándo y por qué se reabrió. '
+                        .'Después de corregir, debe volver a declarar el período.'
                     )
                     ->modalSubmitActionLabel('Sí, reabrir período')
                     ->schema([
@@ -335,8 +330,7 @@ class FiscalPeriodsTable
             ])
             // Ordenar por (año desc, mes desc) — Filament v4 no soporta múltiples
             // defaultSort, así que aplicamos el secondary sort via modifyQueryUsing.
-            ->modifyQueryUsing(fn (Builder $query): Builder =>
-                $query->orderBy('period_year', 'desc')->orderBy('period_month', 'desc')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->orderBy('period_year', 'desc')->orderBy('period_month', 'desc')
             )
             ->striped()
             ->paginated([25, 50, 100]);

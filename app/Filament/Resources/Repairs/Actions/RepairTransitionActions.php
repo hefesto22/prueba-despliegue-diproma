@@ -87,6 +87,7 @@ class RepairTransitionActions
 
     /**
      * @deprecated Mantenido por compatibilidad — usar primary() + secondary().
+     *
      * @return array<int, Action>
      */
     public static function all(): array
@@ -209,7 +210,7 @@ class RepairTransitionActions
                         ->success()
                         ->title('Cotización aprobada — reparación en proceso')
                         ->body((float) ($data['advance_payment'] ?? 0) > 0
-                            ? "Anticipo de L. " . number_format((float) $data['advance_payment'], 2) . " registrado en caja. Reparación {$record->repair_number} en proceso."
+                            ? 'Anticipo de L. '.number_format((float) $data['advance_payment'], 2)." registrado en caja. Reparación {$record->repair_number} en proceso."
                             : "Reparación {$record->repair_number} en proceso.")
                         ->send();
                 } catch (\Throwable $e) {
@@ -228,7 +229,7 @@ class RepairTransitionActions
             ->requiresConfirmation()
             ->modalHeading('Rechazar cotización')
             ->modalDescription(fn (Repair $record) => $record->hasAdvancePayment()
-                ? "⚠️ Esta reparación tiene un anticipo cobrado de L. " . number_format((float) $record->advance_payment, 2) . ". Después de rechazar, gestiona la devolución o conversión a crédito desde la reparación."
+                ? '⚠️ Esta reparación tiene un anticipo cobrado de L. '.number_format((float) $record->advance_payment, 2).'. Después de rechazar, gestiona la devolución o conversión a crédito desde la reparación.'
                 : 'El cliente no aprueba la cotización. La reparación queda en estado terminal Rechazada.')
             ->modalSubmitActionLabel('Rechazar')
             ->schema([
@@ -349,11 +350,11 @@ class RepairTransitionActions
                             'Factura %s emitida. %s',
                             $delivered->invoice?->invoice_number ?? '—',
                             (float) $delivered->advance_payment > 0
-                                ? 'Saldo cobrado: L. ' . number_format(
+                                ? 'Saldo cobrado: L. '.number_format(
                                     max(0, (float) $delivered->total - (float) $delivered->advance_payment),
                                     2
                                 )
-                                : 'Total cobrado: L. ' . number_format((float) $delivered->total, 2),
+                                : 'Total cobrado: L. '.number_format((float) $delivered->total, 2),
                         ))
                         ->send();
                 } catch (\Throwable $e) {
@@ -455,7 +456,7 @@ class RepairTransitionActions
             ->requiresConfirmation()
             ->modalHeading('Anular reparación')
             ->modalDescription(fn (Repair $record) => $record->hasAdvancePayment()
-                ? "⚠️ Hay un anticipo cobrado de L. " . number_format((float) $record->advance_payment, 2) . ". Después de anular debes gestionar la devolución o conversión a crédito."
+                ? '⚠️ Hay un anticipo cobrado de L. '.number_format((float) $record->advance_payment, 2).'. Después de anular debes gestionar la devolución o conversión a crédito.'
                 : 'La reparación queda en estado terminal Anulada. Esta acción no se revierte.')
             ->modalSubmitActionLabel('Anular')
             ->schema([

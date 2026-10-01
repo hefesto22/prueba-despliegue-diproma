@@ -91,10 +91,10 @@ final class CaiAvailabilityService
         // respuesta — memoizar bajo una sola clave evita que el memo crezca
         // con establishment_ids que no aportan información.
         if (config('invoicing.mode') !== 'por_sucursal') {
-            return $type->value . ':any';
+            return $type->value.':any';
         }
 
-        return $type->value . ':' . ($establishmentId ?? 'null');
+        return $type->value.':'.($establishmentId ?? 'null');
     }
 
     private function queryAvailability(DocumentType $type, ?int $establishmentId): bool

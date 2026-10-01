@@ -166,7 +166,7 @@ class RealisticHistoricalSeeder extends Seeder
         $this->call(CaiRangeDemoSeeder::class);
 
         // Paso 5: configuración fiscal
-        $this->command?->info("\n[5/10] Configurando fiscal_period_start = " . self::FISCAL_PERIOD_START . '…');
+        $this->command?->info("\n[5/10] Configurando fiscal_period_start = ".self::FISCAL_PERIOD_START.'…');
         $this->setFiscalPeriodStart();
 
         // Paso 6-8: histórico transaccional
@@ -232,8 +232,8 @@ class RealisticHistoricalSeeder extends Seeder
         $permissionCount = Permission::where('guard_name', $guard)->count();
         if ($permissionCount === 0) {
             $msg = 'No hay permisos de Shield en DB. Antes de correr este demo ejecutá:'
-                . PHP_EOL . '  php artisan shield:generate --all --panel=admin'
-                . PHP_EOL . '  php artisan db:seed --class=Database\\\\Seeders\\\\RolesAndSuperAdminSeeder';
+                .PHP_EOL.'  php artisan shield:generate --all --panel=admin'
+                .PHP_EOL.'  php artisan db:seed --class=Database\\\\Seeders\\\\RolesAndSuperAdminSeeder';
             $this->command?->error($msg);
             throw new \RuntimeException($msg);
         }

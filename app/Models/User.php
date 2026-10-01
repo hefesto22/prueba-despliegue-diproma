@@ -4,29 +4,29 @@ namespace App\Models;
 
 use App\Services\UserHierarchyService;
 use App\Traits\HasAuditFields;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use RuntimeException;
-use Spatie\Permission\Traits\HasRoles;
 use BezhanSalleh\FilamentShield\Traits\HasPanelShield;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Spatie\Activitylog\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use RuntimeException;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
-    use HasFactory,
-        Notifiable,
-        HasRoles,
+    use HasAuditFields,
+        HasFactory,
         HasPanelShield,
-        SoftDeletes,
-        HasAuditFields,
-        LogsActivity;
+        HasRoles,
+        LogsActivity,
+        Notifiable,
+        SoftDeletes;
 
     /**
      * Email reservado del usuario "sistema" — actor para acciones automatizadas.
@@ -113,7 +113,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 
@@ -199,7 +199,7 @@ class User extends Authenticatable implements FilamentUser
     /**
      * Scope: only active users.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
      * @return \Illuminate\Database\Eloquent\Builder<User>
      */
     public function scopeActive($query)
@@ -210,7 +210,7 @@ class User extends Authenticatable implements FilamentUser
     /**
      * Scope: only inactive users.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
      * @return \Illuminate\Database\Eloquent\Builder<User>
      */
     public function scopeInactive($query)
@@ -222,8 +222,7 @@ class User extends Authenticatable implements FilamentUser
      * Scope: only users visible for the given user.
      * Super admin sees all, others see their branch.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
-     * @param User $user
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
      * @return \Illuminate\Database\Eloquent\Builder<User>
      */
     public function scopeVisibleTo($query, User $user)
@@ -243,7 +242,7 @@ class User extends Authenticatable implements FilamentUser
      * usuario", etc. El system user es un actor técnico — no tiene sentido
      * que aparezca en una lista que el admin va a leer.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
      * @return \Illuminate\Database\Eloquent\Builder<User>
      */
     public function scopeWithoutSystem($query)
@@ -275,8 +274,8 @@ class User extends Authenticatable implements FilamentUser
 
         if ($user === null) {
             throw new RuntimeException(
-                'System user no encontrado (email: ' . self::SYSTEM_EMAIL . '). '
-                . 'Ejecutá: php artisan db:seed --class=SystemUserSeeder'
+                'System user no encontrado (email: '.self::SYSTEM_EMAIL.'). '
+                .'Ejecutá: php artisan db:seed --class=SystemUserSeeder'
             );
         }
 

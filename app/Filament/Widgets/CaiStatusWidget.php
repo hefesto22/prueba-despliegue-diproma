@@ -164,10 +164,10 @@ class CaiStatusWidget extends StatsOverviewWidget
         $proximo = $alerts->first();
 
         $base = "Más próximo: {$proximo->daysUntilExpiration} día"
-            . ($proximo->daysUntilExpiration === 1 ? '' : 's');
+            .($proximo->daysUntilExpiration === 1 ? '' : 's');
 
         if ($alerts->contains(fn ($a) => ! $a->hasSuccessor)) {
-            return $base . ' · ⚠️ hay sin sucesor';
+            return $base.' · ⚠️ hay sin sucesor';
         }
 
         return $base;
@@ -183,10 +183,10 @@ class CaiStatusWidget extends StatsOverviewWidget
         $menor = $alerts->sortBy('remaining')->first();
 
         $base = "Menor restante: {$menor->remaining} factura"
-            . ($menor->remaining === 1 ? '' : 's');
+            .($menor->remaining === 1 ? '' : 's');
 
         if ($alerts->contains(fn ($a) => ! $a->hasSuccessor)) {
-            return $base . ' · ⚠️ hay sin sucesor';
+            return $base.' · ⚠️ hay sin sucesor';
         }
 
         return $base;

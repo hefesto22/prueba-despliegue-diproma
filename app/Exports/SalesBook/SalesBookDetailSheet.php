@@ -24,7 +24,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * columna Estado marcada (obligación SAR: el correlativo debe verse completo
  * sin huecos) pero NO suman en los totales del resumen.
  */
-class SalesBookDetailSheet implements FromCollection, WithHeadings, WithMapping, WithTitle, WithStyles, ShouldAutoSize
+class SalesBookDetailSheet implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     private int $rowCounter = 0;
 
@@ -84,7 +84,7 @@ class SalesBookDetailSheet implements FromCollection, WithHeadings, WithMapping,
 
     public function title(): string
     {
-        return 'Detalle ' . $this->book->summary->periodSlug();
+        return 'Detalle '.$this->book->summary->periodSlug();
     }
 
     public function styles(Worksheet $sheet): array

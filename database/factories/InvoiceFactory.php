@@ -27,45 +27,45 @@ class InvoiceFactory extends Factory
     public function definition(): array
     {
         $subtotal = $this->faker->randomFloat(2, 100, 5000);
-        $isv      = round($subtotal * 0.15, 2);
-        $total    = round($subtotal + $isv, 2);
+        $isv = round($subtotal * 0.15, 2);
+        $total = round($subtotal + $isv, 2);
 
         return [
-            'sale_id'             => Sale::factory()->completada(),
-            'cai_range_id'        => CaiRange::factory(),
-            'establishment_id'    => Establishment::factory(),
+            'sale_id' => Sale::factory()->completada(),
+            'cai_range_id' => CaiRange::factory(),
+            'establishment_id' => Establishment::factory(),
 
-            'invoice_number'      => $this->nextNumber(),
-            'cai'                 => $this->faker->regexify('[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}'),
-            'emission_point'      => '001',
-            'invoice_date'        => now()->toDateString(),
+            'invoice_number' => $this->nextNumber(),
+            'cai' => $this->faker->regexify('[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}'),
+            'emission_point' => '001',
+            'invoice_date' => now()->toDateString(),
             'cai_expiration_date' => now()->addMonths(6)->toDateString(),
 
             // Snapshot emisor
-            'company_name'        => 'Empresa Test S. de R.L.',
-            'company_rtn'         => '08019999000000',
-            'company_address'     => 'Col. Test, Tegucigalpa, Honduras',
-            'company_phone'       => '+504 2222-0000',
-            'company_email'       => 'facturacion@empresa.test',
+            'company_name' => 'Empresa Test S. de R.L.',
+            'company_rtn' => '08019999000000',
+            'company_address' => 'Col. Test, Tegucigalpa, Honduras',
+            'company_phone' => '+504 2222-0000',
+            'company_email' => 'facturacion@empresa.test',
 
             // Snapshot receptor
-            'customer_name'       => $this->faker->name(),
-            'customer_rtn'        => null,
+            'customer_name' => $this->faker->name(),
+            'customer_rtn' => null,
 
             // Totales
-            'subtotal'            => $subtotal,
-            'exempt_total'        => 0,
-            'taxable_total'       => $subtotal,
-            'isv'                 => $isv,
-            'discount'            => 0,
-            'total'               => $total,
+            'subtotal' => $subtotal,
+            'exempt_total' => 0,
+            'taxable_total' => $subtotal,
+            'isv' => $isv,
+            'discount' => 0,
+            'total' => $total,
 
-            'is_void'             => false,
-            'without_cai'         => false,
-            'pdf_path'            => null,
-            'integrity_hash'      => null,
-            'emitted_at'          => now(),
-            'created_by'          => User::factory(),
+            'is_void' => false,
+            'without_cai' => false,
+            'pdf_path' => null,
+            'integrity_hash' => null,
+            'emitted_at' => now(),
+            'created_by' => User::factory(),
         ];
     }
 
@@ -79,9 +79,9 @@ class InvoiceFactory extends Factory
     public function withoutCai(): self
     {
         return $this->state(fn () => [
-            'without_cai'         => true,
-            'cai'                 => null,
-            'cai_range_id'        => null,
+            'without_cai' => true,
+            'cai' => null,
+            'cai_range_id' => null,
             'cai_expiration_date' => null,
         ]);
     }
@@ -89,15 +89,15 @@ class InvoiceFactory extends Factory
     public function withTotal(float $subtotal): self
     {
         return $this->state(function () use ($subtotal) {
-            $isv   = round($subtotal * 0.15, 2);
+            $isv = round($subtotal * 0.15, 2);
             $total = round($subtotal + $isv, 2);
 
             return [
-                'subtotal'      => $subtotal,
+                'subtotal' => $subtotal,
                 'taxable_total' => $subtotal,
-                'exempt_total'  => 0,
-                'isv'           => $isv,
-                'total'         => $total,
+                'exempt_total' => 0,
+                'isv' => $isv,
+                'total' => $total,
             ];
         });
     }
@@ -113,6 +113,6 @@ class InvoiceFactory extends Factory
         static $seq = 0;
         $seq++;
 
-        return '001-001-01-' . str_pad((string) $seq, 8, '0', STR_PAD_LEFT);
+        return '001-001-01-'.str_pad((string) $seq, 8, '0', STR_PAD_LEFT);
     }
 }

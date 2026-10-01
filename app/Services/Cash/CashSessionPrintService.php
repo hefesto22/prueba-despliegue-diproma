@@ -55,18 +55,18 @@ class CashSessionPrintService
             ?? CompanySetting::current();
 
         return [
-            'session'        => $session,
-            'isOpen'         => $session->isOpen(),
-            'company'        => $this->buildCompanyBlock($company),
-            'establishment'  => $this->buildEstablishmentBlock($session),
-            'people'         => $this->buildPeopleBlock($session),
-            'dates'          => $this->buildDatesBlock($session),
-            'balances'       => $this->buildBalancesBlock($session),
-            'cashFlow'       => $this->buildCashFlowBlock($session),
+            'session' => $session,
+            'isOpen' => $session->isOpen(),
+            'company' => $this->buildCompanyBlock($company),
+            'establishment' => $this->buildEstablishmentBlock($session),
+            'people' => $this->buildPeopleBlock($session),
+            'dates' => $this->buildDatesBlock($session),
+            'balances' => $this->buildBalancesBlock($session),
+            'cashFlow' => $this->buildCashFlowBlock($session),
             'byPaymentMethod' => $this->buildPaymentMethodBlock($session),
             'byExpenseCategory' => $this->buildExpenseCategoryBlock($session),
-            'movements'      => $this->mapMovementsForView($session),
-            'meta'           => $this->buildMetaBlock(),
+            'movements' => $this->mapMovementsForView($session),
+            'meta' => $this->buildMetaBlock(),
         ];
     }
 
@@ -79,20 +79,20 @@ class CashSessionPrintService
     {
         if ($company === null) {
             return [
-                'name'    => 'Empresa',
-                'rtn'     => '',
+                'name' => 'Empresa',
+                'rtn' => '',
                 'address' => '',
-                'phone'   => '',
-                'email'   => '',
+                'phone' => '',
+                'email' => '',
             ];
         }
 
         return [
-            'name'    => (string) ($company->trade_name ?: $company->legal_name),
-            'rtn'     => (string) ($company->formatted_rtn ?? $company->rtn),
+            'name' => (string) ($company->trade_name ?: $company->legal_name),
+            'rtn' => (string) ($company->formatted_rtn ?? $company->rtn),
             'address' => (string) ($company->full_address ?? $company->address),
-            'phone'   => (string) $company->phone,
-            'email'   => (string) $company->email,
+            'phone' => (string) $company->phone,
+            'email' => (string) $company->email,
         ];
     }
 
@@ -104,11 +104,11 @@ class CashSessionPrintService
         $est = $session->establishment;
 
         return [
-            'name'    => $est?->name ?? '—',
-            'code'    => $est?->code ?? '—',
+            'name' => $est?->name ?? '—',
+            'code' => $est?->code ?? '—',
             'address' => $est?->address,
-            'city'    => $est?->city,
-            'phone'   => $est?->phone,
+            'city' => $est?->city,
+            'phone' => $est?->phone,
             'is_main' => (bool) $est?->is_main,
         ];
     }
@@ -119,8 +119,8 @@ class CashSessionPrintService
     private function buildPeopleBlock(CashSession $session): array
     {
         return [
-            'opened_by'     => $session->openedBy?->name ?? '—',
-            'closed_by'     => $session->closedBy?->name,
+            'opened_by' => $session->openedBy?->name ?? '—',
+            'closed_by' => $session->closedBy?->name,
             'authorized_by' => $session->authorizedBy?->name,
         ];
     }
@@ -131,9 +131,9 @@ class CashSessionPrintService
     private function buildDatesBlock(CashSession $session): array
     {
         return [
-            'opened_at'       => $session->opened_at?->format('d/m/Y H:i'),
-            'closed_at'       => $session->closed_at?->format('d/m/Y H:i'),
-            'duration_human'  => $this->formatDuration($session),
+            'opened_at' => $session->opened_at?->format('d/m/Y H:i'),
+            'closed_at' => $session->closed_at?->format('d/m/Y H:i'),
+            'duration_human' => $this->formatDuration($session),
         ];
     }
 
@@ -147,9 +147,9 @@ class CashSessionPrintService
      */
     private function buildBalancesBlock(CashSession $session): array
     {
-        $opening    = (float) $session->opening_amount;
-        $expected   = (float) ($session->expected_closing_amount ?? $this->calculator->expectedCash($session));
-        $actual     = $session->actual_closing_amount !== null
+        $opening = (float) $session->opening_amount;
+        $expected = (float) ($session->expected_closing_amount ?? $this->calculator->expectedCash($session));
+        $actual = $session->actual_closing_amount !== null
             ? (float) $session->actual_closing_amount
             : null;
         $discrepancy = $session->discrepancy !== null
@@ -157,13 +157,13 @@ class CashSessionPrintService
             : null;
 
         return [
-            'opening'           => $this->formatMoney($opening),
-            'expected'          => $this->formatMoney($expected),
-            'actual'            => $actual !== null ? $this->formatMoney($actual) : null,
-            'discrepancy'       => $discrepancy !== null ? $this->formatMoney($discrepancy) : null,
-            'discrepancy_raw'   => $discrepancy,
-            'discrepancy_sign'  => $this->classifyDiscrepancy($discrepancy),
-            'tolerance'         => $this->formatMoney(
+            'opening' => $this->formatMoney($opening),
+            'expected' => $this->formatMoney($expected),
+            'actual' => $actual !== null ? $this->formatMoney($actual) : null,
+            'discrepancy' => $discrepancy !== null ? $this->formatMoney($discrepancy) : null,
+            'discrepancy_raw' => $discrepancy,
+            'discrepancy_sign' => $this->classifyDiscrepancy($discrepancy),
+            'tolerance' => $this->formatMoney(
                 $session->establishment?->companySetting?->effectiveCashDiscrepancyTolerance() ?? 0.0
             ),
         ];
@@ -177,7 +177,7 @@ class CashSessionPrintService
     private function buildCashFlowBlock(CashSession $session): array
     {
         return [
-            'inflows'  => $this->formatMoney($this->calculator->totalCashInflows($session)),
+            'inflows' => $this->formatMoney($this->calculator->totalCashInflows($session)),
             'outflows' => $this->formatMoney($this->calculator->totalCashOutflows($session)),
         ];
     }
@@ -195,9 +195,9 @@ class CashSessionPrintService
         foreach ($raw as $methodValue => $amount) {
             $method = PaymentMethod::tryFrom($methodValue);
             $rows[] = [
-                'method'     => $methodValue,
-                'label'      => $method?->getLabel() ?? ucfirst((string) $methodValue),
-                'amount'     => $this->formatMoney((float) $amount),
+                'method' => $methodValue,
+                'label' => $method?->getLabel() ?? ucfirst((string) $methodValue),
+                'amount' => $this->formatMoney((float) $amount),
                 'amount_raw' => (float) $amount,
             ];
         }
@@ -222,9 +222,9 @@ class CashSessionPrintService
         foreach ($raw as $categoryValue => $amount) {
             $category = ExpenseCategory::tryFrom($categoryValue);
             $rows[] = [
-                'category'   => $categoryValue,
-                'label'      => $category?->getLabel() ?? ucfirst((string) $categoryValue),
-                'amount'     => $this->formatMoney((float) $amount),
+                'category' => $categoryValue,
+                'label' => $category?->getLabel() ?? ucfirst((string) $categoryValue),
+                'amount' => $this->formatMoney((float) $amount),
                 'amount_raw' => (float) $amount,
             ];
         }
@@ -251,18 +251,18 @@ class CashSessionPrintService
             $category = $movement->category;
 
             return [
-                'occurred_at'    => $movement->occurred_at?->format('d/m/Y H:i'),
-                'type'           => $type?->value,
-                'type_label'     => $type?->getLabel() ?? '—',
-                'method'         => $method?->value,
-                'method_label'   => $method?->getLabel() ?? '—',
+                'occurred_at' => $movement->occurred_at?->format('d/m/Y H:i'),
+                'type' => $type?->value,
+                'type_label' => $type?->getLabel() ?? '—',
+                'method' => $method?->value,
+                'method_label' => $method?->getLabel() ?? '—',
                 'category_label' => $category?->getLabel(),
-                'amount'         => $this->formatMoney((float) $movement->amount),
-                'amount_raw'     => (float) $movement->amount,
-                'is_inflow'      => $type?->isInflow() ?? false,
-                'is_outflow'     => $type?->isOutflow() ?? false,
-                'description'    => $movement->description,
-                'user_name'      => $movement->user?->name ?? '—',
+                'amount' => $this->formatMoney((float) $movement->amount),
+                'amount_raw' => (float) $movement->amount,
+                'is_inflow' => $type?->isInflow() ?? false,
+                'is_outflow' => $type?->isOutflow() ?? false,
+                'description' => $movement->description,
+                'user_name' => $movement->user?->name ?? '—',
             ];
         })->toArray();
     }
@@ -275,8 +275,8 @@ class CashSessionPrintService
     private function buildMetaBlock(): array
     {
         return [
-            'printed_at'   => now()->format('d/m/Y H:i'),
-            'printed_by'   => auth()->user()?->name ?? '—',
+            'printed_at' => now()->format('d/m/Y H:i'),
+            'printed_by' => auth()->user()?->name ?? '—',
         ];
     }
 
@@ -304,9 +304,9 @@ class CashSessionPrintService
 
         $parts = [];
         if ($diff->h > 0) {
-            $parts[] = $diff->h . 'h';
+            $parts[] = $diff->h.'h';
         }
-        $parts[] = $diff->i . 'min';
+        $parts[] = $diff->i.'min';
 
         return implode(' ', $parts);
     }

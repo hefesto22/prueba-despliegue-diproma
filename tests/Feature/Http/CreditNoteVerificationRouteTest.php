@@ -51,10 +51,10 @@ class CreditNoteVerificationRouteTest extends TestCase
         $company = CompanySetting::factory()->create([
             'legal_name' => 'Diproma S. de R.L.',
             'trade_name' => 'Diproma',
-            'rtn'        => '08011999000001',
-            'address'    => 'Barrio Guamilito, SPS',
-            'phone'      => '2550-0000',
-            'email'      => 'diproma@test.com',
+            'rtn' => '08011999000001',
+            'address' => 'Barrio Guamilito, SPS',
+            'phone' => '2550-0000',
+            'email' => 'diproma@test.com',
         ]);
         Cache::put('company_settings', $company, 60 * 60 * 24);
 
@@ -71,37 +71,37 @@ class CreditNoteVerificationRouteTest extends TestCase
         );
 
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-01',
-            'document_type'  => '01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-01',
+            'document_type' => '01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         CaiRange::factory()->active()->create([
-            'prefix'         => '001-001-03',
-            'document_type'  => '03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'prefix' => '001-001-03',
+            'document_type' => '03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         $product = Product::factory()->create([
-            'stock'      => 10,
+            'stock' => 10,
             'cost_price' => 50.00,
-            'tax_type'   => TaxType::Gravado15,
+            'tax_type' => TaxType::Gravado15,
         ]);
 
         $sale = app(SaleService::class)->processSale(
             cartItems: [[
                 'product_id' => $product->id,
-                'quantity'   => 1,
+                'quantity' => 1,
                 'unit_price' => 1000.00,
-                'tax_type'   => TaxType::Gravado15->value,
+                'tax_type' => TaxType::Gravado15->value,
             ]],
             paymentMethod: PaymentMethod::Efectivo,
             customerName: 'Cliente Verificacion',
-            customerRtn:  '08011999000999',
+            customerRtn: '08011999000999',
         );
 
         $invoice = app(InvoiceService::class)->generateFromSale($sale->fresh(['items']));
@@ -110,8 +110,8 @@ class CreditNoteVerificationRouteTest extends TestCase
         $this->creditNote = app(CreditNoteService::class)->generateFromInvoice(
             new EmitirNotaCreditoInput(
                 invoice: $invoice->fresh(['sale.items']),
-                reason:  CreditNoteReason::DevolucionFisica,
-                lineas:  [new LineaAcreditarInput($saleItem->id, 1)],
+                reason: CreditNoteReason::DevolucionFisica,
+                lineas: [new LineaAcreditarInput($saleItem->id, 1)],
             )
         );
     }
@@ -199,9 +199,9 @@ class CreditNoteVerificationRouteTest extends TestCase
         // El regex `[a-f0-9]{64}` en la ruta rechaza antes de golpear la BD.
         // Casos: hash corto, caracteres invalidos, longitud incorrecta.
         $this->get('/notas-credito/verificar/short')->assertNotFound();
-        $this->get('/notas-credito/verificar/' . str_repeat('z', 64))->assertNotFound();
-        $this->get('/notas-credito/verificar/' . str_repeat('a', 63))->assertNotFound();
-        $this->get('/notas-credito/verificar/' . str_repeat('a', 65))->assertNotFound();
+        $this->get('/notas-credito/verificar/'.str_repeat('z', 64))->assertNotFound();
+        $this->get('/notas-credito/verificar/'.str_repeat('a', 63))->assertNotFound();
+        $this->get('/notas-credito/verificar/'.str_repeat('a', 65))->assertNotFound();
     }
 
     #[Test]

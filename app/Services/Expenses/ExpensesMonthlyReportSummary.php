@@ -31,11 +31,11 @@ final class ExpensesMonthlyReportSummary
 {
     /**
      * @param  array<string, array{label: string, count: int, total: float}>  $byCategory
-     *         Agrupado por value de ExpenseCategory. Label resuelto al construir.
+     *                                                                                     Agrupado por value de ExpenseCategory. Label resuelto al construir.
      * @param  array<int, array{name: string, count: int, total: float}>  $byEstablishment
-     *         Agrupado por establishment_id. Name resuelto al construir.
+     *                                                                                      Agrupado por establishment_id. Name resuelto al construir.
      * @param  array<string, array{label: string, count: int, total: float}>  $byPaymentMethod
-     *         Agrupado por value de PaymentMethod. Label resuelto al construir.
+     *                                                                                          Agrupado por value de PaymentMethod. Label resuelto al construir.
      */
     public function __construct(
         public readonly int $year,
@@ -73,12 +73,12 @@ final class ExpensesMonthlyReportSummary
     public function periodLabel(): string
     {
         $meses = [
-            1  => 'Enero',     2  => 'Febrero',   3  => 'Marzo',     4  => 'Abril',
-            5  => 'Mayo',      6  => 'Junio',     7  => 'Julio',     8  => 'Agosto',
-            9  => 'Septiembre',10 => 'Octubre',   11 => 'Noviembre', 12 => 'Diciembre',
+            1 => 'Enero',     2 => 'Febrero',   3 => 'Marzo',     4 => 'Abril',
+            5 => 'Mayo',      6 => 'Junio',     7 => 'Julio',     8 => 'Agosto',
+            9 => 'Septiembre', 10 => 'Octubre',   11 => 'Noviembre', 12 => 'Diciembre',
         ];
 
-        return ($meses[$this->month] ?? (string) $this->month) . ' ' . $this->year;
+        return ($meses[$this->month] ?? (string) $this->month).' '.$this->year;
     }
 
     /**

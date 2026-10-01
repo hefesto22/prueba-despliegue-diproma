@@ -25,10 +25,10 @@ final class EmitirNotaCreditoInput
     public readonly array $lineas;
 
     /**
-     * @param  Invoice                 $invoice      Factura origen ya hidratada.
-     * @param  CreditNoteReason        $reason       Razón legal de la NC.
-     * @param  LineaAcreditarInput[]   $lineas       Líneas a acreditar (al menos una).
-     * @param  string|null             $reasonNotes  Notas obligatorias si la razón las exige.
+     * @param  Invoice  $invoice  Factura origen ya hidratada.
+     * @param  CreditNoteReason  $reason  Razón legal de la NC.
+     * @param  LineaAcreditarInput[]  $lineas  Líneas a acreditar (al menos una).
+     * @param  string|null  $reasonNotes  Notas obligatorias si la razón las exige.
      */
     public function __construct(
         public readonly Invoice $invoice,
@@ -52,7 +52,7 @@ final class EmitirNotaCreditoInput
             if (isset($vistos[$linea->saleItemId])) {
                 throw new InvalidArgumentException(
                     "sale_item_id {$linea->saleItemId} está duplicado. "
-                    . 'Consolidá las líneas antes de emitir la NC.'
+                    .'Consolidá las líneas antes de emitir la NC.'
                 );
             }
             $vistos[$linea->saleItemId] = true;

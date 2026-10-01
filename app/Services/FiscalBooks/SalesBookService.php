@@ -30,11 +30,11 @@ class SalesBookService
     /**
      * Construir el Libro de Ventas de un período mensual.
      *
-     * @param  int       $year              Año del período (ej: 2026)
-     * @param  int       $month             Mes 1-12
-     * @param  int|null  $establishmentId   NULL = todas las sucursales (default)
+     * @param  int  $year  Año del período (ej: 2026)
+     * @param  int  $month  Mes 1-12
+     * @param  int|null  $establishmentId  NULL = todas las sucursales (default)
      *
-     * @throws InvalidArgumentException  Si year/month están fuera de rango válido
+     * @throws InvalidArgumentException Si year/month están fuera de rango válido
      */
     public function build(int $year, int $month, ?int $establishmentId = null): SalesBook
     {
@@ -43,7 +43,7 @@ class SalesBookService
         [$from, $to] = $this->periodRange($year, $month);
 
         $invoices = $this->fetchInvoices($from, $to, $establishmentId);
-        $notes    = $this->fetchCreditNotes($from, $to, $establishmentId);
+        $notes = $this->fetchCreditNotes($from, $to, $establishmentId);
 
         $entries = $this->buildEntries($invoices, $notes);
         $summary = $this->buildSummary($year, $month, $invoices, $notes);
@@ -63,7 +63,7 @@ class SalesBookService
     private function periodRange(int $year, int $month): array
     {
         $from = CarbonImmutable::create($year, $month, 1)->startOfMonth();
-        $to   = $from->endOfMonth();
+        $to = $from->endOfMonth();
 
         return [$from->toDateString(), $to->toDateString()];
     }
@@ -111,14 +111,14 @@ class SalesBookService
      * luego número. Mantiene el criterio del detalle del Libro de Ventas
      * que espera el SAR: cronológico con facturas y notas intercaladas.
      *
-     * @param  Collection<int, Invoice>     $invoices
+     * @param  Collection<int, Invoice>  $invoices
      * @param  Collection<int, CreditNote>  $notes
      * @return Collection<int, SalesBookEntry>
      */
     private function buildEntries(Collection $invoices, Collection $notes): Collection
     {
         $invoiceEntries = $invoices->map(fn (Invoice $invoice) => SalesBookEntry::fromInvoice($invoice));
-        $noteEntries    = $notes->map(fn (CreditNote $note) => SalesBookEntry::fromCreditNote($note));
+        $noteEntries = $notes->map(fn (CreditNote $note) => SalesBookEntry::fromCreditNote($note));
 
         return $invoiceEntries
             ->concat($noteEntries)
@@ -137,35 +137,35 @@ class SalesBookService
      * Las anuladas se cuentan por separado para la trazabilidad pero NO
      * suman en los montos — esto es lo que el contador declarará al SAR.
      *
-     * @param  Collection<int, Invoice>     $invoices
+     * @param  Collection<int, Invoice>  $invoices
      * @param  Collection<int, CreditNote>  $notes
      */
     private function buildSummary(int $year, int $month, Collection $invoices, Collection $notes): SalesBookSummary
     {
         $facturasVigentes = $invoices->where('is_void', false);
         $facturasAnuladas = $invoices->where('is_void', true);
-        $notasVigentes    = $notes->where('is_void', false);
-        $notasAnuladas    = $notes->where('is_void', true);
+        $notasVigentes = $notes->where('is_void', false);
+        $notasAnuladas = $notes->where('is_void', true);
 
         return new SalesBookSummary(
-            periodYear:  $year,
+            periodYear: $year,
             periodMonth: $month,
 
             facturasEmitidasCount: $invoices->count(),
             facturasVigentesCount: $facturasVigentes->count(),
             facturasAnuladasCount: $facturasAnuladas->count(),
-            facturasExento:  round((float) $facturasVigentes->sum('exempt_total'), 2),
+            facturasExento: round((float) $facturasVigentes->sum('exempt_total'), 2),
             facturasGravado: round((float) $facturasVigentes->sum('taxable_total'), 2),
-            facturasIsv:     round((float) $facturasVigentes->sum('isv'), 2),
-            facturasTotal:   round((float) $facturasVigentes->sum('total'), 2),
+            facturasIsv: round((float) $facturasVigentes->sum('isv'), 2),
+            facturasTotal: round((float) $facturasVigentes->sum('total'), 2),
 
             notasCreditoEmitidasCount: $notes->count(),
             notasCreditoVigentesCount: $notasVigentes->count(),
             notasCreditoAnuladasCount: $notasAnuladas->count(),
-            notasCreditoExento:  round((float) $notasVigentes->sum('exempt_total'), 2),
+            notasCreditoExento: round((float) $notasVigentes->sum('exempt_total'), 2),
             notasCreditoGravado: round((float) $notasVigentes->sum('taxable_total'), 2),
-            notasCreditoIsv:     round((float) $notasVigentes->sum('isv'), 2),
-            notasCreditoTotal:   round((float) $notasVigentes->sum('total'), 2),
+            notasCreditoIsv: round((float) $notasVigentes->sum('isv'), 2),
+            notasCreditoTotal: round((float) $notasVigentes->sum('total'), 2),
         );
     }
 

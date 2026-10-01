@@ -17,7 +17,7 @@ use Filament\Support\Contracts\HasLabel;
  * trabaja con un carrito en memoria — la venta se crea
  * directamente al procesar.
  */
-enum SaleStatus: string implements HasLabel, HasColor, HasIcon
+enum SaleStatus: string implements HasColor, HasIcon, HasLabel
 {
     case Pendiente = 'pendiente';
     case Completada = 'completada';

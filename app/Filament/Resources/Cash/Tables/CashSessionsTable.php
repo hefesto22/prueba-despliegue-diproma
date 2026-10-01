@@ -123,7 +123,7 @@ class CashSessionsTable
                 SelectFilter::make('estado')
                     ->label('Estado')
                     ->options([
-                        'open'   => 'Abiertas',
+                        'open' => 'Abiertas',
                         'closed' => 'Cerradas',
                     ])
                     ->placeholder('Todas')

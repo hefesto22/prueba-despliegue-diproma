@@ -28,8 +28,8 @@ final class DescuadreExcedeTolerancianException extends RuntimeException
     ) {
         parent::__construct(sprintf(
             'El descuadre de caja (L. %s) supera la tolerancia configurada '
-            . '(L. %s) para la sesión #%d. Requiere autorización de un usuario '
-            . 'con permisos para continuar el cierre.',
+            .'(L. %s) para la sesión #%d. Requiere autorización de un usuario '
+            .'con permisos para continuar el cierre.',
             number_format(abs($discrepancy), 2),
             number_format($tolerance, 2),
             $sessionId,

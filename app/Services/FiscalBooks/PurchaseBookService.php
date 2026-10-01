@@ -42,11 +42,11 @@ class PurchaseBookService
     /**
      * Construir el Libro de Compras de un período mensual.
      *
-     * @param  int       $year              Año del período (ej: 2026)
-     * @param  int       $month             Mes 1-12
-     * @param  int|null  $establishmentId   NULL = todas las sucursales (default)
+     * @param  int  $year  Año del período (ej: 2026)
+     * @param  int  $month  Mes 1-12
+     * @param  int|null  $establishmentId  NULL = todas las sucursales (default)
      *
-     * @throws InvalidArgumentException  Si year/month están fuera de rango válido
+     * @throws InvalidArgumentException Si year/month están fuera de rango válido
      */
     public function build(int $year, int $month, ?int $establishmentId = null): PurchaseBook
     {
@@ -76,7 +76,7 @@ class PurchaseBookService
     private function periodRange(int $year, int $month): array
     {
         $from = CarbonImmutable::create($year, $month, 1)->startOfMonth();
-        $to   = $from->endOfMonth();
+        $to = $from->endOfMonth();
 
         return [$from->toDateString(), $to->toDateString()];
     }
@@ -133,6 +133,7 @@ class PurchaseBookService
     private function resolveRtnReceptor(): string
     {
         $company = CompanySetting::current();
+
         return $company?->rtn ?? '';
     }
 
@@ -164,41 +165,41 @@ class PurchaseBookService
      */
     private function buildSummary(int $year, int $month, Collection $purchases): PurchaseBookSummary
     {
-        $facturas      = $this->filterByType($purchases, SupplierDocumentType::Factura);
-        $notasCredito  = $this->filterByType($purchases, SupplierDocumentType::NotaCredito);
-        $notasDebito   = $this->filterByType($purchases, SupplierDocumentType::NotaDebito);
+        $facturas = $this->filterByType($purchases, SupplierDocumentType::Factura);
+        $notasCredito = $this->filterByType($purchases, SupplierDocumentType::NotaCredito);
+        $notasDebito = $this->filterByType($purchases, SupplierDocumentType::NotaDebito);
 
-        [$factVig,   $factAnul]   = $this->splitByVoidStatus($facturas);
-        [$ncVig,     $ncAnul]     = $this->splitByVoidStatus($notasCredito);
-        [$ndVig,     $ndAnul]     = $this->splitByVoidStatus($notasDebito);
+        [$factVig,   $factAnul] = $this->splitByVoidStatus($facturas);
+        [$ncVig,     $ncAnul] = $this->splitByVoidStatus($notasCredito);
+        [$ndVig,     $ndAnul] = $this->splitByVoidStatus($notasDebito);
 
         return new PurchaseBookSummary(
-            periodYear:  $year,
+            periodYear: $year,
             periodMonth: $month,
 
             facturasEmitidasCount: $facturas->count(),
             facturasVigentesCount: $factVig->count(),
             facturasAnuladasCount: $factAnul->count(),
-            facturasExento:  round((float) $factVig->sum('exempt_total'), 2),
+            facturasExento: round((float) $factVig->sum('exempt_total'), 2),
             facturasGravado: round((float) $factVig->sum('taxable_total'), 2),
-            facturasIsv:     round((float) $factVig->sum('isv'), 2),
-            facturasTotal:   round((float) $factVig->sum('total'), 2),
+            facturasIsv: round((float) $factVig->sum('isv'), 2),
+            facturasTotal: round((float) $factVig->sum('total'), 2),
 
             notasCreditoEmitidasCount: $notasCredito->count(),
             notasCreditoVigentesCount: $ncVig->count(),
             notasCreditoAnuladasCount: $ncAnul->count(),
-            notasCreditoExento:  round((float) $ncVig->sum('exempt_total'), 2),
+            notasCreditoExento: round((float) $ncVig->sum('exempt_total'), 2),
             notasCreditoGravado: round((float) $ncVig->sum('taxable_total'), 2),
-            notasCreditoIsv:     round((float) $ncVig->sum('isv'), 2),
-            notasCreditoTotal:   round((float) $ncVig->sum('total'), 2),
+            notasCreditoIsv: round((float) $ncVig->sum('isv'), 2),
+            notasCreditoTotal: round((float) $ncVig->sum('total'), 2),
 
             notasDebitoEmitidasCount: $notasDebito->count(),
             notasDebitoVigentesCount: $ndVig->count(),
             notasDebitoAnuladasCount: $ndAnul->count(),
-            notasDebitoExento:  round((float) $ndVig->sum('exempt_total'), 2),
+            notasDebitoExento: round((float) $ndVig->sum('exempt_total'), 2),
             notasDebitoGravado: round((float) $ndVig->sum('taxable_total'), 2),
-            notasDebitoIsv:     round((float) $ndVig->sum('isv'), 2),
-            notasDebitoTotal:   round((float) $ndVig->sum('total'), 2),
+            notasDebitoIsv: round((float) $ndVig->sum('isv'), 2),
+            notasDebitoTotal: round((float) $ndVig->sum('total'), 2),
         );
     }
 

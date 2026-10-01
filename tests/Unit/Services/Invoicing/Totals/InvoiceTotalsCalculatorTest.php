@@ -53,7 +53,7 @@ class InvoiceTotalsCalculatorTest extends TestCase
      */
     private function makeSale(array $items, float $subtotal, float $isv, float $total, float $discount = 0.0): Sale
     {
-        $sale = new Sale();
+        $sale = new Sale;
         $sale->subtotal = $subtotal;
         $sale->isv = $isv;
         $sale->total = $total;
@@ -61,7 +61,7 @@ class InvoiceTotalsCalculatorTest extends TestCase
 
         $itemModels = [];
         foreach ($items as $i => $data) {
-            $item = new SaleItem();
+            $item = new SaleItem;
             $item->id = $i + 1; // identity para TaxableLine
             $item->unit_price = $data['unit_price'];
             $item->quantity = $data['quantity'];

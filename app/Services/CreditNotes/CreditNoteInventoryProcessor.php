@@ -59,11 +59,11 @@ final class CreditNoteInventoryProcessor
      * true (razones no físicas como `ErrorFacturacion` o `AjustePrecio` no
      * tocan kardex al emitir, así que no hay nada que registrar).
      *
-     * @param  Invoice     $invoice    Factura origen — usada para referenciar el
-     *                                 SalidaVenta original del que reusamos unit_cost.
-     * @param  CreditNote  $creditNote NC ya creada (filas en credit_notes/
-     *                                 credit_note_items persistidas) pero aún
-     *                                 sin emitted_at/integrity_hash.
+     * @param  Invoice  $invoice  Factura origen — usada para referenciar el
+     *                            SalidaVenta original del que reusamos unit_cost.
+     * @param  CreditNote  $creditNote  NC ya creada (filas en credit_notes/
+     *                                  credit_note_items persistidas) pero aún
+     *                                  sin emitted_at/integrity_hash.
      * @param  list<LineaAcreditarInput>  $lineas
      * @param  Collection<int, \App\Models\SaleItem>  $saleItems
      */
@@ -90,7 +90,7 @@ final class CreditNoteInventoryProcessor
         $quantityByProduct = [];
         foreach ($lineas as $linea) {
             /** @var \App\Models\SaleItem $saleItem */
-            $saleItem  = $saleItems[$linea->saleItemId];
+            $saleItem = $saleItems[$linea->saleItemId];
             $productId = $saleItem->product_id;
             $quantityByProduct[$productId] = ($quantityByProduct[$productId] ?? 0) + $linea->quantity;
         }
@@ -108,11 +108,11 @@ final class CreditNoteInventoryProcessor
             $originalUnitCost = $originalMovements[$productId]?->unit_cost;
 
             InventoryMovement::record(
-                product:  $product,
-                type:     MovementType::EntradaNotaCredito,
+                product: $product,
+                type: MovementType::EntradaNotaCredito,
                 quantity: $quantity,
                 reference: $creditNote,
-                notes:    "NC {$creditNote->credit_note_number} sobre factura {$invoice->invoice_number}",
+                notes: "NC {$creditNote->credit_note_number} sobre factura {$invoice->invoice_number}",
                 unitCost: $originalUnitCost !== null ? (float) $originalUnitCost : null,
                 establishment: $creditNote->establishment,
             );
@@ -136,10 +136,10 @@ final class CreditNoteInventoryProcessor
      * de permitir stock negativo silencioso que descuadraría el Libro de
      * Ventas y la valoración contable.
      *
-     * @throws StockInsuficienteParaAnularNCException  Stock actual < cantidad
-     *   a revertir. El caller (`voidNotaCredito`) deja propagar y la
-     *   transacción externa hace rollback — el flag `is_void` no se
-     *   actualiza y la NC sigue emitida.
+     * @throws StockInsuficienteParaAnularNCException Stock actual < cantidad
+     *                                                a revertir. El caller (`voidNotaCredito`) deja propagar y la
+     *                                                transacción externa hace rollback — el flag `is_void` no se
+     *                                                actualiza y la NC sigue emitida.
      */
     public function revertForVoid(CreditNote $creditNote): void
     {
@@ -174,23 +174,23 @@ final class CreditNoteInventoryProcessor
             // escritura donde otra transacción podría consumir el stock.
             if ($product->stock < $quantity) {
                 throw new StockInsuficienteParaAnularNCException(
-                    creditNoteId:     $creditNote->id,
+                    creditNoteId: $creditNote->id,
                     creditNoteNumber: $creditNote->credit_note_number,
-                    productId:        $product->id,
-                    productName:      $product->name,
-                    requerido:        $quantity,
-                    disponible:       (int) $product->stock,
+                    productId: $product->id,
+                    productName: $product->name,
+                    requerido: $quantity,
+                    disponible: (int) $product->stock,
                 );
             }
 
             $originalUnitCost = $originalMovements[$productId]?->unit_cost;
 
             InventoryMovement::record(
-                product:  $product,
-                type:     MovementType::SalidaAnulacionNotaCredito,
+                product: $product,
+                type: MovementType::SalidaAnulacionNotaCredito,
                 quantity: $quantity,
                 reference: $creditNote,
-                notes:    "NC {$creditNote->credit_note_number} anulada",
+                notes: "NC {$creditNote->credit_note_number} anulada",
                 unitCost: $originalUnitCost !== null ? (float) $originalUnitCost : null,
                 establishment: $creditNote->establishment,
             );

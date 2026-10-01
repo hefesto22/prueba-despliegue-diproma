@@ -29,7 +29,7 @@ class FiscalPeriodsPendingNotification extends Notification
     use Queueable;
 
     /**
-     * @param Collection<int, \App\Models\FiscalPeriod> $periods Ordenados cronológicamente ASC.
+     * @param  Collection<int, \App\Models\FiscalPeriod>  $periods  Ordenados cronológicamente ASC.
      */
     public function __construct(
         public readonly Collection $periods,
@@ -74,13 +74,13 @@ class FiscalPeriodsPendingNotification extends Notification
     {
         $count = $this->periods->count();
 
-        return (new MailMessage())
+        return (new MailMessage)
             ->subject("Sistema Diproma · {$count} período(s) fiscal(es) sin declarar")
             ->greeting("Hola {$notifiable->name},")
             ->line($this->title($count))
             ->line("Períodos pendientes: {$this->periodLabels()}")
             ->line('Recuerda que el ISV se presenta antes del día 10 del mes siguiente al período. '
-                . 'Declararlo tarde genera mora y recargos ante el SAR.')
+                .'Declararlo tarde genera mora y recargos ante el SAR.')
             ->action('Ir a Declaraciones ISV', FiscalPeriodResource::getUrl('index', panel: 'admin'))
             ->line('Esta alerta se genera automáticamente — puedes ignorarla una vez declarados los períodos.');
     }

@@ -39,12 +39,15 @@ use Tests\TestCase;
  */
 class RepairDeliveryServiceTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private RepairDeliveryService $service;
+
     private User $cajero;
+
     private CashSession $caja;
+
     private DeviceCategory $deviceCategory;
 
     protected function setUp(): void

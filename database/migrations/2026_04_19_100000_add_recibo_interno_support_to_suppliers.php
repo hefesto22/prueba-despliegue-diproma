@@ -62,8 +62,8 @@ return new class extends Migration
                 'department' => null,
                 'credit_days' => 0,
                 'notes' => 'Proveedor genérico del sistema — se usa automáticamente '
-                    . 'al registrar compras informales (Recibo Interno, sin CAI). '
-                    . 'No eliminar: los recibos internos históricos lo referencian.',
+                    .'al registrar compras informales (Recibo Interno, sin CAI). '
+                    .'No eliminar: los recibos internos históricos lo referencian.',
                 'is_active' => true,
                 'is_generic' => true,
                 'created_at' => now(),

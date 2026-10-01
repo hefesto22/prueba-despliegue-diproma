@@ -4,8 +4,8 @@ namespace App\Filament\Resources\Suppliers\Schemas;
 
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class SupplierInfolist

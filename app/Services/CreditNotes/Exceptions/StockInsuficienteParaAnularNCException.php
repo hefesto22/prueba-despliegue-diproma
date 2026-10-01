@@ -28,10 +28,10 @@ class StockInsuficienteParaAnularNCException extends CreditNoteException
     ) {
         parent::__construct(
             "No se puede anular la nota de crédito {$creditNoteNumber}: el producto "
-            . "«{$productName}» (#{$productId}) tiene stock {$disponible} pero se "
-            . "requiere revertir {$requerido} unidades. Probablemente la mercadería "
-            . 'devuelta ya fue revendida. Ajuste el inventario manualmente o emita '
-            . 'una nota de débito antes de intentar anular nuevamente.'
+            ."«{$productName}» (#{$productId}) tiene stock {$disponible} pero se "
+            ."requiere revertir {$requerido} unidades. Probablemente la mercadería "
+            .'devuelta ya fue revendida. Ajuste el inventario manualmente o emita '
+            .'una nota de débito antes de intentar anular nuevamente.'
         );
     }
 }

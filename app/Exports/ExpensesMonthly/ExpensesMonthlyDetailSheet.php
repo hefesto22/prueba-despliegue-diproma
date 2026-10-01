@@ -37,7 +37,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  *   - Columnas monetarias con formato `#,##0.00` y alineadas a la derecha.
  *   - ShouldAutoSize para que las columnas se ajusten al contenido.
  */
-class ExpensesMonthlyDetailSheet implements FromCollection, WithHeadings, WithMapping, WithTitle, WithStyles, ShouldAutoSize
+class ExpensesMonthlyDetailSheet implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     private int $rowCounter = 0;
 
@@ -105,7 +105,7 @@ class ExpensesMonthlyDetailSheet implements FromCollection, WithHeadings, WithMa
 
     public function title(): string
     {
-        return 'Detalle ' . $this->report->summary->periodSlug();
+        return 'Detalle '.$this->report->summary->periodSlug();
     }
 
     public function styles(Worksheet $sheet): array
@@ -157,16 +157,16 @@ class ExpensesMonthlyDetailSheet implements FromCollection, WithHeadings, WithMa
         return [
             1 => [
                 'font' => [
-                    'bold'  => true,
+                    'bold' => true,
                     'color' => ['rgb' => 'FFFFFFFF'],
                 ],
                 'fill' => [
-                    'fillType'   => Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'FF1A1A1A'],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical'   => Alignment::VERTICAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
                 ],
             ],
         ];

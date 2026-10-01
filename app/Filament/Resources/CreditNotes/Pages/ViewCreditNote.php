@@ -68,8 +68,8 @@ class ViewCreditNote extends ViewRecord
                 ->modalHeading('¿Anular esta Nota de Crédito?')
                 ->modalDescription(
                     'Si la razón fue "Devolución física", el stock del producto '
-                    . 'se retirará nuevamente del inventario. Esta acción no se '
-                    . 'puede revertir y queda registrada en el kardex.'
+                    .'se retirará nuevamente del inventario. Esta acción no se '
+                    .'puede revertir y queda registrada en el kardex.'
                 )
                 ->modalSubmitActionLabel('Sí, anular')
                 ->visible(fn (): bool => ! $this->record->is_void)

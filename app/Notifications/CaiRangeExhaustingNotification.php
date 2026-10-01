@@ -74,28 +74,28 @@ class CaiRangeExhaustingNotification extends Notification
             ? "[CRÍTICO] Sistema Diproma · {$count} CAI(s) cercanos a agotarse"
             : "Sistema Diproma · {$count} CAI(s) cercanos a agotarse";
 
-        $mail = (new MailMessage())
+        $mail = (new MailMessage)
             ->subject($subject)
             ->greeting("Hola {$notifiable->name},")
             ->line($this->title($count, $severity));
 
         foreach ($this->alerts as $alert) {
-            $mail->line('• ' . $alert->shortLabel());
+            $mail->line('• '.$alert->shortLabel());
         }
 
         if ($this->hasAlertsWithoutSuccessor()) {
             $mail->line('⚠️ Hay CAIs sin sucesor pre-registrado. Solicita un CAI adicional al SAR '
-                . 'y regístralo como siguiente ANTES de que se agoten los correlativos actuales — '
-                . 'de lo contrario no será posible emitir más facturas de ese tipo.');
+                .'y regístralo como siguiente ANTES de que se agoten los correlativos actuales — '
+                .'de lo contrario no será posible emitir más facturas de ese tipo.');
         } else {
             $mail->line('Todos los CAIs en alerta tienen sucesor pre-registrado — cuando el actual '
-                . 'se agote, el sistema podrá promover el siguiente.');
+                .'se agote, el sistema podrá promover el siguiente.');
         }
 
         return $mail
             ->action('Ir al módulo CAI', CaiRangeResource::getUrl('index', panel: 'admin'))
             ->line('Esta alerta se genera automáticamente cada mañana — dejará de llegarte una vez '
-                . 'resuelto el agotamiento.');
+                .'resuelto el agotamiento.');
     }
 
     private function maxSeverity(): CaiAlertSeverity

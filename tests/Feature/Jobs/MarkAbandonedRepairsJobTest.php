@@ -14,8 +14,8 @@ use Tests\TestCase;
 
 class MarkAbandonedRepairsJobTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesMatriz;
+    use RefreshDatabase;
 
     private DeviceCategory $deviceCategory;
 

@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Schema;
  *     el form lo marca obligatorio y el guard en InvoiceService lanza
  *     PeriodoFiscalNoConfiguradoException si está vacío al emitir.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('company_settings', function (Blueprint $table) {

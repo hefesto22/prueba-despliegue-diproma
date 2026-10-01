@@ -17,7 +17,7 @@ class SalesChart extends ChartWidget
 
     protected ?string $description = 'Comparativa con el período anterior';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = '300s';
 
@@ -140,10 +140,10 @@ class SalesChart extends ChartWidget
     private function fetchAggregated(Carbon $start, Carbon $end, string $granularity): array
     {
         $groupExpr = match ($granularity) {
-            'day' => "DATE(date)",
+            'day' => 'DATE(date)',
             'week' => "DATE_FORMAT(date, '%x-%v')",   // ISO year-week
             'month' => "DATE_FORMAT(date, '%Y-%m')",
-            default => "DATE(date)",
+            default => 'DATE(date)',
         };
 
         return Sale::query()
@@ -189,7 +189,7 @@ class SalesChart extends ChartWidget
     {
         return match ($granularity) {
             'day' => Carbon::parse($bucket)->format('d/m'),
-            'week' => 'Sem ' . substr($bucket, -2),
+            'week' => 'Sem '.substr($bucket, -2),
             'month' => Carbon::createFromFormat('Y-m', $bucket)->translatedFormat('M Y'),
             default => $bucket,
         };

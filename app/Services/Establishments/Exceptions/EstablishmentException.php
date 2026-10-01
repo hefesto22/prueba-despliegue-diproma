@@ -9,6 +9,4 @@ use RuntimeException;
  * Permite capturar selectivamente fallos del dominio de sucursales sin atrapar
  * excepciones genéricas del framework.
  */
-abstract class EstablishmentException extends RuntimeException
-{
-}
+abstract class EstablishmentException extends RuntimeException {}

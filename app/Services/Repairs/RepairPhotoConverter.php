@@ -29,7 +29,9 @@ use Illuminate\Support\Str;
 class RepairPhotoConverter
 {
     private const QUALITY = 80;
+
     private const MAX_DIMENSION = 1920;
+
     private const SUPPORTED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
     /**
@@ -43,12 +45,11 @@ class RepairPhotoConverter
      *                              Ej: "tmp/abc123.jpg"
      * @param  string  $destDirectory  Directorio relativo donde guardar el WebP.
      *                                 Ej: "repairs/42"
-     *
-     * @return string  Path relativo del archivo WebP final dentro del disk.
-     *                 Ej: "repairs/42/photo-9f8e7d6c.webp"
+     * @return string Path relativo del archivo WebP final dentro del disk.
+     *                Ej: "repairs/42/photo-9f8e7d6c.webp"
      *
      * @throws \RuntimeException Si el archivo no existe, no es imagen válida,
-     *                          o GD no puede procesarlo.
+     *                           o GD no puede procesarlo.
      */
     public function convertToWebp(string $sourcePath, string $destDirectory): string
     {
@@ -64,7 +65,7 @@ class RepairPhotoConverter
         if (! in_array($mime, self::SUPPORTED_MIMES, true)) {
             throw new \RuntimeException(
                 "RepairPhotoConverter: formato no soportado ({$mime}). "
-                . "Soportados: " . implode(', ', self::SUPPORTED_MIMES)
+                .'Soportados: '.implode(', ', self::SUPPORTED_MIMES)
             );
         }
 
@@ -73,7 +74,7 @@ class RepairPhotoConverter
             $disk->makeDirectory($destDirectory);
         }
 
-        $finalRelativePath = trim($destDirectory, '/') . '/photo-' . Str::random(12) . '.webp';
+        $finalRelativePath = trim($destDirectory, '/').'/photo-'.Str::random(12).'.webp';
         $finalAbsolutePath = $disk->path($finalRelativePath);
 
         // Cargar la imagen al recurso GD según mime
@@ -99,8 +100,6 @@ class RepairPhotoConverter
 
     /**
      * Cargar archivo de imagen al recurso GD según su mime.
-     *
-     * @return \GdImage
      */
     private function loadImage(string $absolutePath, string $mime): \GdImage
     {
@@ -115,7 +114,7 @@ class RepairPhotoConverter
         if ($image === false) {
             throw new \RuntimeException(
                 "RepairPhotoConverter: GD no pudo leer la imagen ({$mime}). "
-                . "Posible archivo corrupto o no soportado."
+                .'Posible archivo corrupto o no soportado.'
             );
         }
 

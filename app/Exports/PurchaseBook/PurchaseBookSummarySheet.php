@@ -32,15 +32,20 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
  * eso decide su número de fila Y su estilo. Agregar o reordenar filas no
  * requiere tocar registerEvents() — los estilos siguen al layout.
  */
-class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents, WithColumnWidths, ShouldAutoSize
+class PurchaseBookSummarySheet implements FromCollection, ShouldAutoSize, WithColumnWidths, WithEvents, WithTitle
 {
     // Tipos de fila — gobiernan rendering Y estilo.
-    private const ROW_TITLE          = 'title';          // título principal, fondo oscuro, merge
+    private const ROW_TITLE = 'title';          // título principal, fondo oscuro, merge
+
     private const ROW_SECTION_HEADER = 'section_header'; // encabezado de sección, fondo medio, merge
-    private const ROW_KEY_VALUE      = 'key_value';      // concepto | valor (entero)
-    private const ROW_MONEY          = 'money';          // concepto | valor monetario (#,##0.00)
-    private const ROW_HIGHLIGHT      = 'highlight';      // fila destacada (ej: crédito fiscal neto)
-    private const ROW_SPACER         = 'spacer';         // fila vacía
+
+    private const ROW_KEY_VALUE = 'key_value';      // concepto | valor (entero)
+
+    private const ROW_MONEY = 'money';          // concepto | valor monetario (#,##0.00)
+
+    private const ROW_HIGHLIGHT = 'highlight';      // fila destacada (ej: crédito fiscal neto)
+
+    private const ROW_SPACER = 'spacer';         // fila vacía
 
     /**
      * Layout declarativo. La única fuente de verdad para rendering + estilos.
@@ -109,7 +114,7 @@ class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents,
 
     public function title(): string
     {
-        return 'Resumen ' . $this->book->summary->periodSlug();
+        return 'Resumen '.$this->book->summary->periodSlug();
     }
 
     public function columnWidths(): array
@@ -132,12 +137,12 @@ class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents,
                     $excelRow = $index + 1; // Excel es 1-indexed
 
                     match ($row['type']) {
-                        self::ROW_TITLE          => $this->styleTitle($sheet, $excelRow),
+                        self::ROW_TITLE => $this->styleTitle($sheet, $excelRow),
                         self::ROW_SECTION_HEADER => $this->styleSectionHeader($sheet, $excelRow),
-                        self::ROW_MONEY          => $this->styleMoney($sheet, $excelRow),
-                        self::ROW_HIGHLIGHT      => $this->styleHighlight($sheet, $excelRow),
+                        self::ROW_MONEY => $this->styleMoney($sheet, $excelRow),
+                        self::ROW_HIGHLIGHT => $this->styleHighlight($sheet, $excelRow),
                         self::ROW_KEY_VALUE,
-                        self::ROW_SPACER         => null, // estilo base sin modificaciones
+                        self::ROW_SPACER => null, // estilo base sin modificaciones
                     };
                 }
 
@@ -168,17 +173,17 @@ class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents,
         $sheet->mergeCells("A{$row}:B{$row}");
         $sheet->getStyle("A{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
-                'size'  => 14,
+                'bold' => true,
+                'size' => 14,
                 'color' => ['rgb' => 'FFFFFFFF'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FF1A1A1A'],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical'   => Alignment::VERTICAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
             ],
         ]);
         $sheet->getRowDimension($row)->setRowHeight(28);
@@ -189,17 +194,17 @@ class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents,
         $sheet->mergeCells("A{$row}:B{$row}");
         $sheet->getStyle("A{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
+                'bold' => true,
                 'color' => ['rgb' => 'FFFFFFFF'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FF424242'],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_LEFT,
-                'vertical'   => Alignment::VERTICAL_CENTER,
-                'indent'     => 1,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'indent' => 1,
             ],
         ]);
     }
@@ -220,11 +225,11 @@ class PurchaseBookSummarySheet implements FromCollection, WithTitle, WithEvents,
 
         $sheet->getStyle("A{$row}:B{$row}")->applyFromArray([
             'font' => [
-                'bold'  => true,
+                'bold' => true,
                 'color' => ['rgb' => 'FF1B5E20'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FFE8F5E9'],
             ],
         ]);

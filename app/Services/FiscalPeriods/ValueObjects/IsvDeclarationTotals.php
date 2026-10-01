@@ -70,14 +70,14 @@ final class IsvDeclarationTotals
     /**
      * Canonical constructor — deriva totales y cuadratura SAR desde inputs brutos.
      *
-     * @param  float  $ventasGravadas          Sección A1 — ventas con ISV.
-     * @param  float  $ventasExentas           Sección A2 — ventas exentas/exportación.
-     * @param  float  $comprasGravadas         Sección B1 — compras con ISV.
-     * @param  float  $comprasExentas          Sección B2 — compras exentas.
-     * @param  float  $isvDebitoFiscal         Sección C — ISV cobrado en ventas.
-     * @param  float  $isvCreditoFiscal        Sección C — ISV pagado en compras.
-     * @param  float  $isvRetencionesRecibidas Sección D — retenciones del período (>= 0).
-     * @param  float  $saldoAFavorAnterior     Sección E arrastrada del mes previo (>= 0).
+     * @param  float  $ventasGravadas  Sección A1 — ventas con ISV.
+     * @param  float  $ventasExentas  Sección A2 — ventas exentas/exportación.
+     * @param  float  $comprasGravadas  Sección B1 — compras con ISV.
+     * @param  float  $comprasExentas  Sección B2 — compras exentas.
+     * @param  float  $isvDebitoFiscal  Sección C — ISV cobrado en ventas.
+     * @param  float  $isvCreditoFiscal  Sección C — ISV pagado en compras.
+     * @param  float  $isvRetencionesRecibidas  Sección D — retenciones del período (>= 0).
+     * @param  float  $saldoAFavorAnterior  Sección E arrastrada del mes previo (>= 0).
      *
      * @throws DomainException Si retenciones o saldo anterior son negativos.
      */
@@ -94,18 +94,18 @@ final class IsvDeclarationTotals
         if ($isvRetencionesRecibidas < 0) {
             throw new DomainException(
                 "isv_retenciones_recibidas no puede ser negativo (recibido: {$isvRetencionesRecibidas}). "
-                . 'Las retenciones son un crédito acumulado del período.'
+                .'Las retenciones son un crédito acumulado del período.'
             );
         }
 
         if ($saldoAFavorAnterior < 0) {
             throw new DomainException(
                 "saldo_a_favor_anterior no puede ser negativo (recibido: {$saldoAFavorAnterior}). "
-                . 'Si el mes previo resultó en ISV a pagar, el saldo arrastrado es 0.'
+                .'Si el mes previo resultó en ISV a pagar, el saldo arrastrado es 0.'
             );
         }
 
-        $ventasTotales  = round($ventasGravadas  + $ventasExentas,  2);
+        $ventasTotales = round($ventasGravadas + $ventasExentas, 2);
         $comprasTotales = round($comprasGravadas + $comprasExentas, 2);
 
         // Regla SAR Formulario 201 — Sección E final:
@@ -119,22 +119,22 @@ final class IsvDeclarationTotals
             2
         );
 
-        $isvAPagar            = $neto > 0 ? $neto      : 0.0;
+        $isvAPagar = $neto > 0 ? $neto : 0.0;
         $saldoAFavorSiguiente = $neto < 0 ? abs($neto) : 0.0;
 
         return new self(
-            ventasGravadas:          round($ventasGravadas,          2),
-            ventasExentas:           round($ventasExentas,           2),
-            ventasTotales:           $ventasTotales,
-            comprasGravadas:         round($comprasGravadas,         2),
-            comprasExentas:          round($comprasExentas,          2),
-            comprasTotales:          $comprasTotales,
-            isvDebitoFiscal:         round($isvDebitoFiscal,         2),
-            isvCreditoFiscal:        round($isvCreditoFiscal,        2),
+            ventasGravadas: round($ventasGravadas, 2),
+            ventasExentas: round($ventasExentas, 2),
+            ventasTotales: $ventasTotales,
+            comprasGravadas: round($comprasGravadas, 2),
+            comprasExentas: round($comprasExentas, 2),
+            comprasTotales: $comprasTotales,
+            isvDebitoFiscal: round($isvDebitoFiscal, 2),
+            isvCreditoFiscal: round($isvCreditoFiscal, 2),
             isvRetencionesRecibidas: round($isvRetencionesRecibidas, 2),
-            saldoAFavorAnterior:     round($saldoAFavorAnterior,     2),
-            isvAPagar:               $isvAPagar,
-            saldoAFavorSiguiente:    $saldoAFavorSiguiente,
+            saldoAFavorAnterior: round($saldoAFavorAnterior, 2),
+            isvAPagar: $isvAPagar,
+            saldoAFavorSiguiente: $saldoAFavorSiguiente,
         );
     }
 
@@ -147,18 +147,18 @@ final class IsvDeclarationTotals
     public function toArray(): array
     {
         return [
-            'ventas_gravadas'           => $this->ventasGravadas,
-            'ventas_exentas'            => $this->ventasExentas,
-            'ventas_totales'            => $this->ventasTotales,
-            'compras_gravadas'          => $this->comprasGravadas,
-            'compras_exentas'           => $this->comprasExentas,
-            'compras_totales'           => $this->comprasTotales,
-            'isv_debito_fiscal'         => $this->isvDebitoFiscal,
-            'isv_credito_fiscal'        => $this->isvCreditoFiscal,
+            'ventas_gravadas' => $this->ventasGravadas,
+            'ventas_exentas' => $this->ventasExentas,
+            'ventas_totales' => $this->ventasTotales,
+            'compras_gravadas' => $this->comprasGravadas,
+            'compras_exentas' => $this->comprasExentas,
+            'compras_totales' => $this->comprasTotales,
+            'isv_debito_fiscal' => $this->isvDebitoFiscal,
+            'isv_credito_fiscal' => $this->isvCreditoFiscal,
             'isv_retenciones_recibidas' => $this->isvRetencionesRecibidas,
-            'saldo_a_favor_anterior'    => $this->saldoAFavorAnterior,
-            'isv_a_pagar'               => $this->isvAPagar,
-            'saldo_a_favor_siguiente'   => $this->saldoAFavorSiguiente,
+            'saldo_a_favor_anterior' => $this->saldoAFavorAnterior,
+            'isv_a_pagar' => $this->isvAPagar,
+            'saldo_a_favor_siguiente' => $this->saldoAFavorSiguiente,
         ];
     }
 

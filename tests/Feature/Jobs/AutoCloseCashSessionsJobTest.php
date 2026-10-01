@@ -79,13 +79,14 @@ class AutoCloseCashSessionsJobTest extends TestCase
 
     private function runJob(): void
     {
-        (new AutoCloseCashSessionsJob())->handle($this->cashSessions);
+        (new AutoCloseCashSessionsJob)->handle($this->cashSessions);
     }
 
     private function makeAdmin(bool $active = true): User
     {
         $admin = User::factory()->create(['is_active' => $active]);
         $admin->assignRole('admin');
+
         return $admin;
     }
 
@@ -159,9 +160,9 @@ class AutoCloseCashSessionsJobTest extends TestCase
 
         $this->runJob();
 
-        Notification::assertSentTo($cajero,     CashSessionAutoClosedNotification::class);
-        Notification::assertSentTo($admin1,     CashSessionAutoClosedNotification::class);
-        Notification::assertSentTo($admin2,     CashSessionAutoClosedNotification::class);
+        Notification::assertSentTo($cajero, CashSessionAutoClosedNotification::class);
+        Notification::assertSentTo($admin1, CashSessionAutoClosedNotification::class);
+        Notification::assertSentTo($admin2, CashSessionAutoClosedNotification::class);
         Notification::assertSentTo($superAdmin, CashSessionAutoClosedNotification::class);
     }
 
@@ -174,7 +175,7 @@ class AutoCloseCashSessionsJobTest extends TestCase
         $cajero = User::factory()->create();
         $this->cashSessions->open($this->matriz->id, $cajero, 1000.00);
 
-        $adminActivo   = $this->makeAdmin(active: true);
+        $adminActivo = $this->makeAdmin(active: true);
         $adminInactivo = $this->makeAdmin(active: false);
 
         $this->runJob();

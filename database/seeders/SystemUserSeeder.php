@@ -37,14 +37,14 @@ class SystemUserSeeder extends Seeder
         User::firstOrCreate(
             ['email' => User::SYSTEM_EMAIL],
             [
-                'name'              => 'Sistema Diproma',
+                'name' => 'Sistema Diproma',
                 // Random 64 chars — el cast 'hashed' de User lo procesa al guardar.
                 // Nadie tiene este password ni puede recuperarlo (no hay ruta de
                 // password reset para este email — está oculto en todos los listados).
-                'password'          => Str::random(64),
-                'is_active'         => false,
-                'phone'             => null,
-                'avatar_url'        => null,
+                'password' => Str::random(64),
+                'is_active' => false,
+                'phone' => null,
+                'avatar_url' => null,
                 'email_verified_at' => null,
             ],
         );

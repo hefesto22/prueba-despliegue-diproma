@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\CaiRanges\Pages;
 
 use App\Filament\Resources\CaiRanges\CaiRangeResource;
-use App\Models\CaiRange;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateCaiRange extends CreateRecord

@@ -57,6 +57,7 @@ class RepairPhoto extends Model
         if (empty($this->photo_path)) {
             return null;
         }
+
         return Storage::disk('public')->url($this->photo_path);
     }
 

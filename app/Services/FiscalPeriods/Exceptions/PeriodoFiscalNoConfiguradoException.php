@@ -17,8 +17,8 @@ class PeriodoFiscalNoConfiguradoException extends FiscalPeriodException
     {
         parent::__construct(
             'No se puede operar con períodos fiscales: la empresa no ha configurado '
-            . 'la fecha de inicio del tracking fiscal. Vaya a Configuración de Empresa '
-            . 'y defina el campo "Inicio de período fiscal" antes de continuar.'
+            .'la fecha de inicio del tracking fiscal. Vaya a Configuración de Empresa '
+            .'y defina el campo "Inicio de período fiscal" antes de continuar.'
         );
     }
 }

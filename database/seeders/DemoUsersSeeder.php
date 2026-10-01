@@ -73,16 +73,20 @@ class DemoUsersSeeder extends Seeder
     private const DEMO_PASSWORD = '12345678';
 
     private const ANTOMY_EMAIL = 'antomy@gmail.com';
-    private const ANTOMY_NAME  = 'Antomy';
+
+    private const ANTOMY_NAME = 'Antomy';
 
     private const CAJERO_EMAIL = 'cajero@gmail.com';
-    private const CAJERO_NAME  = 'Cajero Demo';
+
+    private const CAJERO_NAME = 'Cajero Demo';
 
     private const CONTADOR_EMAIL = 'contador@gmail.com';
-    private const CONTADOR_NAME  = 'Contador Demo';
+
+    private const CONTADOR_NAME = 'Contador Demo';
 
     private const TECNICO_EMAIL = 'tecnico@gmail.com';
-    private const TECNICO_NAME  = 'Técnico Demo';
+
+    private const TECNICO_NAME = 'Técnico Demo';
 
     public function run(): void
     {
@@ -100,8 +104,8 @@ class DemoUsersSeeder extends Seeder
 
         if ($mauricio === null) {
             $this->command?->error(
-                'No se encontró el super_admin (' . RolesAndSuperAdminSeeder::SUPER_ADMIN_EMAIL . '). '
-                . 'Asegurate que RolesAndSuperAdminSeeder corrió correctamente.'
+                'No se encontró el super_admin ('.RolesAndSuperAdminSeeder::SUPER_ADMIN_EMAIL.'). '
+                .'Asegurate que RolesAndSuperAdminSeeder corrió correctamente.'
             );
 
             return;
@@ -112,9 +116,9 @@ class DemoUsersSeeder extends Seeder
         DB::transaction(function () use ($mauricio): void {
             // 3.1. Antomy = admin. Su `created_by` es Mauricio (super_admin).
             $antomy = $this->upsertDemoUser(
-                email:     self::ANTOMY_EMAIL,
-                name:      self::ANTOMY_NAME,
-                role:      RolesAndSuperAdminSeeder::ROLE_ADMIN,
+                email: self::ANTOMY_EMAIL,
+                name: self::ANTOMY_NAME,
+                role: RolesAndSuperAdminSeeder::ROLE_ADMIN,
                 createdBy: $mauricio->id,
             );
 
@@ -122,34 +126,34 @@ class DemoUsersSeeder extends Seeder
             //      Reproduce el flujo real: el admin operativo onboardea al
             //      personal, no el dueño del sistema.
             $this->upsertDemoUser(
-                email:     self::CAJERO_EMAIL,
-                name:      self::CAJERO_NAME,
-                role:      RolesAndSuperAdminSeeder::ROLE_CAJERO,
+                email: self::CAJERO_EMAIL,
+                name: self::CAJERO_NAME,
+                role: RolesAndSuperAdminSeeder::ROLE_CAJERO,
                 createdBy: $antomy->id,
             );
 
             $this->upsertDemoUser(
-                email:     self::CONTADOR_EMAIL,
-                name:      self::CONTADOR_NAME,
-                role:      RolesAndSuperAdminSeeder::ROLE_CONTADOR,
+                email: self::CONTADOR_EMAIL,
+                name: self::CONTADOR_NAME,
+                role: RolesAndSuperAdminSeeder::ROLE_CONTADOR,
                 createdBy: $antomy->id,
             );
 
             $this->upsertDemoUser(
-                email:     self::TECNICO_EMAIL,
-                name:      self::TECNICO_NAME,
-                role:      RolesAndSuperAdminSeeder::ROLE_TECNICO,
+                email: self::TECNICO_EMAIL,
+                name: self::TECNICO_NAME,
+                role: RolesAndSuperAdminSeeder::ROLE_TECNICO,
                 createdBy: $antomy->id,
             );
         });
 
         $this->command?->info(
             'Demo users listos: '
-            . self::ANTOMY_EMAIL . ' (admin), '
-            . self::CAJERO_EMAIL . ' (cajero), '
-            . self::CONTADOR_EMAIL . ' (contador), '
-            . self::TECNICO_EMAIL . ' (técnico). '
-            . 'Password de todos: ' . self::DEMO_PASSWORD
+            .self::ANTOMY_EMAIL.' (admin), '
+            .self::CAJERO_EMAIL.' (cajero), '
+            .self::CONTADOR_EMAIL.' (contador), '
+            .self::TECNICO_EMAIL.' (técnico). '
+            .'Password de todos: '.self::DEMO_PASSWORD
         );
     }
 
@@ -169,9 +173,9 @@ class DemoUsersSeeder extends Seeder
         $user = User::firstOrCreate(
             ['email' => $email],
             [
-                'name'       => $name,
-                'password'   => self::DEMO_PASSWORD,
-                'is_active'  => true,
+                'name' => $name,
+                'password' => self::DEMO_PASSWORD,
+                'is_active' => true,
                 'created_by' => $createdBy,
             ],
         );

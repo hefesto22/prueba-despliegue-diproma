@@ -29,17 +29,17 @@ class IsvRetentionReceivedFactory extends Factory
             'establishment_id' => fn () => Establishment::main()->value('id')
                 ?? Establishment::factory()->main()->create()->id,
 
-            'period_year'      => $now->year,
-            'period_month'     => $now->month,
-            'retention_type'   => IsvRetentionType::TarjetasCreditoDebito,
+            'period_year' => $now->year,
+            'period_month' => $now->month,
+            'retention_type' => IsvRetentionType::TarjetasCreditoDebito,
 
-            'agent_rtn'        => $this->faker->numerify('##############'),
-            'agent_name'       => $this->faker->company(),
-            'document_number'  => $this->faker->optional(0.7)->bothify('CR-########'),
-            'document_path'    => null,
+            'agent_rtn' => $this->faker->numerify('##############'),
+            'agent_name' => $this->faker->company(),
+            'document_number' => $this->faker->optional(0.7)->bothify('CR-########'),
+            'document_path' => null,
 
-            'amount'           => $this->faker->randomFloat(2, 50, 5000),
-            'notes'            => $this->faker->optional(0.2)->sentence(),
+            'amount' => $this->faker->randomFloat(2, 50, 5000),
+            'notes' => $this->faker->optional(0.2)->sentence(),
         ];
     }
 
@@ -49,7 +49,7 @@ class IsvRetentionReceivedFactory extends Factory
     public function forPeriod(int $year, int $month): static
     {
         return $this->state(fn () => [
-            'period_year'  => $year,
+            'period_year' => $year,
             'period_month' => $month,
         ]);
     }

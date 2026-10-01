@@ -30,20 +30,20 @@ namespace App\Services\FiscalPeriods\Exceptions;
 class PeriodoFiscalNoReabiertoException extends FiscalPeriodException
 {
     /**
-     * @param  int  $periodYear   Año del período sobre el que se intentó redeclarar.
+     * @param  int  $periodYear  Año del período sobre el que se intentó redeclarar.
      * @param  int  $periodMonth  Mes del período sobre el que se intentó redeclarar.
      */
     public function __construct(
         public readonly int $periodYear,
         public readonly int $periodMonth,
     ) {
-        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT) . "/{$periodYear}";
+        $periodo = str_pad((string) $periodMonth, 2, '0', STR_PAD_LEFT)."/{$periodYear}";
 
         parent::__construct(
             "No se puede emitir una declaración rectificativa para el período {$periodo} "
-            . 'porque nunca fue reabierto. Para rectificar una declaración previa, primero '
-            . 'reabra el período fiscal documentando la razón (FiscalPeriodService::reopen) '
-            . 'y luego invoque redeclare(). Si es la primera declaración del período, use declare().'
+            .'porque nunca fue reabierto. Para rectificar una declaración previa, primero '
+            .'reabra el período fiscal documentando la razón (FiscalPeriodService::reopen) '
+            .'y luego invoque redeclare(). Si es la primera declaración del período, use declare().'
         );
     }
 }

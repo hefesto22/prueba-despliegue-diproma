@@ -65,7 +65,7 @@ class PurchaseBookServiceTest extends TestCase
 
         $this->proveedor = Supplier::factory()->create([
             'name' => 'Proveedor Demo S.A.',
-            'rtn'  => '05011988654321',
+            'rtn' => '05011988654321',
         ]);
 
         $this->service = app(PurchaseBookService::class);
@@ -78,12 +78,12 @@ class PurchaseBookServiceTest extends TestCase
             ->fromSupplier($this->proveedor)
             ->withTotals(
                 taxable: $overrides['taxable_total'] ?? 1000.00,
-                exempt:  $overrides['exempt_total']  ?? 0.0,
+                exempt: $overrides['exempt_total'] ?? 0.0,
             )
             ->confirmada()
             ->create(array_merge([
-                'date'             => '2026-04-15',
-                'document_type'    => SupplierDocumentType::Factura,
+                'date' => '2026-04-15',
+                'document_type' => SupplierDocumentType::Factura,
                 'establishment_id' => $this->matriz->id,
             ], array_diff_key($overrides, array_flip(['taxable_total', 'exempt_total']))));
     }
@@ -164,11 +164,11 @@ class PurchaseBookServiceTest extends TestCase
             ->withTotals(500.00)
             ->confirmada()
             ->create([
-                'date'                    => '2026-04-18',
-                'document_type'           => SupplierDocumentType::ReciboInterno,
-                'supplier_cai'            => null,
+                'date' => '2026-04-18',
+                'document_type' => SupplierDocumentType::ReciboInterno,
+                'supplier_cai' => null,
                 'supplier_invoice_number' => 'RI-20260418-0001',
-                'establishment_id'        => $this->matriz->id,
+                'establishment_id' => $this->matriz->id,
             ]);
 
         $book = $this->service->build(2026, 4);
@@ -199,14 +199,14 @@ class PurchaseBookServiceTest extends TestCase
 
         // 1 nota de crédito (reduce crédito fiscal)
         $this->makePurchase([
-            'document_type'  => SupplierDocumentType::NotaCredito,
-            'taxable_total'  => 200,
+            'document_type' => SupplierDocumentType::NotaCredito,
+            'taxable_total' => 200,
         ]);
 
         // 1 nota de débito (incrementa crédito fiscal)
         $this->makePurchase([
-            'document_type'  => SupplierDocumentType::NotaDebito,
-            'taxable_total'  => 300,
+            'document_type' => SupplierDocumentType::NotaDebito,
+            'taxable_total' => 300,
         ]);
 
         $book = $this->service->build(2026, 4);
@@ -270,12 +270,12 @@ class PurchaseBookServiceTest extends TestCase
         $this->makePurchase([
             'document_type' => SupplierDocumentType::NotaDebito,
             'taxable_total' => 400,
-            'exempt_total'  => 50,
+            'exempt_total' => 50,
         ]);
         $this->makePurchase([
             'document_type' => SupplierDocumentType::NotaCredito,
             'taxable_total' => 300,
-            'exempt_total'  => 100,
+            'exempt_total' => 100,
         ]);
 
         $book = $this->service->build(2026, 4);
@@ -316,14 +316,14 @@ class PurchaseBookServiceTest extends TestCase
         // NC: 1 anulada
         $this->makePurchase([
             'document_type' => SupplierDocumentType::NotaCredito,
-            'status'        => PurchaseStatus::Anulada,
+            'status' => PurchaseStatus::Anulada,
         ]);
 
         // ND: 1 vigente + 1 anulada
         $this->makePurchase(['document_type' => SupplierDocumentType::NotaDebito]);
         $this->makePurchase([
             'document_type' => SupplierDocumentType::NotaDebito,
-            'status'        => PurchaseStatus::Anulada,
+            'status' => PurchaseStatus::Anulada,
         ]);
 
         $book = $this->service->build(2026, 4);
@@ -450,8 +450,8 @@ class PurchaseBookServiceTest extends TestCase
         $this->makePurchase(); // matriz (default)
         $this->makePurchase(['establishment_id' => $sucursal->id]);
 
-        $libroComp     = $this->service->build(2026, 4);
-        $libroMatriz   = $this->service->build(2026, 4, $this->matriz->id);
+        $libroComp = $this->service->build(2026, 4);
+        $libroMatriz = $this->service->build(2026, 4, $this->matriz->id);
         $libroSucursal = $this->service->build(2026, 4, $sucursal->id);
 
         // Sin filtro: ambas
@@ -485,31 +485,31 @@ class PurchaseBookServiceTest extends TestCase
         $this->makePurchase(['supplier_invoice_number' => 'MTZ-F-001']);
         $this->makePurchase(['supplier_invoice_number' => 'MTZ-F-002']);
         $this->makePurchase([
-            'document_type'           => SupplierDocumentType::NotaCredito,
+            'document_type' => SupplierDocumentType::NotaCredito,
             'supplier_invoice_number' => 'MTZ-NC-001',
         ]);
         $this->makePurchase([
-            'document_type'           => SupplierDocumentType::NotaDebito,
+            'document_type' => SupplierDocumentType::NotaDebito,
             'supplier_invoice_number' => 'MTZ-ND-001',
         ]);
 
         // Sucursal: 2 facturas + 1 NC + 1 ND
         $this->makePurchase([
-            'establishment_id'        => $sucursal->id,
+            'establishment_id' => $sucursal->id,
             'supplier_invoice_number' => 'SUC-F-001',
         ]);
         $this->makePurchase([
-            'establishment_id'        => $sucursal->id,
+            'establishment_id' => $sucursal->id,
             'supplier_invoice_number' => 'SUC-F-002',
         ]);
         $this->makePurchase([
-            'establishment_id'        => $sucursal->id,
-            'document_type'           => SupplierDocumentType::NotaCredito,
+            'establishment_id' => $sucursal->id,
+            'document_type' => SupplierDocumentType::NotaCredito,
             'supplier_invoice_number' => 'SUC-NC-001',
         ]);
         $this->makePurchase([
-            'establishment_id'        => $sucursal->id,
-            'document_type'           => SupplierDocumentType::NotaDebito,
+            'establishment_id' => $sucursal->id,
+            'document_type' => SupplierDocumentType::NotaDebito,
             'supplier_invoice_number' => 'SUC-ND-001',
         ]);
 

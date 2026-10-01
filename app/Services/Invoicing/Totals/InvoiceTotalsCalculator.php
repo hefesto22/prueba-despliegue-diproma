@@ -83,11 +83,11 @@ final class InvoiceTotalsCalculator
 
         if ($sale->items->isEmpty()) {
             return new InvoiceTotalsResult(
-                subtotal:     0.0,
+                subtotal: 0.0,
                 taxableTotal: 0.0,
-                exemptTotal:  0.0,
-                isv:          0.0,
-                total:        0.0,
+                exemptTotal: 0.0,
+                isv: 0.0,
+                total: 0.0,
             );
         }
 
@@ -99,9 +99,9 @@ final class InvoiceTotalsCalculator
         foreach ($sale->items as $item) {
             $taxLines[] = new TaxableLine(
                 unitPrice: (float) $item->unit_price,
-                quantity:  (int) $item->quantity,
-                taxType:   $item->tax_type,
-                identity:  $item->id,
+                quantity: (int) $item->quantity,
+                taxType: $item->tax_type,
+                identity: $item->id,
             );
         }
 
@@ -115,17 +115,17 @@ final class InvoiceTotalsCalculator
         //    El orden posicional de $breakdown->lines coincide con el de
         //    $sale->items (SaleTaxCalculator preserva orden).
         $taxable = 0.0;
-        $exempt  = 0.0;
-        $isv     = 0.0;
+        $exempt = 0.0;
+        $isv = 0.0;
 
         foreach ($sale->items as $i => $item) {
             $line = $breakdown->lines[$i];
 
             if ($item->tax_type === TaxType::Gravado15) {
                 $taxable += $line->subtotal;
-                $isv     += $line->isv;
+                $isv += $line->isv;
             } else {
-                $exempt  += $line->subtotal;
+                $exempt += $line->subtotal;
             }
         }
 
@@ -136,30 +136,30 @@ final class InvoiceTotalsCalculator
         //    de SaleTaxCalculator). NO sumamos exempt aparte como hacía la
         //    versión buggy — eso double-counteaba.
         $discount = (float) ($sale->discount_amount ?? 0);
-        $gross    = (float) $sale->total + $discount;
-        $ratio    = ($gross > 0 && $discount > 0) ? $discount / $gross : 0.0;
+        $gross = (float) $sale->total + $discount;
+        $ratio = ($gross > 0 && $discount > 0) ? $discount / $gross : 0.0;
 
         if ($ratio > 0) {
             $taxable = round($taxable * (1 - $ratio), 2);
-            $exempt  = round($exempt  * (1 - $ratio), 2);
-            $isv     = round($isv     * (1 - $ratio), 2);
+            $exempt = round($exempt * (1 - $ratio), 2);
+            $isv = round($isv * (1 - $ratio), 2);
         } else {
             // Normalización defensiva contra drift del accumulator
             // (suma de lineBases ya redondeados puede terminar en 0.00000001).
             $taxable = round($taxable, 2);
-            $exempt  = round($exempt, 2);
-            $isv     = round($isv, 2);
+            $exempt = round($exempt, 2);
+            $isv = round($isv, 2);
         }
 
         $subtotal = round($taxable + $exempt, 2);
-        $total    = round($subtotal + $isv, 2);
+        $total = round($subtotal + $isv, 2);
 
         return new InvoiceTotalsResult(
-            subtotal:     $subtotal,
+            subtotal: $subtotal,
             taxableTotal: $taxable,
-            exemptTotal:  $exempt,
-            isv:          $isv,
-            total:        $total,
+            exemptTotal: $exempt,
+            isv: $isv,
+            total: $total,
         );
     }
 }

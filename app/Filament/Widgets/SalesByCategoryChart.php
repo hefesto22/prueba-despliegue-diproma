@@ -17,7 +17,7 @@ class SalesByCategoryChart extends ChartWidget
 
     protected ?string $description = 'Distribución del mes actual';
 
-    protected int | string | array $columnSpan = [
+    protected int|string|array $columnSpan = [
         'default' => 'full',
         'xl' => 1,
     ];

@@ -23,7 +23,7 @@ use Filament\Support\Contracts\HasLabel;
  * - ajuste_entrada: corrección positiva (conteo físico, devolución)
  * - ajuste_salida: corrección negativa (merma, daño, robo)
  */
-enum MovementType: string implements HasLabel, HasColor, HasIcon
+enum MovementType: string implements HasColor, HasIcon, HasLabel
 {
     // Compras
     case EntradaCompra = 'entrada_compra';

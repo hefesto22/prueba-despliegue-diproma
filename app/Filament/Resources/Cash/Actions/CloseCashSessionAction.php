@@ -46,8 +46,8 @@ final class CloseCashSessionAction
 {
     /**
      * @param  Closure(): ?CashSession  $sessionResolver  Retorna la sesión a cerrar o null si no aplica.
-     * @param  CashBalanceCalculator    $balanceCalculator  Calculador de efectivo esperado (inyectado desde la Page).
-     * @param  CashSessionService       $cashSessions       Servicio de caja (inyectado desde la Page).
+     * @param  CashBalanceCalculator  $balanceCalculator  Calculador de efectivo esperado (inyectado desde la Page).
+     * @param  CashSessionService  $cashSessions  Servicio de caja (inyectado desde la Page).
      *
      * Los servicios se inyectan explícitamente desde la Page (que tiene DI via
      * boot()) en vez de resolverse con app() dentro de buildSchema/handle —
@@ -108,7 +108,7 @@ final class CloseCashSessionAction
                 ->label('Efectivo esperado en caja')
                 ->content(new HtmlString(sprintf(
                     '<div class="text-lg font-bold text-gray-900 dark:text-white">L. %s</div>'
-                    . '<div class="text-xs text-gray-500">Monto inicial + ingresos efectivo − egresos efectivo</div>',
+                    .'<div class="text-xs text-gray-500">Monto inicial + ingresos efectivo − egresos efectivo</div>',
                     number_format($expected, 2),
                 ))),
 
@@ -179,11 +179,11 @@ final class CloseCashSessionAction
 
         try {
             $closed = $cashSessions->close(
-                session:             $session,
-                closedBy:            auth()->user(),
+                session: $session,
+                closedBy: auth()->user(),
                 actualClosingAmount: (float) $data['actual_amount'],
-                notes:               $data['notes'] ?? null,
-                authorizedBy:        $authorizedBy,
+                notes: $data['notes'] ?? null,
+                authorizedBy: $authorizedBy,
             );
 
             $discrepancy = (float) $closed->discrepancy;
@@ -247,7 +247,7 @@ final class CloseCashSessionAction
         if ($discrepancy === 0.0) {
             return new HtmlString(
                 '<div class="text-lg font-bold text-success-600 dark:text-success-400">'
-                . 'L. 0.00 · Caja cuadrada exactamente</div>'
+                .'L. 0.00 · Caja cuadrada exactamente</div>'
             );
         }
 
@@ -258,8 +258,8 @@ final class CloseCashSessionAction
         $toleranceMsg = $exceedsTolerance
             ? sprintf(
                 '<div class="text-xs text-danger-600 mt-1">'
-                . 'Supera la tolerancia de L. %s — se requiere autorización de un administrador.'
-                . '</div>',
+                .'Supera la tolerancia de L. %s — se requiere autorización de un administrador.'
+                .'</div>',
                 number_format($tolerance, 2),
             )
             : '';
@@ -292,7 +292,7 @@ final class CloseCashSessionAction
      * porque auto-autorizarse un descuadre no tiene sentido de auditoría
      * (quien cuenta no firma su propio descuadre).
      *
-     * @return array<int, string>  Map [user_id => "Nombre"]
+     * @return array<int, string> Map [user_id => "Nombre"]
      */
     private static function authorizerOptions(): array
     {

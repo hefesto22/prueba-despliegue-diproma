@@ -90,10 +90,10 @@ class IsvRetentionReceivedResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListIsvRetentionsReceived::route('/'),
+            'index' => ListIsvRetentionsReceived::route('/'),
             'create' => CreateIsvRetentionReceived::route('/create'),
-            'view'   => ViewIsvRetentionReceived::route('/{record}'),
-            'edit'   => EditIsvRetentionReceived::route('/{record}/edit'),
+            'view' => ViewIsvRetentionReceived::route('/{record}'),
+            'edit' => EditIsvRetentionReceived::route('/{record}/edit'),
         ];
     }
 }

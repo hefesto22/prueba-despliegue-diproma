@@ -39,11 +39,11 @@ namespace App\Services\FiscalPeriods\Exceptions;
 class VentanaAnulacionVencidaException extends FiscalPeriodException
 {
     /**
-     * @param  string  $documentLabel   Etiqueta human-readable del documento. Ejemplo:
-     *                                  "la factura 000-001-01-00000123".
-     * @param  string  $cutoffDate      Fecha de corte en formato d/m/Y. Ejemplo: "10/07/2026".
-     * @param  string  $invoicePeriod   Período fiscal del documento en formato m/Y.
-     *                                  Ejemplo: "06/2026".
+     * @param  string  $documentLabel  Etiqueta human-readable del documento. Ejemplo:
+     *                                 "la factura 000-001-01-00000123".
+     * @param  string  $cutoffDate  Fecha de corte en formato d/m/Y. Ejemplo: "10/07/2026".
+     * @param  string  $invoicePeriod  Período fiscal del documento en formato m/Y.
+     *                                 Ejemplo: "06/2026".
      */
     public function __construct(
         public readonly string $documentLabel,
@@ -52,10 +52,10 @@ class VentanaAnulacionVencidaException extends FiscalPeriodException
     ) {
         parent::__construct(
             "No se puede anular {$documentLabel}: las anulaciones del período "
-            . "fiscal {$invoicePeriod} cerraron el {$cutoffDate}. "
-            . 'Política operativa Diproma: las anulaciones se aceptan hasta el día 9 '
-            . 'del mes siguiente al de la factura, para que el contador prepare la '
-            . 'declaración mensual al SAR sin cambios de último momento.'
+            ."fiscal {$invoicePeriod} cerraron el {$cutoffDate}. "
+            .'Política operativa Diproma: las anulaciones se aceptan hasta el día 9 '
+            .'del mes siguiente al de la factura, para que el contador prepare la '
+            .'declaración mensual al SAR sin cambios de último momento.'
         );
     }
 }

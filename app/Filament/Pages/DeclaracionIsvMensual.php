@@ -167,7 +167,7 @@ class DeclaracionIsvMensual extends Page implements HasForms
         $now = CarbonImmutable::now();
 
         $this->form->fill([
-            'period_year'  => $now->year,
+            'period_year' => $now->year,
             'period_month' => $now->month,
         ]);
     }
@@ -191,15 +191,15 @@ class DeclaracionIsvMensual extends Page implements HasForms
                             Select::make('period_month')
                                 ->label('Mes')
                                 ->options([
-                                    1  => 'Enero',
-                                    2  => 'Febrero',
-                                    3  => 'Marzo',
-                                    4  => 'Abril',
-                                    5  => 'Mayo',
-                                    6  => 'Junio',
-                                    7  => 'Julio',
-                                    8  => 'Agosto',
-                                    9  => 'Septiembre',
+                                    1 => 'Enero',
+                                    2 => 'Febrero',
+                                    3 => 'Marzo',
+                                    4 => 'Abril',
+                                    5 => 'Mayo',
+                                    6 => 'Junio',
+                                    7 => 'Julio',
+                                    8 => 'Agosto',
+                                    9 => 'Septiembre',
                                     10 => 'Octubre',
                                     11 => 'Noviembre',
                                     12 => 'Diciembre',
@@ -372,11 +372,11 @@ class DeclaracionIsvMensual extends Page implements HasForms
             ->get();
 
         $this->loadedFiscalPeriodId = $period->id;
-        $this->loadedYear           = $period->period_year;
-        $this->loadedMonth          = $period->period_month;
-        $this->periodStatus         = $this->resolvePeriodStatus($period);
-        $this->computedTotals       = $totals;
-        $this->activeSnapshot       = $active !== null ? $this->snapshotToArray($active) : null;
+        $this->loadedYear = $period->period_year;
+        $this->loadedMonth = $period->period_month;
+        $this->periodStatus = $this->resolvePeriodStatus($period);
+        $this->computedTotals = $totals;
+        $this->activeSnapshot = $active !== null ? $this->snapshotToArray($active) : null;
         $this->rectificativasHistory = $history
             ->map(fn (IsvMonthlyDeclaration $s) => $this->snapshotToArray($s))
             ->all();
@@ -384,10 +384,10 @@ class DeclaracionIsvMensual extends Page implements HasForms
         Notification::make()
             ->title("Período cargado: {$period->period_label}")
             ->body(match ($this->periodStatus) {
-                'open'     => 'Abierto — puede declarar cuando el mes haya vencido.',
+                'open' => 'Abierto — puede declarar cuando el mes haya vencido.',
                 'declared' => 'Declarado al SAR — puede reabrir para rectificativa.',
                 'reopened' => 'Reabierto — pendiente de presentar rectificativa.',
-                default    => '',
+                default => '',
             })
             ->success()
             ->send();
@@ -582,7 +582,7 @@ class DeclaracionIsvMensual extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $year  = (int) ($data['period_year'] ?? 0);
+        $year = (int) ($data['period_year'] ?? 0);
         $month = (int) ($data['period_month'] ?? 0);
 
         if ($year < 2000 || $month < 1 || $month > 12) {
@@ -608,8 +608,8 @@ class DeclaracionIsvMensual extends Page implements HasForms
             return null;
         }
 
-        $selected   = CarbonImmutable::create($year, $month, 1);
-        $now        = CarbonImmutable::now()->startOfMonth();
+        $selected = CarbonImmutable::create($year, $month, 1);
+        $now = CarbonImmutable::now()->startOfMonth();
         $startMonth = CarbonImmutable::instance($start)->startOfMonth();
 
         if ($selected->greaterThan($now)) {
@@ -627,7 +627,7 @@ class DeclaracionIsvMensual extends Page implements HasForms
                 ->title('Período fuera de rango')
                 ->body(
                     "El período seleccionado es anterior al inicio del tracking fiscal ({$startMonth->format('m/Y')}). "
-                    . 'Las declaraciones previas no viven en este sistema.'
+                    .'Las declaraciones previas no viven en este sistema.'
                 )
                 ->warning()
                 ->send();
@@ -649,7 +649,7 @@ class DeclaracionIsvMensual extends Page implements HasForms
     private function assertPeriodIsDeclarable(FiscalPeriod $period): bool
     {
         $selected = CarbonImmutable::create($period->period_year, $period->period_month, 1);
-        $now      = CarbonImmutable::now()->startOfMonth();
+        $now = CarbonImmutable::now()->startOfMonth();
 
         if ($selected->greaterThanOrEqualTo($now)) {
             Notification::make()
@@ -711,8 +711,8 @@ class DeclaracionIsvMensual extends Page implements HasForms
             ->orderByDesc('declared_at')
             ->get();
 
-        $this->periodStatus         = $this->resolvePeriodStatus($period);
-        $this->activeSnapshot       = $active !== null ? $this->snapshotToArray($active) : null;
+        $this->periodStatus = $this->resolvePeriodStatus($period);
+        $this->activeSnapshot = $active !== null ? $this->snapshotToArray($active) : null;
         $this->rectificativasHistory = $history
             ->map(fn (IsvMonthlyDeclaration $s) => $this->snapshotToArray($s))
             ->all();
@@ -720,12 +720,12 @@ class DeclaracionIsvMensual extends Page implements HasForms
 
     private function resetLoadedState(): void
     {
-        $this->loadedFiscalPeriodId  = null;
-        $this->loadedYear            = null;
-        $this->loadedMonth           = null;
-        $this->periodStatus          = null;
-        $this->computedTotals        = null;
-        $this->activeSnapshot        = null;
+        $this->loadedFiscalPeriodId = null;
+        $this->loadedYear = null;
+        $this->loadedMonth = null;
+        $this->periodStatus = null;
+        $this->computedTotals = null;
+        $this->activeSnapshot = null;
         $this->rectificativasHistory = [];
     }
 
@@ -752,27 +752,27 @@ class DeclaracionIsvMensual extends Page implements HasForms
     private function snapshotToArray(IsvMonthlyDeclaration $s): array
     {
         return [
-            'id'                        => $s->id,
-            'declared_at'               => $s->declared_at?->format('d/m/Y H:i'),
-            'declared_by_name'          => $s->declaredByUser?->name,
-            'siisar_acuse_number'       => $s->siisar_acuse_number,
-            'superseded_at'             => $s->superseded_at?->format('d/m/Y H:i'),
-            'superseded_by_name'        => $s->supersededByUser?->name,
-            'notes'                     => $s->notes,
+            'id' => $s->id,
+            'declared_at' => $s->declared_at?->format('d/m/Y H:i'),
+            'declared_by_name' => $s->declaredByUser?->name,
+            'siisar_acuse_number' => $s->siisar_acuse_number,
+            'superseded_at' => $s->superseded_at?->format('d/m/Y H:i'),
+            'superseded_by_name' => $s->supersededByUser?->name,
+            'notes' => $s->notes,
 
             // Totales SAR
-            'ventas_gravadas'           => (float) $s->ventas_gravadas,
-            'ventas_exentas'            => (float) $s->ventas_exentas,
-            'ventas_totales'            => (float) $s->ventas_totales,
-            'compras_gravadas'          => (float) $s->compras_gravadas,
-            'compras_exentas'           => (float) $s->compras_exentas,
-            'compras_totales'           => (float) $s->compras_totales,
-            'isv_debito_fiscal'         => (float) $s->isv_debito_fiscal,
-            'isv_credito_fiscal'        => (float) $s->isv_credito_fiscal,
+            'ventas_gravadas' => (float) $s->ventas_gravadas,
+            'ventas_exentas' => (float) $s->ventas_exentas,
+            'ventas_totales' => (float) $s->ventas_totales,
+            'compras_gravadas' => (float) $s->compras_gravadas,
+            'compras_exentas' => (float) $s->compras_exentas,
+            'compras_totales' => (float) $s->compras_totales,
+            'isv_debito_fiscal' => (float) $s->isv_debito_fiscal,
+            'isv_credito_fiscal' => (float) $s->isv_credito_fiscal,
             'isv_retenciones_recibidas' => (float) $s->isv_retenciones_recibidas,
-            'saldo_a_favor_anterior'    => (float) $s->saldo_a_favor_anterior,
-            'isv_a_pagar'               => (float) $s->isv_a_pagar,
-            'saldo_a_favor_siguiente'   => (float) $s->saldo_a_favor_siguiente,
+            'saldo_a_favor_anterior' => (float) $s->saldo_a_favor_anterior,
+            'isv_a_pagar' => (float) $s->isv_a_pagar,
+            'saldo_a_favor_siguiente' => (float) $s->saldo_a_favor_siguiente,
         ];
     }
 

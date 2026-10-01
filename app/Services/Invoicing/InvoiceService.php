@@ -20,11 +20,11 @@ class InvoiceService
     /**
      * Generar factura fiscal a partir de una venta completada.
      *
-     * @param  Sale          $sale             Venta ya procesada.
-     * @param  bool          $withoutCai       True para factura sin CAI (referencia interna).
-     * @param  int|null      $establishmentId  Establecimiento emisor. En modo centralizado es opcional
-     *                                         (cae a matriz). En modo por_sucursal es obligatorio.
-     * @param  DocumentType  $documentType     Tipo SAR; por defecto DocumentType::Factura ('01').
+     * @param  Sale  $sale  Venta ya procesada.
+     * @param  bool  $withoutCai  True para factura sin CAI (referencia interna).
+     * @param  int|null  $establishmentId  Establecimiento emisor. En modo centralizado es opcional
+     *                                     (cae a matriz). En modo por_sucursal es obligatorio.
+     * @param  DocumentType  $documentType  Tipo SAR; por defecto DocumentType::Factura ('01').
      */
     public function generateFromSale(
         Sale $sale,
@@ -46,7 +46,7 @@ class InvoiceService
 
             if ($withoutCai) {
                 // Factura sin CAI: referencia interna basada en el número de venta
-                $invoiceNumber = 'SC-' . $sale->sale_number;
+                $invoiceNumber = 'SC-'.$sale->sale_number;
 
                 // Para reportes, intentamos al menos registrar el establishment
                 if (! $resolvedEstablishmentId) {
@@ -141,6 +141,7 @@ class InvoiceService
      *             Este método llama directamente a Invoice::void() sin
      *             restaurar stock ni validar el período fiscal. Solo se
      *             mantiene por compatibilidad con tests existentes.
+     *
      * @internal  No llamar desde UI ni controladores — siempre pasar por
      *            FiscalPeriodService::assertCanVoidInvoice() +
      *            SaleService::cancel().
@@ -165,13 +166,13 @@ class InvoiceService
     private function calculateIntegrityHash(Invoice $invoice): string
     {
         return hash('sha256', json_encode([
-            'id'             => $invoice->id,
+            'id' => $invoice->id,
             'invoice_number' => $invoice->invoice_number,
-            'cai'            => $invoice->cai,
-            'company_rtn'    => $invoice->company_rtn,
-            'customer_rtn'   => $invoice->customer_rtn,
-            'total'          => (string) $invoice->total,
-            'invoice_date'   => $invoice->invoice_date?->toDateString(),
+            'cai' => $invoice->cai,
+            'company_rtn' => $invoice->company_rtn,
+            'customer_rtn' => $invoice->customer_rtn,
+            'total' => (string) $invoice->total,
+            'invoice_date' => $invoice->invoice_date?->toDateString(),
         ]));
     }
 }

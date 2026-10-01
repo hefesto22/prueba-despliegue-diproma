@@ -21,14 +21,16 @@ class CorrelativoCentralizadoTest extends TestCase
     use RefreshDatabase;
 
     private CorrelativoCentralizado $resolver;
+
     private CompanySetting $company;
+
     private Establishment $mainEstablishment;
 
     protected function setUp(): void
     {
         parent::setUp();
         Cache::forget('company_settings');
-        $this->resolver = new CorrelativoCentralizado();
+        $this->resolver = new CorrelativoCentralizado;
         $this->company = CompanySetting::factory()->create();
         $this->mainEstablishment = Establishment::factory()
             ->for($this->company, 'companySetting')
@@ -182,10 +184,10 @@ class CorrelativoCentralizadoTest extends TestCase
     {
         // CAI tipo 01 (factura)
         $caiFactura = CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::Factura->value,
-            'prefix'         => '001-001-01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::Factura->value,
+            'prefix' => '001-001-01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 10,
         ]);
 
@@ -193,10 +195,10 @@ class CorrelativoCentralizadoTest extends TestCase
         // Este es el caso defensivo del bug que corregimos: el enum mapea SAR
         // correctamente (NC='03') y los dos CAI conviven sin canibalizarse.
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 50,
         ]);
 
@@ -212,18 +214,18 @@ class CorrelativoCentralizadoTest extends TestCase
         // y requiere un CAI por tipo de documento. El resolver debe devolver el
         // correcto según el DocumentType recibido.
         CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::Factura->value,
-            'prefix'         => '001-001-01',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::Factura->value,
+            'prefix' => '001-001-01',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 
         $caiNc = CaiRange::factory()->active()->create([
-            'document_type'  => DocumentType::NotaCredito->value,
-            'prefix'         => '001-001-03',
-            'range_start'    => 1,
-            'range_end'      => 100,
+            'document_type' => DocumentType::NotaCredito->value,
+            'prefix' => '001-001-03',
+            'range_start' => 1,
+            'range_end' => 100,
             'current_number' => 0,
         ]);
 

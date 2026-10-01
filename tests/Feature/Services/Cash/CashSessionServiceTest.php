@@ -316,7 +316,7 @@ class CashSessionServiceTest extends TestCase
         $session = $this->service->open($this->matriz->id, $this->cajero, 1000.00);
 
         try {
-            DB::transaction(function () use ($session) {
+            DB::transaction(function () {
                 $this->service->recordMovementWithinTransaction($this->matriz->id, [
                     'user_id' => $this->cajero->id,
                     'type' => CashMovementType::Expense,
@@ -539,7 +539,7 @@ class CashSessionServiceTest extends TestCase
         CashMovement::factory()->forSession($session)->saleIncome(500.00, PaymentMethod::Efectivo)->create();
         $autoClosed = $this->service->closeBySystem($session->fresh());
 
-        $admin   = User::factory()->create();
+        $admin = User::factory()->create();
         $gerente = User::factory()->create();
 
         $reconciled = $this->service->reconcile(

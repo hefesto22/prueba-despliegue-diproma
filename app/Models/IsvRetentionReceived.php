@@ -31,7 +31,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[ObservedBy([IsvRetentionReceivedObserver::class])]
 class IsvRetentionReceived extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditFields, LogsActivity;
+    use HasAuditFields, HasFactory, LogsActivity, SoftDeletes;
 
     /**
      * Nombre explícito: Laravel pluraliza solo la última palabra
@@ -113,6 +113,7 @@ class IsvRetentionReceived extends Model
     public function scopeOfType(Builder $query, IsvRetentionType|string $type): Builder
     {
         $value = $type instanceof IsvRetentionType ? $type->value : $type;
+
         return $query->where('retention_type', $value);
     }
 
@@ -139,6 +140,6 @@ class IsvRetentionReceived extends Model
             9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
         ];
 
-        return ($meses[$this->period_month] ?? (string) $this->period_month) . ' ' . $this->period_year;
+        return ($meses[$this->period_month] ?? (string) $this->period_month).' '.$this->period_year;
     }
 }

@@ -43,7 +43,7 @@ class PrintCreditNote extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
-    public function mount(int | string $record): void
+    public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
 

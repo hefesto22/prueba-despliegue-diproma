@@ -17,7 +17,7 @@ class PurchaseTest extends TestCase
     {
         $purchase = Purchase::factory()->create(['date' => now()]);
 
-        $this->assertStringStartsWith('COMP-' . now()->year . '-', $purchase->purchase_number);
+        $this->assertStringStartsWith('COMP-'.now()->year.'-', $purchase->purchase_number);
     }
 
     public function test_purchase_numbers_are_sequential(): void

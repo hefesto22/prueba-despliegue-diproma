@@ -13,7 +13,7 @@ class LatestSales extends TableWidget
 {
     protected static ?int $sort = 7;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = '120s';
 
