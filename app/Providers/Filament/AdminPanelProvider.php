@@ -11,6 +11,7 @@ use App\Filament\Widgets\NetProfitOverview;
 use App\Filament\Widgets\SalesByCategoryChart;
 use App\Filament\Widgets\SalesChart;
 use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\TitheWidget;
 use App\Filament\Widgets\TopProductsChart;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
@@ -107,6 +108,7 @@ class AdminPanelProvider extends PanelProvider
                 StatsOverview::class,            // sort 1 — KPIs operativos (ventas, stock, compras)
                 FinancialStatsOverview::class,   // sort 2 — KPIs financieros (ganancia, margen, ticket)
                 NetProfitOverview::class,        // sort 3 — Utilidad Neta (Ganancia Bruta − Gastos)
+                TitheWidget::class,              // sort 3 — Diezmo del mes (solo Calculate:Tithe)
                 SalesChart::class,               // sort 4 — Tendencia de ventas con período comparativo
                 TopProductsChart::class,         // sort 5 — Top 10 productos (columna izquierda en xl)
                 SalesByCategoryChart::class,     // sort 6 — Ventas por categoría (columna derecha en xl)

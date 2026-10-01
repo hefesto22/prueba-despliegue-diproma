@@ -2,14 +2,13 @@
 
 namespace App\Services\Dashboard;
 
-use App\Enums\MovementType;
 use App\Enums\PaymentStatus;
 use App\Enums\SaleStatus;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Sale;
-use App\Models\SaleItem;
+use App\Services\Finance\MonthlyProfitCalculator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +29,10 @@ class DashboardStatsService
     private const CACHE_TTL = 300;
 
     private const CACHE_PREFIX = 'dashboard_stats:';
+
+    public function __construct(
+        private readonly MonthlyProfitCalculator $profits,
+    ) {}
 
     // ─── Ventas (monto + conteo + delta) ─────────────────────────────────
 
@@ -119,56 +122,22 @@ class DashboardStatsService
     // ─── Métricas financieras ─────────────────────────────────────────────
 
     /**
-     * Ganancia bruta del mes = revenue - costo de ventas.
-     *
-     * Fuente del costo según el tipo de línea:
-     *   - Línea CON producto (POS y piezas de inventario de reparaciones):
-     *     snapshot `unit_cost` del movimiento `SalidaVenta` del kardex —
-     *     costo promedio ponderado exacto al momento de la venta, no el
-     *     `cost_price` actual del producto.
-     *   - Línea SIN producto (honorarios y piezas externas de reparaciones):
-     *     `sale_items.unit_cost` copiado desde la cotización al entregar.
-     *     Honorarios no tienen costo (NULL → 0) = ganancia pura.
-     *
-     * Honestidad estadística: las líneas de producto pre-migración sin
-     * snapshot de kardex se excluyen del cálculo (revenue y cost) — no se
-     * inventan costos. Las líneas sin producto siempre entran (su costo
-     * NULL significa "sin costo", no "costo desconocido").
+     * Ganancia bruta del mes = revenue − costo de ventas. El cálculo (fuentes
+     * del costo, líneas sin kardex) vive en MonthlyProfitCalculator, que
+     * comparte con el diezmo.
      *
      * @return array{gross_profit: float, margin_percent: float, revenue: float, cost: float}
      */
     public function grossProfitThisMonth(): array
     {
         return $this->remember('gross_profit_month', function () {
-            $start = Carbon::now()->startOfMonth();
-            $end = Carbon::now()->endOfDay();
+            $row = $this->profits->grossProfitBetween(
+                Carbon::now()->startOfMonth(),
+                Carbon::now()->endOfDay(),
+            );
 
-            // LEFT JOIN al kardex: las líneas sin producto no tienen movimiento
-            // SalidaVenta y antes quedaban excluidas por el INNER JOIN — el
-            // dashboard ignoraba todo el ingreso de honorarios y piezas
-            // externas de reparaciones. Una sola query agregada, sin N+1.
-            $row = SaleItem::query()
-                ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
-                ->leftJoin('inventory_movements as im', function ($join) {
-                    $join->on('im.reference_id', '=', 'sales.id')
-                        ->whereColumn('im.product_id', 'sale_items.product_id')
-                        ->where('im.reference_type', Sale::class)
-                        ->where('im.type', MovementType::SalidaVenta->value);
-                })
-                ->where('sales.status', SaleStatus::Completada)
-                ->whereBetween('sales.date', [$start, $end])
-                ->where(function ($query) {
-                    $query->whereNull('sale_items.product_id')   // honorarios / pieza externa
-                        ->orWhereNotNull('im.unit_cost');        // producto con kardex
-                })
-                ->selectRaw('
-                    COALESCE(SUM(sale_items.subtotal), 0) as revenue,
-                    COALESCE(SUM(sale_items.quantity * COALESCE(im.unit_cost, sale_items.unit_cost, 0)), 0) as cost
-                ')
-                ->first();
-
-            $revenue = (float) ($row->revenue ?? 0);
-            $cost = (float) ($row->cost ?? 0);
+            $revenue = $row['revenue'];
+            $cost = $row['cost'];
             $profit = $revenue - $cost;
             $margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
 
@@ -182,40 +151,19 @@ class DashboardStatsService
     }
 
     /**
-     * Total de gastos operativos del mes en curso.
-     *
-     * Desde "todo en Compras" (2026-09-28) los gastos son las compras tipo
-     * Gasto confirmadas, más las comisiones de tarjeta guardadas en las ventas.
-     *
-     *   - Se suma el SUBTOTAL de la compra, no el total: el ISV de una factura
-     *     se recupera como crédito fiscal, no es gasto. Las ventas también
-     *     entran a la utilidad sin ISV, así que el criterio es el mismo. En un
-     *     Recibo Interno subtotal = total (no hay ISV que recuperar).
-     *   - La mercadería NO suma aquí: su costo entra por el costo de lo
-     *     vendido (grossProfitThisMonth), cuando se vende.
-     *   - Las comisiones de tarjeta se cuentan aunque la venta se haya anulado
-     *     después: el banco ya las cobró.
-     *
-     * Filtra por la fecha del documento (no created_at): una factura del mes
-     * pasado registrada tarde pertenece al mes pasado.
+     * Total de gastos operativos del mes en curso: compras tipo Gasto
+     * confirmadas (sin ISV) + comisiones de tarjeta. Las reglas viven en
+     * MonthlyProfitCalculator::operatingExpensesBetween().
      */
     public function expensesThisMonth(): float
     {
         return $this->remember('expenses_month', function () {
-            $start = Carbon::now()->startOfMonth();
-            $end = Carbon::now()->endOfMonth();
+            $row = $this->profits->operatingExpensesBetween(
+                Carbon::now()->startOfMonth(),
+                Carbon::now()->endOfMonth(),
+            );
 
-            $expensePurchases = (float) Purchase::query()
-                ->gastos()
-                ->confirmadas()
-                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                ->sum('subtotal');
-
-            $cardFees = (float) Sale::query()
-                ->whereBetween('date', [$start, $end])
-                ->sum('card_fee_amount');
-
-            return round($expensePurchases + $cardFees, 2);
+            return round($row['expense_purchases'] + $row['card_fees'], 2);
         });
     }
 

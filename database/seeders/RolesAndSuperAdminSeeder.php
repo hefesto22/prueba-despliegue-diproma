@@ -189,9 +189,13 @@ class RolesAndSuperAdminSeeder extends Seeder
         $cajeroRole->syncPermissions($this->permisosCajero($allPermissionNames));
         $tecnicoRole->syncPermissions($this->permisosTecnico($allPermissionNames));
 
-        // super_admin no necesita permisos asignados — el `Gate::before` que
-        // Shield instala lo deja pasar todo. Asignar permisos explícitos sería
-        // redundante y crearía una segunda fuente de verdad para un mismo rol.
+        // super_admin: TODOS los permisos, explícitos. Con
+        // `super_admin.define_via_gate = false` (config/filament-shield.php)
+        // Shield NO instala un Gate::before: el super_admin solo puede lo que
+        // tiene asignado. Sin esta línea, cada permiso nuevo (p. ej. un custom
+        // permission como Calculate:Tithe) le quedaba oculto hasta correr
+        // `shield:super-admin` a mano.
+        $superAdminRole->syncPermissions($allPermissionNames);
 
         // Limpiar cache de Spatie para que los cambios se vean en el panel
         // sin reiniciar el servidor.

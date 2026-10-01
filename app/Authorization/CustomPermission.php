@@ -57,6 +57,9 @@ enum CustomPermission: string
     // ─── CAI (Código de Autorización de Impresión SAR) ───────
     case ManageCai = 'Manage:Cai';
 
+    // ─── Finanzas del dueño ──────────────────────────────────
+    case CalculateTithe = 'Calculate:Tithe';
+
     /**
      * Etiqueta en español para UI administrativa (si algún día se quiere
      * mostrar al lado del checkbox en Shield). Hoy Shield muestra el value,
@@ -68,6 +71,7 @@ enum CustomPermission: string
             self::DeclareFiscalPeriod => 'Declarar período fiscal',
             self::ReopenFiscalPeriod => 'Reabrir período fiscal (rectificativa)',
             self::ManageCai => 'Gestionar alertas de CAI',
+            self::CalculateTithe => 'Sacar el diezmo del mes',
         };
     }
 
@@ -81,6 +85,7 @@ enum CustomPermission: string
             self::DeclareFiscalPeriod,
             self::ReopenFiscalPeriod => 'Períodos fiscales',
             self::ManageCai => 'CAI / Facturación',
+            self::CalculateTithe => 'Finanzas',
         };
     }
 
