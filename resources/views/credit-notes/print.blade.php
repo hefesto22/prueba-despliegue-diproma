@@ -150,6 +150,7 @@
             font-variant-numeric: tabular-nums;
         }
         table.items td .sku { font-size: 10px; color: #666; display: block; margin-top: 2px; }
+        table.items td .item-detail { font-size: 10px; color: #444; display: block; margin-top: 2px; white-space: pre-line; }
         table.items tr { page-break-inside: avoid; }
 
         /* Zona inferior: QR a la izquierda, totales a la derecha */
@@ -392,6 +393,9 @@
                     <tr>
                         <td>
                             {{ $item['description'] }}
+                            @if (filled($item['detail'] ?? null))
+                                <span class="item-detail">{{ $item['detail'] }}</span>
+                            @endif
                             @if (!empty($item['sku']))
                                 <span class="sku">SKU: {{ $item['sku'] }}</span>
                             @endif

@@ -15,6 +15,8 @@ class SaleItem extends Model
         'sale_id',
         'product_id',
         'description',
+        'product_name',
+        'detail',
         'quantity',
         'unit_price',
         'unit_cost',
@@ -51,11 +53,13 @@ class SaleItem extends Model
     /**
      * Nombre legible del item para la factura.
      *
-     * Precedencia: `description` explícita > `product->name` del catálogo.
+     * Precedencia: `description` explícita > `product_name` congelado al
+     * vender > `product->name` actual (solo líneas anteriores a 2026-10-01
+     * que el backfill no alcanzó, p. ej. producto borrado del todo).
      *   - Servicios del POS con detalle: description = "HONORARIO POR
      *     ASESORÍA — Se impartió conferencia" (tiene product_id Y description).
      *   - Entrega de reparación: description libre sin product_id.
-     *   - Producto físico del POS: description null → nombre del catálogo.
+     *   - Producto físico: description null → nombre congelado.
      *
      * Esto encapsula la lógica para que las views de impresión no tengan
      * que verificar `$item->product_id` en cada plantilla (Law of Demeter).
@@ -66,7 +70,30 @@ class SaleItem extends Model
             return $this->description;
         }
 
+        if (filled($this->product_name)) {
+            return $this->product_name;
+        }
+
         return $this->product?->name ?? '—';
+    }
+
+    /**
+     * Datos del producto que se congelan en la línea al vender: el nombre y,
+     * si la ficha lo pide, su descripción para imprimirla en la factura.
+     *
+     * Congelados para que una reimpresión salga idéntica a la original aunque
+     * después se edite el producto.
+     *
+     * @return array{product_name: string, detail: ?string}
+     */
+    public static function snapshotOf(Product $product): array
+    {
+        return [
+            'product_name' => $product->name,
+            'detail' => $product->print_description && filled($product->description)
+                ? trim((string) $product->description)
+                : null,
+        ];
     }
 
     // ─── Relaciones ──────────────────────────────────────────

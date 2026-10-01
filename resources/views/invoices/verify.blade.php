@@ -307,6 +307,14 @@
             font-family: 'Courier New', monospace;
             margin-top: 1px;
         }
+        /* Descripción del producto (casilla "Imprimir en la factura"). */
+        table.items td .item-detail {
+            display: block;
+            font-size: 9px;
+            color: #475569;
+            margin-top: 2px;
+            white-space: pre-line;
+        }
         table.items .tag {
             display: inline-block;
             padding: 1px 6px;
@@ -660,7 +668,12 @@
                     @endphp
                     <tr>
                         <td><span class="sku">{{ $item['sku'] ?? '—' }}</span></td>
-                        <td>{{ $item['description'] }}</td>
+                        <td>
+                            {{ $item['description'] }}
+                            @if (filled($item['detail'] ?? null))
+                                <span class="item-detail">{{ $item['detail'] }}</span>
+                            @endif
+                        </td>
                         <td class="num">L {{ $item['unit_price'] }}</td>
                         <td class="center">{{ $item['quantity'] }}</td>
                         <td class="center">

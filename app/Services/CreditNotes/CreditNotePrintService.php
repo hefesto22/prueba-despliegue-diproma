@@ -49,6 +49,9 @@ class CreditNotePrintService
         // no hace query extra (loadMissing es idempotente).
         $creditNote->loadMissing([
             'items.product',
+            // La línea de la NC repite la de la factura: nombre y detalle
+            // congelados en el SaleItem de origen.
+            'items.saleItem.product',
             'establishment',
             'caiRange',
         ]);
@@ -95,7 +98,10 @@ class CreditNotePrintService
             $lineTotal = (float) $item->total;
 
             return [
-                'description' => $item->product?->name ?? 'Producto',
+                // Mismo texto que la línea de la factura de origen (nombre
+                // congelado al vender); product->name solo como último recurso.
+                'description' => $item->saleItem?->display_name ?? $item->product?->name ?? 'Producto',
+                'detail' => $item->saleItem?->detail,
                 'sku' => $item->product?->sku,
                 'quantity' => $this->formatQuantity($quantity),
                 'unit_price' => $this->formatMoney($unitPrice),

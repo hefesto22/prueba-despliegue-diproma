@@ -7,6 +7,7 @@ use App\Enums\ProductType;
 use App\Enums\TaxType;
 use App\Models\Product;
 use App\Models\SpecOption;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -457,6 +458,8 @@ class ProductForm
                     ->placeholder('Ej: 4MP, lente 2.8mm, IR 30m, IP67, PoE, slot microSD')
                     ->helperText('Especificaciones, características o lo que incluye.')
                     ->visible(fn (callable $get): bool => self::isCustomType($get)),
+                self::printDescriptionCheckbox()
+                    ->visible(fn (callable $get): bool => self::isCustomType($get)),
 
                 Hidden::make('name')->dehydrated(),
             ]);
@@ -640,6 +643,8 @@ class ProductForm
                     ->maxLength(2000)
                     ->placeholder('Notas adicionales del producto')
                     ->visible(fn (callable $get): bool => ! self::isCustomType($get)),
+                self::printDescriptionCheckbox()
+                    ->visible(fn (callable $get): bool => ! self::isCustomType($get)),
                 TagsInput::make('serial_numbers')
                     ->label('Números de serie')
                     ->placeholder('Escriba y presione Enter'),
@@ -658,6 +663,22 @@ class ProductForm
                     ->onColor('success')
                     ->offColor('danger'),
             ]);
+    }
+
+    /**
+     * Casilla junto a la descripción (va en el paso 2 para tipos
+     * personalizados y en "Opcional" para los demás; cada caller fija su
+     * visibilidad igual que la de su Textarea).
+     *
+     * Apagada por defecto. Al vender se congela en sale_items.detail
+     * (SaleItem::snapshotOf): cambiarla después no altera facturas emitidas.
+     */
+    private static function printDescriptionCheckbox(): Checkbox
+    {
+        return Checkbox::make('print_description')
+            ->label('Imprimir esta descripción en la factura')
+            ->helperText('Sale en letra pequeña debajo del nombre del producto. Aplica a las ventas que se hagan desde ahora.')
+            ->default(false);
     }
 
     // ─── Resumen (columna derecha) ──────────────────────────────────────────

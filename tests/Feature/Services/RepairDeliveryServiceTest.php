@@ -382,4 +382,26 @@ class RepairDeliveryServiceTest extends TestCase
             paymentMethod: PaymentMethod::Efectivo,
         );
     }
+
+    public function test_la_pieza_de_inventario_congela_nombre_y_descripcion_en_la_venta(): void
+    {
+        $product = $this->makeProduct(stock: 5);
+        $product->update(['description' => 'Pantalla 15.6 FHD', 'print_description' => true]);
+        $nombre = $product->fresh()->name;
+
+        $repair = $this->makeRepairListoEntrega([
+            ['source' => RepairItemSource::HonorariosReparacion, 'description' => 'Mano de obra', 'unit_price' => 500, 'tax_type' => TaxType::Exento],
+            ['source' => RepairItemSource::PiezaInventario, 'product_id' => $product->id, 'unit_price' => 1150, 'tax_type' => TaxType::Gravado15],
+        ]);
+
+        $delivered = $this->service->deliver(repair: $repair, paymentMethod: PaymentMethod::Efectivo);
+
+        $pieza = Sale::findOrFail($delivered->sale_id)->items()->where('product_id', $product->id)->firstOrFail();
+        $this->assertSame($nombre, $pieza->product_name);
+        $this->assertSame('Pantalla 15.6 FHD', $pieza->detail);
+
+        $honorario = Sale::findOrFail($delivered->sale_id)->items()->whereNull('product_id')->firstOrFail();
+        $this->assertNull($honorario->product_name, 'Sin producto del catálogo no hay nada que congelar.');
+        $this->assertSame('Mano de obra', $honorario->display_name);
+    }
 }

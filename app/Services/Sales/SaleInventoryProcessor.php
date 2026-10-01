@@ -83,6 +83,10 @@ class SaleInventoryProcessor
                 'description' => filled($item['description'] ?? null)
                     ? mb_substr(trim($item['description']), 0, 300)
                     : null,
+                // Nombre (y descripción, si la ficha pide imprimirla)
+                // congelados: la reimpresión de la factura no cambia aunque
+                // después se edite el producto.
+                ...SaleItem::snapshotOf($product),
                 'quantity' => $quantity,
                 'unit_price' => $item['unit_price'],
                 'tax_type' => $this->resolveTaxType($item, $product),

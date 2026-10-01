@@ -75,6 +75,7 @@ class Product extends Model
         'name',
         'sku',
         'description',
+        'print_description',
         'category_id',
         'product_type',
         'is_service',
@@ -120,6 +121,9 @@ class Product extends Model
             // (no se descuenta stock al vender, precio editable en POS).
             // false para productos físicos (stock real, descuento al vender).
             'is_service' => 'boolean',
+            // print_description: la descripción sale en la factura debajo del
+            // nombre. Se congela en sale_items.detail al vender.
+            'print_description' => 'boolean',
         ];
     }
 

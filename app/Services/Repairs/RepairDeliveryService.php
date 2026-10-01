@@ -104,7 +104,9 @@ class RepairDeliveryService
             );
         }
 
-        $repair->loadMissing('items');
+        // items.product: las piezas de inventario congelan nombre y
+        // descripción del producto en la línea de venta (sin N+1).
+        $repair->loadMissing('items.product');
 
         if ($repair->items->count() === 0) {
             throw new RepairDeliveryException(
@@ -189,6 +191,9 @@ class RepairDeliveryService
                     'sale_id' => $sale->id,
                     'product_id' => $item->product_id, // null si no es PiezaInventario
                     'description' => $item->product_id ? null : $item->description,
+                    // Pieza de inventario: nombre (y descripción, si la ficha
+                    // pide imprimirla) congelados para la reimpresión.
+                    ...($item->product !== null ? SaleItem::snapshotOf($item->product) : []),
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
                     // Snapshot del costo para el cálculo de ganancia bruta.

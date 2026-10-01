@@ -222,6 +222,29 @@ class ProductGuidedFormTest extends TestCase
             ->count());
     }
 
+    // ─── Descripción en la factura ───────────────────────────
+
+    public function test_la_casilla_de_imprimir_descripcion_se_guarda(): void
+    {
+        Livewire::test(CreateProduct::class)
+            ->assertFormSet(['print_description' => false])
+            ->fillForm([
+                'type_choice' => 'otro',
+                'product_type' => 'CAMARA',
+                'description' => '4MP, IR 30m',
+                'print_description' => true,
+                'cost_price' => 800,
+                'sale_price' => 1150,
+            ])
+            ->assertSee('Imprimir esta descripción en la factura')
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $camara = Product::query()->latest('id')->firstOrFail();
+        $this->assertTrue($camara->print_description);
+        $this->assertSame('4MP, IR 30m', $camara->description);
+    }
+
     // ─── Editar ──────────────────────────────────────────────
 
     public function test_al_editar_se_marca_el_boton_del_tipo_guardado(): void

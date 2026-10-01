@@ -96,12 +96,14 @@ class InvoicePrintService
             $lineTotal = $unitPrice * $quantity;
 
             return [
-                // Precedencia: description explícita > nombre del catálogo.
-                // El POS llena description SOLO en servicios con detalle
-                // ("HONORARIO POR ASESORÍA — Se impartió conferencia") y las
-                // entregas de reparación la usan sin product_id. Los productos
-                // físicos siempre la dejan null → cae al nombre del catálogo.
-                'description' => $item->description ?? $item->product?->name ?? 'Producto',
+                // Precedencia (SaleItem::display_name): description explícita
+                // > nombre congelado al vender > nombre actual (solo líneas
+                // viejas sin snapshot). Así una reimpresión sale igual que la
+                // original aunque después se edite el producto.
+                'description' => $item->display_name,
+                // Descripción del producto congelada al vender, solo si la
+                // ficha pedía imprimirla. Se muestra debajo del nombre.
+                'detail' => $item->detail,
                 'sku' => $item->product?->sku,
                 'quantity' => $this->formatQuantity($quantity),
                 'unit_price' => $this->formatMoney($unitPrice),
