@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Authorization\CustomPermission;
+use BezhanSalleh\FilamentShield\Support\Utils;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -31,6 +32,7 @@ use Spatie\Permission\PermissionRegistrar;
  *   2) Correr: `php artisan db:seed --class=CustomPermissionsSeeder` (o `db:seed`
  *      completo en fresh install — este seeder está registrado en DatabaseSeeder).
  *   3) Asignar el permiso al rol correspondiente desde el panel Shield.
+ *      super_admin ya lo recibe en este mismo seeder (ver abajo).
  *
  * Idempotente por diseño: firstOrCreate no duplica filas en ejecuciones repetidas.
  *
@@ -63,6 +65,13 @@ class CustomPermissionsSeeder extends Seeder
 
             $permission->wasRecentlyCreated ? $created++ : $existing++;
         }
+
+        // super_admin recibe todos los custom. Con `define_via_gate = false`
+        // (config/filament-shield.php) Shield NO instala Gate::before: el
+        // super_admin solo puede lo que tiene asignado, y un permiso nuevo le
+        // quedaba oculto hasta re-correr RolesAndSuperAdminSeeder. Shield
+        // decide según el config (no-op si algún día se define vía gate).
+        Utils::giveSuperAdminPermission($permissions);
 
         // Limpiar caché de Spatie para que los nuevos se vean al instante sin reiniciar.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

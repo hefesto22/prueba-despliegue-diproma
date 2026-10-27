@@ -43,7 +43,8 @@ use Illuminate\Support\HtmlString;
  * factura. La factura sale en Ventas, Facturas y el Libro de Ventas como
  * cualquier otra.
  *
- * Visible solo con `Issue:SpecialInvoice` — super_admin por Gate::before.
+ * Visible solo con `Issue:SpecialInvoice`, reservado a super_admin (se lo da
+ * CustomPermissionsSeeder; el seeder de roles nunca se lo da a admin).
  * SaleService vuelve a verificar el permiso (defense-in-depth).
  */
 final class SpecialInvoiceAction

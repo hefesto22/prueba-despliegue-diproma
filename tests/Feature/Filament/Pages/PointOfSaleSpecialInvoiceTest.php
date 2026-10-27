@@ -14,9 +14,9 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\Cash\CashSessionService;
 use BezhanSalleh\FilamentShield\Support\Utils;
+use Database\Seeders\CustomPermissionsSeeder;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -44,16 +44,13 @@ class PointOfSaleSpecialInvoiceTest extends TestCase
     {
         parent::setUp();
 
-        Role::firstOrCreate(['name' => Utils::getSuperAdminName(), 'guard_name' => 'web']);
+        // Igual que producción: super_admin NO pasa por Gate::before
+        // (define_via_gate = false), solo puede lo que tiene asignado.
+        // CustomPermissionsSeeder es quien le da Issue:SpecialInvoice.
+        Permission::firstOrCreate(['name' => 'View:PointOfSale', 'guard_name' => 'web']);
+        $this->seed(CustomPermissionsSeeder::class);
+        Role::findByName(Utils::getSuperAdminName(), 'web')->givePermissionTo('View:PointOfSale');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-
-        Gate::before(function ($user) {
-            if ($user instanceof User && $user->hasRole(Utils::getSuperAdminName())) {
-                return true;
-            }
-
-            return null;
-        });
 
         $this->superAdmin = User::factory()->create([
             'is_active' => true,

@@ -61,9 +61,8 @@ enum CustomPermission: string
     case CalculateTithe = 'Calculate:Tithe';
 
     // ─── Facturación fuera del flujo normal ──────────────────
-    // Factura con líneas libres (sin catálogo) desde el POS. Solo super_admin
-    // por defecto (Gate::before de Shield); nadie más la tiene salvo que se
-    // asigne a mano en Shield.
+    // Factura con líneas libres (sin catálogo) desde el POS. Reservado a
+    // super_admin: ver isReservedToSuperAdmin().
     case IssueSpecialInvoice = 'Issue:SpecialInvoice';
 
     /**
@@ -95,6 +94,16 @@ enum CustomPermission: string
             self::IssueSpecialInvoice => 'CAI / Facturación',
             self::CalculateTithe => 'Finanzas',
         };
+    }
+
+    /**
+     * Permisos que SOLO tiene super_admin. RolesAndSuperAdminSeeder los
+     * excluye del rol admin (que recibe "todo menos roles/permisos"), y
+     * CustomPermissionsSeeder se los da a super_admin.
+     */
+    public function isReservedToSuperAdmin(): bool
+    {
+        return $this === self::IssueSpecialInvoice;
     }
 
     /**

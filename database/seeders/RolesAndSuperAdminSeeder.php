@@ -39,8 +39,10 @@ use Spatie\Permission\PermissionRegistrar;
  * ─────────────────────────────────────────────────────────────────────────
  * RESPONSABILIDADES POR ROL
  * ─────────────────────────────────────────────────────────────────────────
- *   - super_admin → Mauricio. Pasa por Gate::before, no necesita permisos.
- *   - admin       → todo EXCEPTO :Role y :Permission (gestión de seguridad).
+ *   - super_admin → Mauricio. TODOS los permisos, asignados explícitamente
+ *                   (define_via_gate = false: no hay Gate::before).
+ *   - admin       → todo EXCEPTO :Role y :Permission (gestión de seguridad)
+ *                   y los custom reservados a super_admin (Issue:SpecialInvoice).
  *   - contador    → lectura completa + acciones fiscales (declarar/reabrir/CRUD
  *                   de períodos y retenciones ISV).
  *   - cajero      → POS + caja + ventas + facturas + clientes + ver productos.
@@ -235,7 +237,8 @@ class RolesAndSuperAdminSeeder extends Seeder
     {
         return array_values(array_filter(
             $allPermissionNames,
-            fn (string $name): bool => ! $this->esPermisoDeSeguridad($name),
+            fn (string $name): bool => ! $this->esPermisoDeSeguridad($name)
+                && ! $this->esReservadoASuperAdmin($name),
         ));
     }
 
@@ -673,6 +676,15 @@ class RolesAndSuperAdminSeeder extends Seeder
     {
         return str_ends_with($name, self::SUFFIX_ROLE)
             || str_ends_with($name, self::SUFFIX_PERMISSION);
+    }
+
+    /**
+     * ¿Es un custom permission que solo tiene super_admin? (p. ej. la factura
+     * de casos fuera de manejo de sistema). La lista vive en el enum.
+     */
+    private function esReservadoASuperAdmin(string $name): bool
+    {
+        return CustomPermission::tryFrom($name)?->isReservedToSuperAdmin() === true;
     }
 
     /**
