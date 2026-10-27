@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Authorization\CustomPermission;
 use App\Enums\CashMovementType;
 use App\Enums\DiscountType;
 use App\Enums\PaymentMethod;
@@ -17,6 +18,7 @@ use App\Services\Cash\CashSessionService;
 use App\Services\Establishments\EstablishmentResolver;
 use App\Services\Sales\Tax\SaleTaxCalculator;
 use App\Services\Sales\Tax\TaxableLine;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
 class SaleService
@@ -93,6 +95,115 @@ class SaleService
             throw new \RuntimeException('No se puede procesar una venta sin productos.');
         }
 
+        return $this->persistSale(
+            createItems: fn (Sale $sale, Establishment $establishment) => $this->inventoryProcessor
+                ->processCartItems($sale, $cartItems, $establishment),
+            paymentMethod: $paymentMethod,
+            customerName: $customerName,
+            customerRtn: $customerRtn,
+            discountType: $discountType,
+            discountValue: $discountValue,
+            notes: $notes,
+            establishment: $establishment,
+        );
+    }
+
+    /**
+     * Factura especial: venta con líneas libres que no salen del catálogo
+     * (casos fuera del manejo normal del sistema — un mantenimiento puntual,
+     * un servicio sin ficha de producto).
+     *
+     * Mismo ciclo que processSale (caja abierta, cliente, totales fiscales,
+     * ingreso a caja, comisión de tarjeta) con tres diferencias:
+     *   - Las líneas no tocan inventario: SaleItem.product_id = null y la
+     *     factura imprime `description` (igual que los honorarios de
+     *     Reparaciones).
+     *   - Nombre y RTN del cliente son obligatorios.
+     *   - Solo la emite quien tenga `Issue:SpecialInvoice` (super_admin).
+     *
+     * Por compartir el ciclo, cancel() la anula sin casos especiales:
+     * revertForCancellation ya salta líneas sin producto y el SaleCancellation
+     * cuadra la caja contra el SaleIncome original.
+     *
+     * La factura CAI la emite el caller con InvoiceService::generateFromSale
+     * dentro de la MISMA transacción que esta venta: si el CAI falla, no
+     * queda venta.
+     *
+     * @param  FreeSaleLine[]  $lines
+     *
+     * @throws AuthorizationException Si el usuario no puede emitir facturas especiales.
+     * @throws \InvalidArgumentException Si no hay líneas, falta el nombre o el RTN no tiene 14 dígitos.
+     * @throws NoHayCajaAbiertaException Si no hay caja abierta en la sucursal.
+     */
+    public function processFreeLineSale(
+        array $lines,
+        PaymentMethod $paymentMethod,
+        string $customerName,
+        string $customerRtn,
+        ?string $notes = null,
+        ?Establishment $establishment = null,
+    ): Sale {
+        // Defense-in-depth: el botón ya se oculta sin el permiso, pero la
+        // regla vive aquí para cualquier otro caller.
+        if (auth()->user()?->can(CustomPermission::IssueSpecialInvoice->value) !== true) {
+            throw new AuthorizationException('No tienes permiso para emitir facturas especiales.');
+        }
+
+        if ($lines === []) {
+            throw new \InvalidArgumentException('La factura necesita al menos una línea.');
+        }
+
+        foreach ($lines as $line) {
+            if (! $line instanceof FreeSaleLine) {
+                throw new \InvalidArgumentException('processFreeLineSale() espera un array<FreeSaleLine>.');
+            }
+        }
+
+        $customerName = trim($customerName);
+        $customerRtn = trim($customerRtn);
+
+        if ($customerName === '') {
+            throw new \InvalidArgumentException('La factura especial debe llevar el nombre del cliente.');
+        }
+
+        if (strlen((string) preg_replace('/\D/', '', $customerRtn)) !== 14) {
+            throw new \InvalidArgumentException("El RTN debe tener 14 dígitos. Recibido: {$customerRtn}");
+        }
+
+        return $this->persistSale(
+            createItems: fn (Sale $sale) => $this->createFreeLineItems($sale, $lines),
+            paymentMethod: $paymentMethod,
+            customerName: $customerName,
+            customerRtn: $customerRtn,
+            discountType: null,
+            discountValue: null,
+            notes: $notes,
+            establishment: $establishment,
+        );
+    }
+
+    /**
+     * Ciclo común de toda venta: caja abierta, cliente, Sale, items, totales
+     * fiscales, ingreso a caja, Completada y comisión de tarjeta.
+     *
+     * Lo único que cambia entre una venta del catálogo y una factura especial
+     * es cómo nacen los items — eso lo decide `$createItems`. Los invariantes
+     * de caja, cliente y fiscales viven en un solo lugar.
+     *
+     * @param  \Closure(Sale, Establishment): mixed  $createItems
+     *
+     * @throws NoHayCajaAbiertaException
+     */
+    private function persistSale(
+        \Closure $createItems,
+        PaymentMethod $paymentMethod,
+        string $customerName,
+        ?string $customerRtn,
+        ?DiscountType $discountType,
+        ?float $discountValue,
+        ?string $notes,
+        ?Establishment $establishment,
+    ): Sale {
         // Resolver sucursal: usa la explícita o delega al EstablishmentResolver,
         // que aplica el orden correcto: default del user autenticado → matriz →
         // NoActiveEstablishmentException (nunca silenciosamente a la sucursal
@@ -107,7 +218,7 @@ class SaleService
         $this->cashSessionService->currentOpenSessionOrFail($establishment->id);
 
         return DB::transaction(function () use (
-            $cartItems, $paymentMethod, $customerName, $customerRtn,
+            $createItems, $paymentMethod, $customerName, $customerRtn,
             $discountType, $discountValue, $notes, $establishment
         ) {
             // 1. Auto-crear cliente SOLO si vienen nombre Y RTN reales.
@@ -144,10 +255,11 @@ class SaleService
                 'notes' => $notes,
             ]);
 
-            // 3. Procesar items: lock, validar stock, crear SaleItems,
-            //    registrar kardex de SalidaVenta y decrementar stock.
-            //    El processor corre BAJO esta transacción — no abre la suya.
-            $this->inventoryProcessor->processCartItems($sale, $cartItems, $establishment);
+            // 3. Crear los items. Venta del catálogo: lock, validar stock,
+            //    SaleItems, kardex SalidaVenta y decremento de stock. Factura
+            //    especial: líneas libres sin inventario. Corre BAJO esta
+            //    transacción — el callback no abre la suya.
+            $createItems($sale, $establishment);
 
             // 4. Calcular totales fiscales (con descuento)
             $sale->load('items');
@@ -362,6 +474,28 @@ class SaleService
             'isv' => $breakdown->isv,
             'total' => $breakdown->total,
         ]);
+    }
+
+    /**
+     * Crea los SaleItems de una factura especial. Sin producto del catálogo:
+     * no hay stock ni kardex que tocar. subtotal/isv_amount/total los escribe
+     * calculateTotals() justo después, con el SaleTaxCalculator (fuente única).
+     *
+     * @param  FreeSaleLine[]  $lines
+     */
+    private function createFreeLineItems(Sale $sale, array $lines): void
+    {
+        foreach ($lines as $line) {
+            SaleItem::create([
+                'sale_id' => $sale->id,
+                'product_id' => null,
+                'description' => $line->description,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unitPrice,
+                'unit_cost' => $line->unitCost,
+                'tax_type' => $line->taxType,
+            ]);
+        }
     }
 
     /**

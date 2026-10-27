@@ -5,9 +5,13 @@ namespace App\Filament\Pages;
 use App\Enums\DiscountType;
 use App\Enums\PaymentMethod;
 use App\Enums\TaxType;
+use App\Exceptions\Cash\NoHayCajaAbiertaException;
+use App\Filament\Actions\SpecialInvoiceAction;
 use App\Models\Customer;
+use App\Models\Establishment;
+use App\Models\Invoice;
 use App\Models\Product;
-use App\Services\Cash\Exceptions\NoHayCajaAbiertaException;
+use App\Models\Sale;
 use App\Services\Establishments\EstablishmentResolver;
 use App\Services\Establishments\Exceptions\NoActiveEstablishmentException;
 use App\Services\Invoicing\InvoiceService;
@@ -27,6 +31,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
@@ -120,6 +125,20 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
         $this->invoices = $invoices;
         $this->establishments = $establishments;
         $this->taxCalculator = $taxCalculator;
+    }
+
+    /**
+     * Botón "Factura casos fuera de manejo de sistema": factura con líneas
+     * libres (sin catálogo). Se oculta sin `Issue:SpecialInvoice` — en la
+     * práctica solo super_admin lo ve.
+     *
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            SpecialInvoiceAction::make(),
+        ];
     }
 
     // ─── Tabla de Productos ─────────────────────────────────
@@ -570,32 +589,11 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
             // Falla temprano con mensaje claro si el user no tiene sucursal asignada.
             $establishment = $this->establishments->resolve();
 
-            // 1. Procesar la venta
-            $sale = $this->sales->processSale(
-                cartItems: collect($this->cart)->map(fn ($item) => [
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'tax_type' => $item['tax_type'],
-                    // Servicios con detalle → description "NOMBRE — detalle"
-                    // (la factura la imprime tal cual, preservando la
-                    // tipificación del servicio para auditoría). Sin detalle
-                    // o producto físico → null (factura usa nombre catálogo).
-                    'description' => ($item['is_service'] ?? false) && filled($item['detail'] ?? '')
-                        ? $item['name'].' — '.$item['detail']
-                        : null,
-                ])->toArray(),
-                paymentMethod: PaymentMethod::from($this->paymentMethod),
-                customerName: filled($this->customerName) ? $this->customerName : 'Consumidor Final',
-                customerRtn: filled($this->customerRtn) ? $this->customerRtn : null,
-                discountType: filled($this->discountType) ? DiscountType::tryFrom($this->discountType) : null,
-                discountValue: filled($this->discountValue) ? (float) $this->discountValue : null,
-                notes: filled($this->notes) ? $this->notes : null,
-                establishment: $establishment,
-            );
-
-            // 2. Generar factura fiscal
-            $invoice = $this->invoices->generateFromSale($sale, $this->withoutCai);
+            // Venta + factura en UNA transacción: si el CAI falla (vencido,
+            // agotado o sin rango activo) no queda una venta cobrada sin
+            // factura. Antes la venta se confirmaba sola, el carrito no se
+            // limpiaba y reintentar la duplicaba (stock y caja dos veces).
+            [$sale, $invoice] = DB::transaction(fn (): array => $this->processSaleWithInvoice($establishment));
 
             // Limpiar todo
             $this->clearCart();
@@ -645,5 +643,39 @@ class PointOfSale extends Page implements HasActions, HasSchemas, HasTable
                 ->danger()
                 ->send();
         }
+    }
+
+    /**
+     * Crea la venta del carrito y emite su factura. Se llama SIEMPRE dentro
+     * de DB::transaction (ver processSale): ninguna de las dos queda sin la otra.
+     *
+     * @return array{0: Sale, 1: Invoice}
+     */
+    private function processSaleWithInvoice(Establishment $establishment): array
+    {
+        $sale = $this->sales->processSale(
+            cartItems: collect($this->cart)->map(fn ($item) => [
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'tax_type' => $item['tax_type'],
+                // Servicios con detalle → description "NOMBRE — detalle"
+                // (la factura la imprime tal cual, preservando la
+                // tipificación del servicio para auditoría). Sin detalle
+                // o producto físico → null (factura usa nombre catálogo).
+                'description' => ($item['is_service'] ?? false) && filled($item['detail'] ?? '')
+                    ? $item['name'].' — '.$item['detail']
+                    : null,
+            ])->toArray(),
+            paymentMethod: PaymentMethod::from($this->paymentMethod),
+            customerName: filled($this->customerName) ? $this->customerName : 'Consumidor Final',
+            customerRtn: filled($this->customerRtn) ? $this->customerRtn : null,
+            discountType: filled($this->discountType) ? DiscountType::tryFrom($this->discountType) : null,
+            discountValue: filled($this->discountValue) ? (float) $this->discountValue : null,
+            notes: filled($this->notes) ? $this->notes : null,
+            establishment: $establishment,
+        );
+
+        return [$sale, $this->invoices->generateFromSale($sale, $this->withoutCai)];
     }
 }

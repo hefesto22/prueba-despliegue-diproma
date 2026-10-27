@@ -60,6 +60,12 @@ enum CustomPermission: string
     // ─── Finanzas del dueño ──────────────────────────────────
     case CalculateTithe = 'Calculate:Tithe';
 
+    // ─── Facturación fuera del flujo normal ──────────────────
+    // Factura con líneas libres (sin catálogo) desde el POS. Solo super_admin
+    // por defecto (Gate::before de Shield); nadie más la tiene salvo que se
+    // asigne a mano en Shield.
+    case IssueSpecialInvoice = 'Issue:SpecialInvoice';
+
     /**
      * Etiqueta en español para UI administrativa (si algún día se quiere
      * mostrar al lado del checkbox en Shield). Hoy Shield muestra el value,
@@ -72,6 +78,7 @@ enum CustomPermission: string
             self::ReopenFiscalPeriod => 'Reabrir período fiscal (rectificativa)',
             self::ManageCai => 'Gestionar alertas de CAI',
             self::CalculateTithe => 'Sacar el diezmo del mes',
+            self::IssueSpecialInvoice => 'Emitir factura de casos fuera de manejo de sistema',
         };
     }
 
@@ -84,7 +91,8 @@ enum CustomPermission: string
         return match ($this) {
             self::DeclareFiscalPeriod,
             self::ReopenFiscalPeriod => 'Períodos fiscales',
-            self::ManageCai => 'CAI / Facturación',
+            self::ManageCai,
+            self::IssueSpecialInvoice => 'CAI / Facturación',
             self::CalculateTithe => 'Finanzas',
         };
     }
